@@ -159,6 +159,33 @@ export const collectHwpxTable = (tblXml: string): string => {
   return renderMarkdownTable(buildGridFromCells(cells));
 };
 
+// 섹션 XML을 위에서부터 훑으며 <hp:tbl> 블록은 마크다운 표로, 그 사이 일반 내용은
+// 기존 문단 추출로 처리해 원래 문서 순서 그대로 이어붙인다.
+// 표 하나의 구조 파싱이 실패해도(예: 예상 밖 셀 배치) 그 표만 구조 없는 텍스트로 폴백하고
+// 문서 전체 추출은 계속 진행한다 — 표 단위 격리 안전장치.
+export const collectHwpxSectionContent = (xml: string): string => {
+  const tblRe = /<hp:tbl\b[^>]*>[\s\S]*?<\/hp:tbl>/g;
+  const parts: string[] = [];
+  let lastIndex = 0;
+  let match = tblRe.exec(xml);
+  while (match) {
+    const before = xml.slice(lastIndex, match.index);
+    const beforeText = collectHwpxSectionText(before);
+    if (beforeText.trim()) parts.push(beforeText);
+    try {
+      parts.push(collectHwpxTable(match[0]));
+    } catch {
+      const fallback = collectHwpxSectionText(match[0]);
+      if (fallback.trim()) parts.push(fallback);
+    }
+    lastIndex = match.index + match[0].length;
+    match = tblRe.exec(xml);
+  }
+  const rest = collectHwpxSectionText(xml.slice(lastIndex));
+  if (rest.trim()) parts.push(rest);
+  return parts.join('\n\n');
+};
+
 const extractHwpx = async (file: File): Promise<string> => {
   const { unzipSync, strFromU8 } = await import('fflate');
   let entries: Record<string, Uint8Array>;

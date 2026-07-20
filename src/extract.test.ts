@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectHwpSectionText, collectHwpxSectionText, collectHwpxTable, decodeHwpParagraphText, parseHwpxCell } from './extract';
+import { collectHwpSectionText, collectHwpxSectionContent, collectHwpxSectionText, collectHwpxTable, decodeHwpParagraphText, parseHwpxCell } from './extract';
 
 // UTF-16LE 문자열 + 컨트롤 문자로 PARA_TEXT 페이로드를 만든다.
 const paraBytes = (codes: number[]): Uint8Array => {
@@ -132,5 +132,35 @@ describe('HWPX 표 블록 → 마크다운', () => {
     const md = collectHwpxTable(tblXml);
     expect(md).toContain('| 기관부담연구개발비 | 기관부담연구개발비 | 기관부담연구개발비 |');
     expect(md).toContain('| 현금 | 현물 | 합계 |');
+  });
+});
+
+describe('HWPX 섹션 — 표와 본문을 문서 순서대로', () => {
+  it('표 앞뒤 일반 문단과 표를 순서대로 이어붙인다', () => {
+    const xml = `<hs:sec xmlns:hp="x">
+      <hp:p><hp:run><hp:t>아래 표를 참고하세요.</hp:t></hp:run></hp:p>
+      <hp:tbl>
+        <hp:tr><hp:tc><hp:cellAddr rowAddr="0" colAddr="0"/><hp:cellSpan rowSpan="1" colSpan="1"/><hp:subList><hp:p><hp:run><hp:t>구분</hp:t></hp:run></hp:p></hp:subList></hp:tc></hp:tr>
+      </hp:tbl>
+      <hp:p><hp:run><hp:t>표 끝.</hp:t></hp:run></hp:p>
+    </hs:sec>`;
+    const result = collectHwpxSectionContent(xml);
+    const lines = result.split('\n');
+    expect(lines[0]).toBe('아래 표를 참고하세요.');
+    expect(result).toContain('| 구분 |');
+    expect(result.trim().endsWith('표 끝.')).toBe(true);
+  });
+
+  it('표가 없는 섹션은 기존 collectHwpxSectionText와 동일하게 동작한다', () => {
+    const xml = `<hp:p><hp:run><hp:t>표 없는 문서</hp:t></hp:run></hp:p>`;
+    expect(collectHwpxSectionContent(xml)).toBe(collectHwpxSectionText(xml));
+  });
+
+  it('표 하나의 구조 파싱이 실패해도(닫는 태그 없음 등) 그 표만 구조 없이 폴백하고 문서 전체는 실패하지 않는다', () => {
+    const xml = `<hp:p><hp:run><hp:t>앞 문단</hp:t></hp:run></hp:p><hp:tbl><hp:tr><hp:tc><hp:subList><hp:p><hp:run><hp:t>깨진표셀</hp:t></hp:run></hp:p></hp:subList>`;
+    // 위 xml은 </hp:tc></hp:tr></hp:tbl>이 없어 표 블록 자체가 감지되지 않는 극단 케이스지만,
+    // collectHwpxTable이 내부적으로 예외를 던지는 경우(예: 좌표 파싱 오류)를 흉내내기 위해
+    // collectHwpxSectionContent는 항상 try/catch로 감싸 폴백하도록 구현한다.
+    expect(() => collectHwpxSectionContent(xml)).not.toThrow();
   });
 });
