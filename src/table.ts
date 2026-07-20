@@ -26,3 +26,14 @@ export const buildGridFromCells = (cells: TableCell[]): string[][] => {
   }
   return grid;
 };
+
+// 격자를 마크다운 표 문자열로 렌더링한다. 첫 행을 헤더로 취급해 구분선을 넣는다.
+export const renderMarkdownTable = (rows: string[][]): string => {
+  if (!rows.length) return '';
+  const colCount = Math.max(...rows.map((r) => r.length));
+  const escapeCell = (cell: string) => (cell ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ').trim();
+  const toLine = (row: string[]) => `| ${Array.from({ length: colCount }, (_, i) => escapeCell(row[i] ?? '')).join(' | ')} |`;
+  const separator = `| ${Array(colCount).fill('---').join(' | ')} |`;
+  const [first, ...rest] = rows;
+  return [toLine(first), separator, ...rest.map(toLine)].join('\n');
+};

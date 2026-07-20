@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildGridFromCells } from './table';
+import { buildGridFromCells, renderMarkdownTable } from './table';
 
 describe('buildGridFromCells', () => {
   it('병합 없는 2x2 셀을 그대로 격자로 만든다', () => {
@@ -38,5 +38,30 @@ describe('buildGridFromCells', () => {
 
   it('빈 셀 목록은 빈 격자를 반환한다', () => {
     expect(buildGridFromCells([])).toEqual([]);
+  });
+});
+
+describe('renderMarkdownTable', () => {
+  it('격자를 마크다운 표로 렌더링하고 첫 행 아래 구분선을 넣는다', () => {
+    const md = renderMarkdownTable([
+      ['구분', '금액'],
+      ['1차년도', '66,500'],
+      ['2차년도', '133,500'],
+    ]);
+    expect(md).toBe(
+      '| 구분 | 금액 |\n' +
+      '| --- | --- |\n' +
+      '| 1차년도 | 66,500 |\n' +
+      '| 2차년도 | 133,500 |'
+    );
+  });
+
+  it('셀 안의 파이프·줄바꿈은 이스케이프·공백으로 치환한다', () => {
+    const md = renderMarkdownTable([['a|b', 'c\nd']]);
+    expect(md).toBe('| a\\|b | c d |\n| --- | --- |');
+  });
+
+  it('빈 격자는 빈 문자열을 반환한다', () => {
+    expect(renderMarkdownTable([])).toBe('');
   });
 });
