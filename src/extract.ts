@@ -3,6 +3,8 @@
 
 import type { TableCell } from './table';
 import { buildGridFromCells, renderMarkdownTable } from './table';
+// 타입 전용 import — pdfjs-dist 본체는 extractPdf 안에서 동적 import로만 로드된다 (번들에 영향 없음).
+import type { TextItem } from 'pdfjs-dist/types/src/display/api';
 
 export interface ExtractedDoc {
   text: string;
@@ -285,7 +287,7 @@ const extractPdf = async (file: File): Promise<string> => {
     const page = await doc.getPage(i);
     const content = await page.getTextContent();
     const items: PdfTextItem[] = content.items
-      .filter((item): item is { str: string; transform: number[]; width: number } => 'str' in item && item.str.trim().length > 0)
+      .filter((item): item is TextItem => 'str' in item && item.str.trim().length > 0)
       .map((item) => ({ str: item.str, x: item.transform[4], y: item.transform[5], width: item.width }));
     pages.push(renderPdfPageText(items));
   }
