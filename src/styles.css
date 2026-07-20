@@ -290,4 +290,28 @@ input[readonly] { background: #f7f8fa; color: #667087; pointer-events: none; }
   .doc-item button { padding: 8px; }
   .auth-card { margin: 20px 14px 0; padding: 28px 20px; }
   .primary.large { height: 50px; }
+
+  /* 로그인 후 셸 — 상단 영역 압축: 중복·부차 정보는 숨긴다 */
+  .sidebar { padding: 12px 14px 10px; }
+  .logo { font-size: 18px; padding: 0 2px; }
+  .project-chip, .policy, .topbar .user-meta, .topbar p { display: none; }
+  .sidebar nav { margin: 10px -14px 0; padding: 0 14px 2px; }
+  .sidebar-bottom { margin-top: 8px; }
+  .cloud-chip { margin-top: 0; flex: 1; padding: 7px 10px; }
+  .topbar > div:first-child { min-width: 0; }
+  .topbar h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .welcome h2 { font-size: 20px; letter-spacing: -.4px; }
+  .page-title h2 { font-size: 21px; letter-spacing: -.4px; }
+  .deadline { width: 100%; }
+  .metric-card { padding: 13px; gap: 10px; }
+  .metric-icon { width: 36px; height: 36px; }
+  .metric-card strong { font-size: 16px; }
+  .panel-head { padding: 16px 16px 12px; }
+  .budget-bars { padding: 0 16px 16px; }
+  .expense-form, .change-form { padding: 16px; }
+  .member-list, .participant-list, .log-table, .history-list, .source-doc-list, .manage-list { padding-left: 16px; padding-right: 16px; }
+  .settings-form { padding: 4px 16px 18px; }
+  .inline-add, .person-add { padding: 14px 16px 16px; }
+  .editor-head { padding: 14px 16px; }
+  .table-head, .table-row { padding: 0 16px; gap: 10px; }
 }
