@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { strToU8, zipSync } from 'fflate';
-import { collectHwpSectionText, collectHwpxSectionContent, collectHwpxSectionText, collectHwpxTable, decodeHwpParagraphText, extractDocumentText, groupPdfItemsIntoRows, parseHwpxCell } from './extract';
+import { collectHwpSectionText, collectHwpxSectionContent, collectHwpxSectionText, collectHwpxTable, decodeHwpParagraphText, detectPdfTableRuns, extractDocumentText, groupPdfItemsIntoRows, parseHwpxCell, rowToColumns } from './extract';
 
 // UTF-16LE 문자열 + 컨트롤 문자로 PARA_TEXT 페이로드를 만든다.
 const paraBytes = (codes: number[]): Uint8Array => {
@@ -204,5 +204,41 @@ describe('PDF 텍스트 조각 → 행 묶기', () => {
       { str: 'b', x: 20, y: 701.5, width: 10 },
     ];
     expect(groupPdfItemsIntoRows(items).length).toBe(1);
+  });
+});
+
+describe('PDF 행 → 열 나누기', () => {
+  it('조각 사이 간격이 넓으면 다른 열로 나눈다', () => {
+    const row = [
+      { str: '1차년도', x: 0, y: 0, width: 40 },
+      { str: '66,500', x: 120, y: 0, width: 30 },
+      { str: '2,250', x: 200, y: 0, width: 25 },
+    ];
+    expect(rowToColumns(row)).toEqual(['1차년도', '66,500', '2,250']);
+  });
+
+  it('간격이 좁으면 같은 열(한 단어)로 합친다', () => {
+    const row = [
+      { str: '정부', x: 0, y: 0, width: 20 },
+      { str: '지원금', x: 20, y: 0, width: 30 },
+    ];
+    expect(rowToColumns(row)).toEqual(['정부지원금']);
+  });
+});
+
+describe('PDF 표 영역 감지', () => {
+  it('열 개수가 3개 이상이고 3행 이상 이어지면 표로 판단한다', () => {
+    const rowsAsColumns = [
+      ['구분', '금액', '비고'],
+      ['1차년도', '66,500', ''],
+      ['2차년도', '133,500', ''],
+      ['합계', '200,000', ''],
+    ];
+    expect(detectPdfTableRuns(rowsAsColumns)).toEqual([{ start: 0, end: 3 }]);
+  });
+
+  it('열이 2개 이하로 흐르는 일반 문단은 표로 판단하지 않는다', () => {
+    const rowsAsColumns = [['이 사업은 다음과 같이 지원합니다.'], ['자세한 내용은 붙임을 참고하세요.']];
+    expect(detectPdfTableRuns(rowsAsColumns)).toEqual([]);
   });
 });

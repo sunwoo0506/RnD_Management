@@ -216,6 +216,39 @@ export const groupPdfItemsIntoRows = (items: PdfTextItem[]): PdfTextItem[][] => 
   return rows;
 };
 
+// 한 행 안에서 조각 사이 간격이 평균 글자폭의 3배(최소 8pt) 이상 벌어지면 다음 열로 넘어간다.
+export const rowToColumns = (row: PdfTextItem[]): string[] => {
+  if (!row.length) return [];
+  const avgCharWidth = row.reduce((sum, i) => sum + i.width / Math.max(i.str.length, 1), 0) / row.length;
+  const gapThreshold = Math.max(avgCharWidth * 3, 8);
+  const columns: string[][] = [[row[0].str]];
+  for (let i = 1; i < row.length; i++) {
+    const gap = row[i].x - (row[i - 1].x + row[i - 1].width);
+    if (gap > gapThreshold) columns.push([row[i].str]);
+    else columns[columns.length - 1].push(row[i].str);
+  }
+  return columns.map((parts) => parts.join('').trim());
+};
+
+// 연속된 행에서 열 개수가 3개 이상이고(인접 행과 ±1 오차 허용) 3행 이상 이어지면 표 영역으로 판단한다.
+export const detectPdfTableRuns = (rowColumns: string[][]): { start: number; end: number }[] => {
+  const runs: { start: number; end: number }[] = [];
+  let runStart = -1;
+  for (let i = 0; i < rowColumns.length; i++) {
+    const colCount = rowColumns[i].length;
+    const prevColCount = i > 0 ? rowColumns[i - 1].length : -1;
+    const tableLike = colCount >= 3 && (runStart === -1 || Math.abs(colCount - prevColCount) <= 1);
+    if (tableLike) {
+      if (runStart === -1) runStart = i;
+    } else if (runStart !== -1) {
+      if (i - runStart >= 3) runs.push({ start: runStart, end: i - 1 });
+      runStart = -1;
+    }
+  }
+  if (runStart !== -1 && rowColumns.length - runStart >= 3) runs.push({ start: runStart, end: rowColumns.length - 1 });
+  return runs;
+};
+
 const extractPdf = async (file: File): Promise<string> => {
   const pdfjs = await import('pdfjs-dist');
   pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
