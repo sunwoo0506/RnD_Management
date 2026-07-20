@@ -1,0 +1,170 @@
+// 공고문·지침 문서에서 텍스트를 추출한다. PDF(pdfjs) · HWP 5.0(OLE 레코드 파싱) · 이미지(OCR) · 일반 텍스트 지원.
+// 무거운 파서들은 전부 동적 import — 등록 위저드에서 파일을 올릴 때만 로드된다.
+
+export interface ExtractedDoc {
+  text: string;
+  method: 'pdf' | 'hwp' | 'hwpx' | 'image' | 'text';
+}
+
+// ---- HWP 5.0 ----
+// 구조: OLE 복합 파일 → FileHeader(플래그: 압축/암호/배포용) + BodyText/Section{n} 스트림.
+// 각 섹션은 레코드 나열이며 PARA_TEXT(태그 67) 레코드만 모으면 본문이 된다.
+// 섹션마다 압축 여부가 다를 수 있어 압축 해제와 원본 파싱을 모두 시도한다.
+
+const HWP_SIGNATURE = 'HWP Document File';
+const TAG_PARA_TEXT = 67;
+
+// 컨트롤 문자 분류 (HWP 5.0 스펙): inline/extended 컨트롤은 자신 포함 8 WCHAR를 차지한다.
+const EXTENDED_OR_INLINE = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]);
+
+// PARA_TEXT 레코드 페이로드(UTF-16LE + 컨트롤)를 일반 텍스트로 디코딩한다.
+export const decodeHwpParagraphText = (bytes: Uint8Array): string => {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let out = '';
+  let i = 0;
+  const chars = Math.floor(bytes.byteLength / 2);
+  while (i < chars) {
+    const code = view.getUint16(i * 2, true);
+    if (code >= 32) { out += String.fromCharCode(code); i += 1; continue; }
+    if (code === 9) { out += '\t'; i += 8; continue; }
+    if (EXTENDED_OR_INLINE.has(code)) { i += 8; continue; }
+    if (code === 10 || code === 13) out += '\n';
+    else if (code === 30 || code === 31) out += ' ';
+    i += 1; // 그 외 char 컨트롤(0, 24~29)은 버린다
+  }
+  return out;
+};
+
+// 섹션 바이트에서 레코드를 걸어가며 PARA_TEXT만 모은다. 형식이 어긋나면 예외.
+export const collectHwpSectionText = (section: Uint8Array): string => {
+  const view = new DataView(section.buffer, section.byteOffset, section.byteLength);
+  const parts: string[] = [];
+  let pos = 0;
+  while (pos + 4 <= section.byteLength) {
+    const header = view.getUint32(pos, true);
+    pos += 4;
+    const tag = header & 0x3ff;
+    let size = (header >> 20) & 0xfff;
+    if (size === 0xfff) {
+      if (pos + 4 > section.byteLength) throw new Error('레코드 크기 필드가 잘렸습니다');
+      size = view.getUint32(pos, true);
+      pos += 4;
+    }
+    if (pos + size > section.byteLength) throw new Error('레코드가 스트림 밖을 가리킵니다');
+    if (tag === TAG_PARA_TEXT) parts.push(decodeHwpParagraphText(section.subarray(pos, pos + size)));
+    pos += size;
+  }
+  return parts.join('\n');
+};
+
+const extractHwp = async (file: File): Promise<string> => {
+  const [{ read, find }, pako] = await Promise.all([import('cfb'), import('pako')]);
+  const container = read(new Uint8Array(await file.arrayBuffer()), { type: 'buffer' });
+
+  const headerEntry = find(container, 'FileHeader');
+  const headerBytes = headerEntry?.content ? new Uint8Array(headerEntry.content as ArrayLike<number>) : null;
+  if (!headerBytes || new TextDecoder('latin1').decode(headerBytes.subarray(0, HWP_SIGNATURE.length)) !== HWP_SIGNATURE) {
+    throw new Error('HWP 5.0 형식이 아닙니다. 한글에서 "PDF로 저장" 후 업로드해주세요.');
+  }
+  const flags = new DataView(headerBytes.buffer, headerBytes.byteOffset).getUint32(36, true);
+  if (flags & 0b10) throw new Error('암호화된 HWP는 읽을 수 없습니다. 암호를 해제하거나 PDF로 변환해주세요.');
+  if (flags & 0b100) throw new Error('배포용(읽기 전용) HWP는 읽을 수 없습니다. PDF로 변환해주세요.');
+  const compressed = (flags & 0b1) !== 0;
+
+  // BodyText/Section{n}을 번호순으로 수집
+  const sections: { index: number; bytes: Uint8Array }[] = [];
+  container.FullPaths.forEach((path, i) => {
+    const match = /BodyText\/Section(\d+)$/.exec(path);
+    const content = container.FileIndex[i]?.content;
+    if (match && content) sections.push({ index: Number(match[1]), bytes: new Uint8Array(content as ArrayLike<number>) });
+  });
+  if (!sections.length) throw new Error('본문(BodyText) 스트림을 찾지 못했습니다.');
+  sections.sort((a, b) => a.index - b.index);
+
+  const texts: string[] = [];
+  for (const section of sections) {
+    // 섹션별로 압축/비압축이 섞일 수 있어 순서를 바꿔가며 둘 다 시도한다.
+    const attempts = compressed ? ['inflate', 'raw'] : ['raw', 'inflate'];
+    let done = false;
+    for (const attempt of attempts) {
+      try {
+        const bytes = attempt === 'inflate' ? pako.inflateRaw(section.bytes) : section.bytes;
+        texts.push(collectHwpSectionText(bytes));
+        done = true;
+        break;
+      } catch { /* 다음 방식 시도 */ }
+    }
+    if (!done) throw new Error(`섹션 ${section.index} 파싱에 실패했습니다. PDF로 변환해 업로드해주세요.`);
+  }
+  return texts.join('\n');
+};
+
+// ---- HWPX (신형식: ZIP + OWPML XML) ----
+// Contents/section{n}.xml 안의 <hp:t> 요소가 본문 텍스트다. 문단(<hp:p>) 단위로 줄바꿈을 넣는다.
+
+const XML_ENTITIES: Record<string, string> = { '&lt;': '<', '&gt;': '>', '&amp;': '&', '&quot;': '"', '&apos;': "'" };
+const decodeXmlText = (raw: string): string => raw
+  .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+  .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(Number(dec)))
+  .replace(/&lt;|&gt;|&amp;|&quot;|&apos;/g, (entity) => XML_ENTITIES[entity]);
+
+// 섹션 XML을 한 번 순회하며 hp:t 텍스트를 모으고 문단 닫힘(</hp:p>)마다 줄바꿈을 넣는다.
+// 표 안의 문단처럼 <hp:p>가 중첩되어도 텍스트가 유실되지 않는다.
+export const collectHwpxSectionText = (xml: string): string => {
+  const tokenRe = /<hp:t(?:\s[^>]*)?>([\s\S]*?)<\/hp:t>|<\/hp:p>/g;
+  let out = '';
+  let match = tokenRe.exec(xml);
+  while (match) {
+    if (match[1] !== undefined) out += decodeXmlText(match[1]);
+    else out += '\n';
+    match = tokenRe.exec(xml);
+  }
+  return out.replace(/\n{3,}/g, '\n\n').trim();
+};
+
+const extractHwpx = async (file: File): Promise<string> => {
+  const { unzipSync, strFromU8 } = await import('fflate');
+  let entries: Record<string, Uint8Array>;
+  try { entries = unzipSync(new Uint8Array(await file.arrayBuffer())); }
+  catch { throw new Error('HWPX 압축을 풀지 못했습니다. 암호화(DRM) 문서라면 PDF로 변환해 업로드해주세요.'); }
+  const sectionNames = Object.keys(entries)
+    .filter((name) => /^Contents\/section\d+\.xml$/i.test(name))
+    .sort((a, b) => Number(/(\d+)/.exec(a)?.[1] ?? 0) - Number(/(\d+)/.exec(b)?.[1] ?? 0));
+  if (!sectionNames.length) throw new Error('HWPX 본문(section*.xml)을 찾지 못했습니다. PDF로 변환해 업로드해주세요.');
+  const text = sectionNames.map((name) => collectHwpxSectionText(strFromU8(entries[name]))).join('\n');
+  if (text.replace(/\s/g, '').length < 20) throw new Error('HWPX에서 텍스트를 읽지 못했습니다. PDF로 변환해 업로드해주세요.');
+  return text;
+};
+
+// ---- PDF ----
+const extractPdf = async (file: File): Promise<string> => {
+  const pdfjs = await import('pdfjs-dist');
+  pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+  const doc = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pages: string[] = [];
+  const limit = Math.min(doc.numPages, 60);
+  for (let i = 1; i <= limit; i++) {
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    pages.push(content.items.map((item) => ('str' in item ? item.str : '')).join(' '));
+  }
+  const text = pages.join('\n');
+  if (text.replace(/\s/g, '').length < 50) {
+    throw new Error('PDF에서 텍스트를 읽지 못했습니다. 스캔본이라면 각 페이지를 이미지로 저장해 업로드하거나, 텍스트 PDF로 변환해주세요.');
+  }
+  return text;
+};
+
+// ---- 진입점 ----
+export const extractDocumentText = async (file: File): Promise<ExtractedDoc> => {
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.hwpx')) return { text: await extractHwpx(file), method: 'hwpx' };
+  if (name.endsWith('.hwp')) return { text: await extractHwp(file), method: 'hwp' };
+  if (file.type === 'application/pdf' || name.endsWith('.pdf')) return { text: await extractPdf(file), method: 'pdf' };
+  if (file.type.startsWith('image/')) {
+    const { recognizeReceipt } = await import('./ocr');
+    return { text: await recognizeReceipt(file), method: 'image' };
+  }
+  if (file.type.startsWith('text/') || /\.(txt|md)$/.test(name)) return { text: await file.text(), method: 'text' };
+  throw new Error('지원하지 않는 형식입니다. PDF, HWP, 이미지, 텍스트 파일을 업로드해주세요.');
+};

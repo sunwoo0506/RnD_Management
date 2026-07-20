@@ -1,0 +1,59 @@
+import { supabase } from './supabase';
+import { deleteEvidenceFiles, getEvidenceFile, parseProject, storeEvidenceFile } from './storage';
+import type { Project } from './types';
+
+// 로그인한 사용자 ID. App의 인증 리스너가 세션 변화에 맞춰 갱신한다.
+let userId: string | null = null;
+export const setCloudUser = (id: string | null) => { userId = id; };
+export const cloudActive = () => supabase !== null && userId !== null;
+
+export const signUpEmail = (email: string, password: string) => supabase!.auth.signUp({ email, password });
+export const signInEmail = (email: string, password: string) => supabase!.auth.signInWithPassword({ email, password });
+export const signOutCloud = () => supabase?.auth.signOut();
+
+// Supabase 오류 메시지를 한국어로 옮긴다. 매핑에 없으면 원문을 그대로 보여준다.
+export const authErrorKo = (message: string): string => {
+  if (/invalid login credentials/i.test(message)) return '이메일 또는 비밀번호가 올바르지 않습니다.';
+  if (/already registered/i.test(message)) return '이미 가입된 이메일입니다. 로그인해주세요.';
+  if (/password should be at least/i.test(message)) return '비밀번호는 6자 이상이어야 합니다.';
+  if (/email not confirmed/i.test(message)) return '이메일 인증이 완료되지 않았습니다. 받은 편지함을 확인해주세요.';
+  if (/rate limit/i.test(message)) return '시도가 너무 잦습니다. 잠시 후 다시 시도해주세요.';
+  return message;
+};
+
+// 과제 데이터는 사용자당 1건, JSONB 통째로 저장한다 (last-write-wins).
+export const fetchCloudProject = async (): Promise<Project | null> => {
+  if (!cloudActive()) return null;
+  const { data, error } = await supabase!.from('projects').select('data').eq('user_id', userId!).maybeSingle();
+  if (error || !data) return null;
+  return parseProject(JSON.stringify(data.data));
+};
+
+export const saveCloudProject = async (project: Project | null): Promise<boolean> => {
+  if (!cloudActive()) return false;
+  const { error } = project
+    ? await supabase!.from('projects').upsert({ user_id: userId!, data: project, updated_at: new Date().toISOString() })
+    : await supabase!.from('projects').delete().eq('user_id', userId!);
+  return !error;
+};
+
+// 증빙 파일: 로그인 상태면 Storage(사용자별 폴더), 아니면 브라우저 IndexedDB.
+export const storeEvidence = async (id: string, file: File): Promise<void> => {
+  if (!cloudActive()) return storeEvidenceFile(id, file);
+  const { error } = await supabase!.storage.from('evidence').upload(`${userId}/${id}`, file, { upsert: true, contentType: file.type });
+  if (error) throw error;
+};
+
+export const getEvidence = async (id: string): Promise<File | undefined> => {
+  if (!cloudActive()) return getEvidenceFile(id);
+  const { data, error } = await supabase!.storage.from('evidence').download(`${userId}/${id}`);
+  if (error || !data) return undefined;
+  return new File([data], id, { type: data.type });
+};
+
+export const deleteEvidence = async (ids: string[]): Promise<void> => {
+  if (!ids.length) return;
+  if (!cloudActive()) return deleteEvidenceFiles(ids);
+  const { error } = await supabase!.storage.from('evidence').remove(ids.map((id) => `${userId}/${id}`));
+  if (error) throw error;
+};

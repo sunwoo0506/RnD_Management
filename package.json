@@ -1,0 +1,40 @@
+{
+  "name": "gwajeon-mvp",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit -p tsconfig.app.json && vite build",
+    "test": "vitest run",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.110.7",
+    "@vitejs/plugin-react": "latest",
+    "cfb": "^1.2.2",
+    "docx": "latest",
+    "fflate": "^0.8.3",
+    "file-saver": "latest",
+    "lucide-react": "latest",
+    "pako": "^3.0.1",
+    "pdfjs-dist": "^6.1.200",
+    "react": "latest",
+    "react-dom": "latest",
+    "tesseract.js": "^7.0.0",
+    "write-excel-file": "^4.1.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "latest",
+    "@testing-library/react": "latest",
+    "@testing-library/user-event": "latest",
+    "@types/file-saver": "latest",
+    "@types/pako": "^2.0.4",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "jsdom": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "vitest": "latest"
+  }
+}
