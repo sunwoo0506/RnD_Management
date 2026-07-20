@@ -39,6 +39,13 @@ describe('buildGridFromCells', () => {
   it('빈 셀 목록은 빈 격자를 반환한다', () => {
     expect(buildGridFromCells([])).toEqual([]);
   });
+
+  it('두 셀이 같은 좌표를 가리키면(겹침) 에러를 던진다', () => {
+    expect(() => buildGridFromCells([
+      { rowAddr: 0, colAddr: 0, rowSpan: 1, colSpan: 1, text: 'A' },
+      { rowAddr: 0, colAddr: 0, rowSpan: 1, colSpan: 1, text: 'B' },
+    ])).toThrow();
+  });
 });
 
 describe('renderMarkdownTable', () => {

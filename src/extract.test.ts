@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { collectHwpSectionText, collectHwpxSectionContent, collectHwpxSectionText, collectHwpxTable, decodeHwpParagraphText, parseHwpxCell } from './extract';
+import { strToU8, zipSync } from 'fflate';
+import { collectHwpSectionText, collectHwpxSectionContent, collectHwpxSectionText, collectHwpxTable, decodeHwpParagraphText, extractDocumentText, parseHwpxCell } from './extract';
 
 // UTF-16LE 문자열 + 컨트롤 문자로 PARA_TEXT 페이로드를 만든다.
 const paraBytes = (codes: number[]): Uint8Array => {
@@ -161,5 +162,25 @@ describe('HWPX 섹션 — 표와 본문을 문서 순서대로', () => {
     expect(() => collectHwpxSectionContent(xml)).not.toThrow();
     expect(collectHwpxSectionContent(xml)).toContain('앞 문단');
     expect(collectHwpxSectionContent(xml)).toContain('뒤 문단');
+  });
+});
+
+describe('extractDocumentText — 실제 HWPX zip으로 전체 배선 확인 (end-to-end)', () => {
+  it('실제 zip 파일을 만들어 extractDocumentText를 호출하면 표가 마크다운으로 나온다', async () => {
+    const sectionXml = `<hs:sec xmlns:hp="x"><hp:tbl>
+      <hp:tr>
+        <hp:tc><hp:cellAddr rowAddr="0" colAddr="0"/><hp:cellSpan rowSpan="1" colSpan="1"/><hp:subList><hp:p><hp:run><hp:t>구분</hp:t></hp:run></hp:p></hp:subList></hp:tc>
+        <hp:tc><hp:cellAddr rowAddr="0" colAddr="1"/><hp:cellSpan rowSpan="1" colSpan="1"/><hp:subList><hp:p><hp:run><hp:t>금액</hp:t></hp:run></hp:p></hp:subList></hp:tc>
+      </hp:tr>
+      <hp:tr>
+        <hp:tc><hp:cellAddr rowAddr="1" colAddr="0"/><hp:cellSpan rowSpan="1" colSpan="1"/><hp:subList><hp:p><hp:run><hp:t>1차년도</hp:t></hp:run></hp:p></hp:subList></hp:tc>
+        <hp:tc><hp:cellAddr rowAddr="1" colAddr="1"/><hp:cellSpan rowSpan="1" colSpan="1"/><hp:subList><hp:p><hp:run><hp:t>66500</hp:t></hp:run></hp:p></hp:subList></hp:tc>
+      </hp:tr>
+    </hp:tbl></hs:sec>`;
+    const zipped = zipSync({ 'Contents/section0.xml': strToU8(sectionXml) });
+    const file = new File([zipped], 'test.hwpx');
+    const result = await extractDocumentText(file);
+    expect(result.method).toBe('hwpx');
+    expect(result.text).toContain('| 구분 | 금액 |');
   });
 });

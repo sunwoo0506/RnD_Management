@@ -10,16 +10,22 @@ export interface TableCell {
 }
 
 // 셀 좌표+병합 정보로 완전한 2차원 격자를 만든다. 병합된 셀의 값은 덮는 모든 칸에 복제한다.
+// 서로 다른 셀이 같은 좌표를 가리키면(격자 정합성 깨짐) 억지로 덮어쓰지 않고 에러를 던진다 —
+// 호출부(collectHwpxSectionContent)의 표 단위 try/catch가 이를 받아 해당 표만 구조 없는 텍스트로 폴백한다.
 export const buildGridFromCells = (cells: TableCell[]): string[][] => {
   if (!cells.length) return [];
   const maxRow = Math.max(...cells.map((c) => c.rowAddr + Math.max(c.rowSpan, 1) - 1));
   const maxCol = Math.max(...cells.map((c) => c.colAddr + Math.max(c.colSpan, 1) - 1));
   const grid: string[][] = Array.from({ length: maxRow + 1 }, () => Array(maxCol + 1).fill(''));
+  const claimed = new Set<string>();
   for (const cell of cells) {
     const rowSpan = Math.max(cell.rowSpan, 1);
     const colSpan = Math.max(cell.colSpan, 1);
     for (let r = cell.rowAddr; r < cell.rowAddr + rowSpan && r <= maxRow; r++) {
       for (let c = cell.colAddr; c < cell.colAddr + colSpan && c <= maxCol; c++) {
+        const key = `${r},${c}`;
+        if (claimed.has(key)) throw new Error(`표 격자 좌표가 겹칩니다 (행 ${r}, 열 ${c}) — 셀 배치 정보가 올바르지 않습니다.`);
+        claimed.add(key);
         grid[r][c] = cell.text;
       }
     }
