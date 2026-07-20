@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { strToU8, zipSync } from 'fflate';
-import { collectHwpSectionText, collectHwpxSectionContent, collectHwpxSectionText, collectHwpxTable, decodeHwpParagraphText, extractDocumentText, parseHwpxCell } from './extract';
+import { collectHwpSectionText, collectHwpxSectionContent, collectHwpxSectionText, collectHwpxTable, decodeHwpParagraphText, extractDocumentText, groupPdfItemsIntoRows, parseHwpxCell } from './extract';
 
 // UTF-16LE 문자열 + 컨트롤 문자로 PARA_TEXT 페이로드를 만든다.
 const paraBytes = (codes: number[]): Uint8Array => {
@@ -182,5 +182,27 @@ describe('extractDocumentText — 실제 HWPX zip으로 전체 배선 확인 (en
     const result = await extractDocumentText(file);
     expect(result.method).toBe('hwpx');
     expect(result.text).toContain('| 구분 | 금액 |');
+  });
+});
+
+describe('PDF 텍스트 조각 → 행 묶기', () => {
+  it('y좌표가 비슷한 조각을 같은 행으로 묶고, 행은 위에서 아래로 정렬한다', () => {
+    const items = [
+      { str: '금액', x: 100, y: 700, width: 20 },
+      { str: '구분', x: 0, y: 700, width: 20 },
+      { str: '1차년도', x: 0, y: 680, width: 30 },
+    ];
+    const rows = groupPdfItemsIntoRows(items);
+    expect(rows.length).toBe(2);
+    expect(rows[0].map((i) => i.str)).toEqual(['구분', '금액']);
+    expect(rows[1].map((i) => i.str)).toEqual(['1차년도']);
+  });
+
+  it('y좌표 오차 3 이내는 같은 행으로 취급한다', () => {
+    const items = [
+      { str: 'a', x: 0, y: 700, width: 10 },
+      { str: 'b', x: 20, y: 701.5, width: 10 },
+    ];
+    expect(groupPdfItemsIntoRows(items).length).toBe(1);
   });
 });

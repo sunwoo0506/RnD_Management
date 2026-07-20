@@ -201,6 +201,21 @@ const extractHwpx = async (file: File): Promise<string> => {
 };
 
 // ---- PDF ----
+
+export interface PdfTextItem { str: string; x: number; y: number; width: number }
+
+// y좌표가 비슷한(오차 3pt 이내) 텍스트 조각을 같은 행으로 묶고, 행은 위→아래, 행 안은 왼→오로 정렬한다.
+export const groupPdfItemsIntoRows = (items: PdfTextItem[]): PdfTextItem[][] => {
+  const sorted = [...items].sort((a, b) => b.y - a.y);
+  const rows: PdfTextItem[][] = [];
+  for (const item of sorted) {
+    const row = rows.find((r) => Math.abs(r[0].y - item.y) < 3);
+    if (row) row.push(item); else rows.push([item]);
+  }
+  rows.forEach((row) => row.sort((a, b) => a.x - b.x));
+  return rows;
+};
+
 const extractPdf = async (file: File): Promise<string> => {
   const pdfjs = await import('pdfjs-dist');
   pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
