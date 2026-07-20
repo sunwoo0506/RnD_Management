@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { strToU8, zipSync } from 'fflate';
-import { collectHwpSectionText, collectHwpxSectionContent, collectHwpxSectionText, collectHwpxTable, decodeHwpParagraphText, detectPdfTableRuns, extractDocumentText, groupPdfItemsIntoRows, parseHwpxCell, rowToColumns } from './extract';
+import { collectHwpSectionText, collectHwpxSectionContent, collectHwpxSectionText, collectHwpxTable, decodeHwpParagraphText, detectPdfTableRuns, extractDocumentText, groupPdfItemsIntoRows, parseHwpxCell, renderPdfPageText, rowToColumns } from './extract';
 
 // UTF-16LE 문자열 + 컨트롤 문자로 PARA_TEXT 페이로드를 만든다.
 const paraBytes = (codes: number[]): Uint8Array => {
@@ -262,5 +262,39 @@ describe('PDF 표 영역 감지', () => {
       ['성명', '김철수', '직위', '연구원', '날짜', '2026-07-20'],
     ];
     expect(detectPdfTableRuns(rowsAsColumns)).toEqual([]);
+  });
+});
+
+describe('PDF 페이지 렌더링 (표 + 일반 문단 혼합)', () => {
+  it('표 영역은 마크다운 표로, 표 앞뒤 문단은 공백으로 이어붙인 기존 방식으로 낸다', () => {
+    const items = [
+      { str: '아래', x: 0, y: 800, width: 20 },
+      { str: '표를', x: 25, y: 800, width: 20 },
+      { str: '참고', x: 50, y: 800, width: 20 },
+
+      { str: '구분', x: 0, y: 700, width: 20 },
+      { str: '금액', x: 100, y: 700, width: 20 },
+      { str: '비고', x: 200, y: 700, width: 20 },
+
+      { str: '1차년도', x: 0, y: 680, width: 30 },
+      { str: '66,500', x: 100, y: 680, width: 30 },
+      { str: '-', x: 200, y: 680, width: 5 },
+
+      { str: '2차년도', x: 0, y: 660, width: 30 },
+      { str: '133,500', x: 100, y: 660, width: 30 },
+      { str: '-', x: 200, y: 660, width: 5 },
+    ];
+    const text = renderPdfPageText(items);
+    expect(text.split('\n')[0]).toBe('아래 표를 참고');
+    expect(text).toContain('| 구분 | 금액 | 비고 |');
+    expect(text).toContain('| 1차년도 | 66,500 | - |');
+  });
+
+  it('표가 없는 페이지는 기존처럼 공백으로 이어붙인 한 줄을 낸다', () => {
+    const items = [
+      { str: '일반', x: 0, y: 800, width: 20 },
+      { str: '문서', x: 25, y: 800, width: 20 },
+    ];
+    expect(renderPdfPageText(items)).toBe('일반 문서');
   });
 });

@@ -249,6 +249,29 @@ export const detectPdfTableRuns = (rowColumns: string[][]): { start: number; end
   return runs;
 };
 
+// 한 페이지의 텍스트 조각들을 행/열로 재구성해, 표로 판단된 구간은 마크다운 표로,
+// 나머지는 기존처럼 공백으로 이어붙인 한 줄로 렌더링한다.
+export const renderPdfPageText = (items: PdfTextItem[]): string => {
+  if (!items.length) return '';
+  const rows = groupPdfItemsIntoRows(items);
+  const rowColumns = rows.map(rowToColumns);
+  const runs = detectPdfTableRuns(rowColumns);
+  const plainLine = (from: number, to: number) =>
+    rows.slice(from, to).map((row) => row.map((i) => i.str).join(' ')).join('\n');
+
+  const parts: string[] = [];
+  let cursor = 0;
+  for (const run of runs) {
+    const before = plainLine(cursor, run.start);
+    if (before.trim()) parts.push(before);
+    parts.push(renderMarkdownTable(rowColumns.slice(run.start, run.end + 1)));
+    cursor = run.end + 1;
+  }
+  const tail = plainLine(cursor, rows.length);
+  if (tail.trim()) parts.push(tail);
+  return parts.join('\n');
+};
+
 const extractPdf = async (file: File): Promise<string> => {
   const pdfjs = await import('pdfjs-dist');
   pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
@@ -258,7 +281,10 @@ const extractPdf = async (file: File): Promise<string> => {
   for (let i = 1; i <= limit; i++) {
     const page = await doc.getPage(i);
     const content = await page.getTextContent();
-    pages.push(content.items.map((item) => ('str' in item ? item.str : '')).join(' '));
+    const items: PdfTextItem[] = content.items
+      .filter((item): item is { str: string; transform: number[]; width: number } => 'str' in item && item.str.trim().length > 0)
+      .map((item) => ({ str: item.str, x: item.transform[4], y: item.transform[5], width: item.width }));
+    pages.push(renderPdfPageText(items));
   }
   const text = pages.join('\n');
   if (text.replace(/\s/g, '').length < 50) {
