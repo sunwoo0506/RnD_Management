@@ -1,6 +1,9 @@
 // 공고문·지침 문서에서 텍스트를 추출한다. PDF(pdfjs) · HWP 5.0(OLE 레코드 파싱) · 이미지(OCR) · 일반 텍스트 지원.
 // 무거운 파서들은 전부 동적 import — 등록 위저드에서 파일을 올릴 때만 로드된다.
 
+import type { TableCell } from './table';
+import { buildGridFromCells, renderMarkdownTable } from './table';
+
 export interface ExtractedDoc {
   text: string;
   method: 'pdf' | 'hwp' | 'hwpx' | 'image' | 'text';
@@ -120,6 +123,23 @@ export const collectHwpxSectionText = (xml: string): string => {
     match = tokenRe.exec(xml);
   }
   return out.replace(/\n{3,}/g, '\n\n').trim();
+};
+
+// 태그 안의 속성값 하나를 읽는다 (속성 순서에 의존하지 않음).
+const xmlAttr = (tagXml: string, name: string): string | undefined =>
+  new RegExp(`\\b${name}="([^"]*)"`).exec(tagXml)?.[1];
+
+// hp:tc(셀) XML에서 좌표(cellAddr)·병합(cellSpan)·텍스트를 읽는다.
+// cellAddr·cellSpan이 없으면(단순 표 등) 0행0열·병합없음으로 취급한다.
+export const parseHwpxCell = (cellXml: string): TableCell => {
+  const addrTag = /<hp:cellAddr\b[^/]*\/>/.exec(cellXml)?.[0] ?? '';
+  const spanTag = /<hp:cellSpan\b[^/]*\/>/.exec(cellXml)?.[0] ?? '';
+  const rowAddr = Number(xmlAttr(addrTag, 'rowAddr') ?? '0') || 0;
+  const colAddr = Number(xmlAttr(addrTag, 'colAddr') ?? '0') || 0;
+  const rowSpan = Number(xmlAttr(spanTag, 'rowSpan') ?? '1') || 1;
+  const colSpan = Number(xmlAttr(spanTag, 'colSpan') ?? '1') || 1;
+  const text = collectHwpxSectionText(cellXml).replace(/\n+/g, ' ').trim();
+  return { rowAddr, colAddr, rowSpan, colSpan, text };
 };
 
 const extractHwpx = async (file: File): Promise<string> => {

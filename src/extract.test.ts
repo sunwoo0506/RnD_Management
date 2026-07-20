@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectHwpSectionText, collectHwpxSectionText, decodeHwpParagraphText } from './extract';
+import { collectHwpSectionText, collectHwpxSectionText, decodeHwpParagraphText, parseHwpxCell } from './extract';
 
 // UTF-16LE 문자열 + 컨트롤 문자로 PARA_TEXT 페이로드를 만든다.
 const paraBytes = (codes: number[]): Uint8Array => {
@@ -75,5 +75,28 @@ describe('HWPX 섹션 XML 텍스트 추출', () => {
     const text = collectHwpxSectionText(xml);
     expect(text).toContain('비목');
     expect(text).toContain('재료비');
+  });
+});
+
+describe('HWPX 셀 파싱', () => {
+  it('cellAddr·cellSpan 속성과 텍스트를 읽는다', () => {
+    const cellXml = `<hp:tc name="A" header="0">
+      <hp:cellAddr colAddr="1" rowAddr="0"/>
+      <hp:cellSpan colSpan="3" rowSpan="1"/>
+      <hp:subList><hp:p><hp:run><hp:t>기관부담연구개발비</hp:t></hp:run></hp:p></hp:subList>
+    </hp:tc>`;
+    expect(parseHwpxCell(cellXml)).toEqual({
+      rowAddr: 0, colAddr: 1, rowSpan: 1, colSpan: 3, text: '기관부담연구개발비',
+    });
+  });
+
+  it('cellAddr·cellSpan이 없으면 0행0열·병합없음으로 취급한다', () => {
+    const cellXml = `<hp:tc><hp:subList><hp:p><hp:run><hp:t>단순셀</hp:t></hp:run></hp:p></hp:subList></hp:tc>`;
+    expect(parseHwpxCell(cellXml)).toEqual({ rowAddr: 0, colAddr: 0, rowSpan: 1, colSpan: 1, text: '단순셀' });
+  });
+
+  it('셀 안에 문단이 여러 개면 공백으로 이어붙인다 (표 셀 안에 줄바꿈을 넣지 않음)', () => {
+    const cellXml = `<hp:tc><hp:subList><hp:p><hp:run><hp:t>1줄</hp:t></hp:run></hp:p><hp:p><hp:run><hp:t>2줄</hp:t></hp:run></hp:p></hp:subList></hp:tc>`;
+    expect(parseHwpxCell(cellXml).text).toBe('1줄 2줄');
   });
 });
