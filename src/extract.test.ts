@@ -290,11 +290,21 @@ describe('PDF 페이지 렌더링 (표 + 일반 문단 혼합)', () => {
     expect(text).toContain('| 1차년도 | 66,500 | - |');
   });
 
-  it('표가 없는 페이지는 기존처럼 공백으로 이어붙인 한 줄을 낸다', () => {
+  it('한 행짜리 페이지는 기존과 동일하게 공백으로 이어붙인 한 줄을 낸다', () => {
     const items = [
       { str: '일반', x: 0, y: 800, width: 20 },
       { str: '문서', x: 25, y: 800, width: 20 },
     ];
     expect(renderPdfPageText(items)).toBe('일반 문서');
+  });
+
+  it('표가 없는 여러 줄짜리 페이지는 줄바꿈을 보존한다 (기존엔 페이지 전체가 한 줄로 뭉개졌음 — 의도된 개선)', () => {
+    const items = [
+      { str: '첫째', x: 0, y: 800, width: 20 },
+      { str: '줄입니다', x: 25, y: 800, width: 40 },
+      { str: '둘째', x: 0, y: 780, width: 20 },
+      { str: '줄입니다', x: 25, y: 780, width: 40 },
+    ];
+    expect(renderPdfPageText(items)).toBe('첫째 줄입니다\n둘째 줄입니다');
   });
 });

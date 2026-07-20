@@ -251,6 +251,9 @@ export const detectPdfTableRuns = (rowColumns: string[][]): { start: number; end
 
 // 한 페이지의 텍스트 조각들을 행/열로 재구성해, 표로 판단된 구간은 마크다운 표로,
 // 나머지는 기존처럼 공백으로 이어붙인 한 줄로 렌더링한다.
+// 참고: 표가 아닌 일반 텍스트도 이제 행 단위로 줄바꿈을 보존한다 (예전엔 페이지 전체가
+// 공백으로 이어붙은 한 줄이었음) — AI 추출의 인용 대조(verifyQuote)는 공백을 모두 무시하고
+// 비교하므로 이 변경에 영향받지 않는다.
 export const renderPdfPageText = (items: PdfTextItem[]): string => {
   if (!items.length) return '';
   const rows = groupPdfItemsIntoRows(items);
