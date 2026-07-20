@@ -142,6 +142,23 @@ export const parseHwpxCell = (cellXml: string): TableCell => {
   return { rowAddr, colAddr, rowSpan, colSpan, text };
 };
 
+// <hp:tbl> 블록 XML에서 hp:tr(행) → hp:tc(셀) 순으로 셀을 모아 격자를 만들고 마크다운으로 렌더링한다.
+export const collectHwpxTable = (tblXml: string): string => {
+  const cells: TableCell[] = [];
+  const trRe = /<hp:tr\b[^>]*>([\s\S]*?)<\/hp:tr>/g;
+  let trMatch = trRe.exec(tblXml);
+  while (trMatch) {
+    const tcRe = /<hp:tc\b[^>]*>([\s\S]*?)<\/hp:tc>/g;
+    let tcMatch = tcRe.exec(trMatch[1]);
+    while (tcMatch) {
+      cells.push(parseHwpxCell(tcMatch[0]));
+      tcMatch = tcRe.exec(trMatch[1]);
+    }
+    trMatch = trRe.exec(tblXml);
+  }
+  return renderMarkdownTable(buildGridFromCells(cells));
+};
+
 const extractHwpx = async (file: File): Promise<string> => {
   const { unzipSync, strFromU8 } = await import('fflate');
   let entries: Record<string, Uint8Array>;

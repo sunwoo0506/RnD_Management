@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectHwpSectionText, collectHwpxSectionText, decodeHwpParagraphText, parseHwpxCell } from './extract';
+import { collectHwpSectionText, collectHwpxSectionText, collectHwpxTable, decodeHwpParagraphText, parseHwpxCell } from './extract';
 
 // UTF-16LE 문자열 + 컨트롤 문자로 PARA_TEXT 페이로드를 만든다.
 const paraBytes = (codes: number[]): Uint8Array => {
@@ -98,5 +98,39 @@ describe('HWPX 셀 파싱', () => {
   it('셀 안에 문단이 여러 개면 공백으로 이어붙인다 (표 셀 안에 줄바꿈을 넣지 않음)', () => {
     const cellXml = `<hp:tc><hp:subList><hp:p><hp:run><hp:t>1줄</hp:t></hp:run></hp:p><hp:p><hp:run><hp:t>2줄</hp:t></hp:run></hp:p></hp:subList></hp:tc>`;
     expect(parseHwpxCell(cellXml).text).toBe('1줄 2줄');
+  });
+});
+
+describe('HWPX 표 블록 → 마크다운', () => {
+  it('행·열을 순서대로 읽어 마크다운 표로 만든다', () => {
+    const tblXml = `<hp:tbl rowCnt="2" colCnt="2">
+      <hp:tr>
+        <hp:tc><hp:cellAddr rowAddr="0" colAddr="0"/><hp:cellSpan rowSpan="1" colSpan="1"/><hp:subList><hp:p><hp:run><hp:t>구분</hp:t></hp:run></hp:p></hp:subList></hp:tc>
+        <hp:tc><hp:cellAddr rowAddr="0" colAddr="1"/><hp:cellSpan rowSpan="1" colSpan="1"/><hp:subList><hp:p><hp:run><hp:t>금액</hp:t></hp:run></hp:p></hp:subList></hp:tc>
+      </hp:tr>
+      <hp:tr>
+        <hp:tc><hp:cellAddr rowAddr="1" colAddr="0"/><hp:cellSpan rowSpan="1" colSpan="1"/><hp:subList><hp:p><hp:run><hp:t>1차년도</hp:t></hp:run></hp:p></hp:subList></hp:tc>
+        <hp:tc><hp:cellAddr rowAddr="1" colAddr="1"/><hp:cellSpan rowSpan="1" colSpan="1"/><hp:subList><hp:p><hp:run><hp:t>66,500</hp:t></hp:run></hp:p></hp:subList></hp:tc>
+      </hp:tr>
+    </hp:tbl>`;
+    expect(collectHwpxTable(tblXml)).toBe(
+      '| 구분 | 금액 |\n| --- | --- |\n| 1차년도 | 66,500 |'
+    );
+  });
+
+  it('가로 병합 헤더가 있어도 값이 모든 열에 복제되어 나온다', () => {
+    const tblXml = `<hp:tbl>
+      <hp:tr>
+        <hp:tc><hp:cellAddr rowAddr="0" colAddr="0"/><hp:cellSpan rowSpan="1" colSpan="3"/><hp:subList><hp:p><hp:run><hp:t>기관부담연구개발비</hp:t></hp:run></hp:p></hp:subList></hp:tc>
+      </hp:tr>
+      <hp:tr>
+        <hp:tc><hp:cellAddr rowAddr="1" colAddr="0"/><hp:cellSpan rowSpan="1" colSpan="1"/><hp:subList><hp:p><hp:run><hp:t>현금</hp:t></hp:run></hp:p></hp:subList></hp:tc>
+        <hp:tc><hp:cellAddr rowAddr="1" colAddr="1"/><hp:cellSpan rowSpan="1" colSpan="1"/><hp:subList><hp:p><hp:run><hp:t>현물</hp:t></hp:run></hp:p></hp:subList></hp:tc>
+        <hp:tc><hp:cellAddr rowAddr="1" colAddr="2"/><hp:cellSpan rowSpan="1" colSpan="1"/><hp:subList><hp:p><hp:run><hp:t>합계</hp:t></hp:run></hp:p></hp:subList></hp:tc>
+      </hp:tr>
+    </hp:tbl>`;
+    const md = collectHwpxTable(tblXml);
+    expect(md).toContain('| 기관부담연구개발비 | 기관부담연구개발비 | 기관부담연구개발비 |');
+    expect(md).toContain('| 현금 | 현물 | 합계 |');
   });
 });
