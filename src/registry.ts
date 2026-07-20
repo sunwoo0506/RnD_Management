@@ -141,3 +141,12 @@ export const downloadRegistryDocument = async (storagePath: string): Promise<Blo
   if (error || !data) throw new Error(error?.message ?? '파일을 내려받지 못했습니다.');
   return data;
 };
+
+// 공유 DB의 원본 문서 삭제(관리자 전용, RLS로 강제) — Storage 파일과 메타 행을 함께 지운다.
+export const deleteRegistryDocument = async (doc: RegistryDocEntry): Promise<void> => {
+  if (!supabase) throw new Error('클라우드가 연결되지 않았습니다.');
+  const { error: storageError } = await supabase.storage.from('registry').remove([doc.storagePath]);
+  if (storageError) throw new Error(storageError.message);
+  const { error } = await supabase.from('registry_documents').delete().eq('id', doc.id);
+  if (error) throw new Error(error.message);
+};

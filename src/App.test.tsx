@@ -22,6 +22,7 @@ describe('과제온 핵심 사용자 흐름', () => {
     // 1단계: 기본 정보
     await user.type(screen.getByLabelText('과제명'), '스마트 물류 창업');
     await user.type(screen.getByLabelText('기업명'), '테스트랩');
+    await user.type(screen.getByLabelText(/지원비율/), '100');
     await user.type(screen.getByLabelText('종료일'), '2027-06-30');
     await user.type(screen.getByLabelText('정산 마감일'), '2027-07-30');
     await user.type(screen.getByLabelText('대표자 이름'), '김대표');
@@ -30,7 +31,7 @@ describe('과제온 핵심 사용자 흐름', () => {
     // 2단계: 규정 선택
     await user.click(screen.getByRole('radio', { name: /예비창업패키지/ }));
     await user.click(screen.getByRole('button', { name: /예산 초안 만들기/ }));
-    expect(screen.getByText('100,000,000원')).toBeInTheDocument();
+    expect(screen.getAllByText('100,000,000원').length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: '예산 편성' }));
     expect(screen.getByText('편성 합계 100,000,000원')).toBeInTheDocument();
     expect(screen.getByText('이 사업은 비목 간 비율 제한이 없습니다')).toBeInTheDocument();
@@ -126,19 +127,19 @@ describe('과제온 핵심 사용자 흐름', () => {
     vi.restoreAllMocks();
   });
 
-  it('과제 설정에서 과제명과 총 사업비를 수정한다', async () => {
+  it('과제 설정에서 과제명과 지원금을 수정한다', async () => {
     localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture()));
     const user = userEvent.setup(); render(<App />);
     await user.click(screen.getByRole('button', { name: '과제 설정' }));
     const name = screen.getByLabelText('과제명');
     await user.clear(name); await user.type(name, '차세대 배터리 개발');
-    const total = screen.getByLabelText('총 사업비');
+    const total = screen.getByLabelText('지원금(정부지원금)');
     await user.clear(total); await user.type(total, '200000000');
     await user.click(screen.getByRole('button', { name: '과제 정보 저장' }));
     expect(screen.getByText('저장됐어요')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '차세대 배터리 개발' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '한눈에 보기' }));
-    expect(screen.getByText('200,000,000원')).toBeInTheDocument();
+    expect(screen.getAllByText('200,000,000원').length).toBeGreaterThan(0);
   });
 
   it('집행 내역 초기화는 집행만 비우고 예산 편성은 유지한다', async () => {

@@ -20,7 +20,7 @@ export interface PackCategory {
   source: PackSource;
 }
 
-export type PackRuleKind = 'ratio' | 'warning' | 'info' | 'evidence';
+export type PackRuleKind = 'ratio' | 'warning' | 'info' | 'evidence' | 'minimum';
 
 export interface PackRule {
   id: string;
@@ -28,6 +28,7 @@ export interface PackRule {
   item?: string;
   message: string;
   limitPct?: number;        // ratio: 상한 %
+  minAmount?: number;       // minimum: 비목에 반드시 편성해야 하는 최소 고정 금액(원) — 공고문에서 온 정액 필수 계상 요구사항
   basis?: string;           // ratio: 상한의 기준 (총액, 직접비, 수정인건비, 구입가...)
   formula?: string;
   trigger?: string;         // warning: 발동 조건 설명
@@ -133,6 +134,9 @@ export interface Project {
   agency: string;
   companyName: string;
   packId: string;               // 적용 규정 팩 (내장 팩 ID 또는 'registry:<uuid>')
+  subsidyAmount?: number;       // 지원금(정부지원금) 실입력액 — 공고문·협약 기준. 미입력 시 totalBudget과 동일(자기부담 없음)으로 취급
+  subsidyRate?: number;         // 총사업비 중 지원금 비율 % (공고문 기준) — 지원금으로 총사업비를 역산할 때 사용. 미입력 시 100 = 전액 지원(자기부담 없음)
+  matchingCashRate?: number;    // 민간부담금 중 현금 비율 % (공고문 기준). 미입력 시 100 = 전액 현금
   programName?: string;         // 사업명 — 공유 DB에서 근거 원본 문서를 찾는 검색 키
   customPack?: RulePack;        // 공유 레지스트리에서 불러온 팩 스냅샷 (있으면 내장 팩보다 우선)
   budgetConfirmed?: boolean;    // 편성 확정 시 미사용(0원) 비목을 화면에서 숨긴다

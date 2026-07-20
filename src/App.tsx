@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  AlertCircle, ArrowDownRight, ArrowRight, ArrowUpRight, Bell, BookOpenCheck,
-  Building2, CalendarDays, Check, CheckCircle2, ChevronRight, CircleDollarSign,
-  Download, Eye, FileCheck2, FileClock, FileText, LayoutDashboard, LogOut, Mail,
-  Pencil, Plus, RefreshCw, ScanLine, Settings as SettingsIcon, ShieldCheck, Trash2, Upload, UserPlus, Users, WalletCards,
+  AlertCircle, ArrowDownRight, ArrowRight, ArrowUpRight, Banknote, Bell, BookOpenCheck,
+  Building2, CalendarDays, Check, CheckCircle2, ChevronRight, CircleDollarSign, CloudUpload,
+  Download, Eye, FileCheck2, FileClock, FileSearch, FileText, HandCoins, Landmark, LayoutDashboard, LogOut, Mail, Package,
+  Pencil, Plus, RefreshCw, ScanLine, Settings as SettingsIcon, ShieldCheck, Sparkles, Trash2, Upload, UserPlus, Users, WalletCards,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
-import { capFor, categoryOf, documentsFor, formatWon, globalRules, makeDraftBudgets, packFor, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, rulesFor, transferLimitError, visibleCategories } from './rules';
+import { capFor, categoryOf, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, rulesFor, transferLimitError, visibleCategories } from './rules';
 import { collectEvidenceIds, downloadBackup, loadProject, parseBackup, saveProject } from './storage';
 import { authErrorKo, deleteEvidence, fetchCloudProject, getEvidence, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence } from './cloud';
 import { isCloudEnabled, supabase } from './supabase';
-import { downloadRegistryDocument, guessDocRole, isRegistryAdmin, listRegistryDocuments, matchDocToSource, REGISTRY_ROLE_LABEL, registryEnabled, uploadRegistryDocument, type RegistryDocEntry } from './registry';
+import { deleteRegistryDocument, downloadRegistryDocument, guessDocRole, isRegistryAdmin, listRegistryDocuments, matchDocToSource, REGISTRY_ROLE_LABEL, registryEnabled, saveRegistryEntry, uploadRegistryDocument, type RegistryDocEntry } from './registry';
+import { annotateVerification, buildCustomPack, fundingScheduleAmountWon, runExtraction, suggestedFundingRates, type Extraction } from './llmExtract';
 import SetupWizard from './SetupWizard';
 import type { BudgetCategoryId, BudgetItem, Evidence, Expense, Participant, PaymentMethod, Project, Screen } from './types';
 
@@ -59,6 +60,8 @@ function Overview({ project, setScreen }: { project: Project; setScreen: (s: Scr
   const complete = project.expenses.length ? Math.round(project.expenses.filter((e) => e.evidence.every((x) => x.completed)).length / project.expenses.length * 100) : 0;
   const dday = daysUntil(project.settlementDeadline);
   const alerts = project.participants.filter((p) => p.projectRate + p.externalRate > 100).length;
+  const funding = fundingBreakdown(project);
+  const pct = (value: number) => project.totalBudget ? value / project.totalBudget * 100 : 0;
   return <div className="page-content">
     <section className="welcome"><div><span>{new Date().getHours() < 12 ? '좋은 아침이에요' : '오늘도 수고 많으셨어요'}, {project.members[0]?.name}님</span><h2>과제 상태를 확인해보세요.</h2></div><div className="deadline"><CalendarDays /><div><small>정산 마감까지</small><strong>{dday >= 0 ? `D-${dday}` : `D+${Math.abs(dday)}`}</strong></div></div></section>
     <div className="metric-grid">
@@ -67,6 +70,24 @@ function Overview({ project, setScreen }: { project: Project; setScreen: (s: Scr
       <article className="metric-card"><div className="metric-icon green"><FileCheck2 /></div><div><span>증빙 완비율</span><strong>{complete}%</strong><small>{incomplete ? `${incomplete}개 서류 미완료` : '모두 준비됐어요'}</small></div></article>
       <article className="metric-card"><div className={`metric-icon ${alerts ? 'red' : 'green'}`}><ShieldCheck /></div><div><span>참여율 경고</span><strong>{alerts}건</strong><small>{alerts ? '확인이 필요해요' : '안전한 상태예요'}</small></div></article>
     </div>
+    <section className="panel funding-panel"><div className="panel-head"><div><span className="section-kicker">FUNDING</span><h3>총사업비 구성</h3><p>총 사업비 {formatWon(project.totalBudget)}의 세부 구성이에요.</p></div><button className="text-button" onClick={() => setScreen('settings')}>지원금 설정 <ArrowRight /></button></div>
+      <div className="funding-grid two">
+        <article className="funding-card major"><div className="metric-icon blue"><Landmark /></div><div><span>지원금</span><strong>{formatWon(funding.subsidy)}</strong><small>총사업비의 {pct(funding.subsidy).toFixed(0)}%</small></div></article>
+        <article className="funding-card major"><div className="metric-icon violet"><HandCoins /></div><div><span>민간부담금</span><strong>{formatWon(funding.matching)}</strong><small>총사업비의 {pct(funding.matching).toFixed(0)}%</small>
+          {funding.matching > 0 && (funding.matchingCashRateKnown
+            ? <div className="matching-split">
+                <div><Banknote /><span>현금</span><b>{formatWon(funding.matchingCash)}</b></div>
+                <div><Package /><span>현물</span><b>{formatWon(funding.matchingInKind)}</b></div>
+              </div>
+            : <div className="matching-split unknown"><AlertCircle /><span>현금·현물 비율 확인 필요 — 과제 설정에서 입력하거나 공고문을 올려 AI로 채우세요</span></div>)}
+        </div></article>
+      </div>
+      {funding.matching === 0
+        ? <p className="field-hint">자기부담 없이 전액 지원되는 과제예요.</p>
+        : funding.matchingCashRateKnown
+        ? <p className="field-hint">민간부담금 중 현금 비율 {funding.matchingCashRate}% 적용 (과제 설정에서 변경). 공고문 기준 최소 금액이며, 실제 협약 내용을 우선 확인하세요.</p>
+        : null}
+    </section>
     <div className="overview-grid">
       <section className="panel budget-status"><div className="panel-head"><div><span className="section-kicker">BUDGET STATUS</span><h3>비목별 집행 현황</h3></div><button className="text-button" onClick={() => setScreen('budget')}>예산 자세히 <ArrowRight /></button></div>
         <div className="budget-bars">{cats.map((category) => { const amount = project.budgets.find((b) => b.categoryId === category.id)?.amount ?? 0; const used = project.expenses.filter((e) => e.categoryId === category.id).reduce((s, e) => s + e.amount, 0); const rate = amount ? Math.min(used / amount * 100, 100) : 0; return <div className="budget-row" key={category.id}><div><strong>{category.name}</strong><span>{formatWon(used)} / {formatWon(amount)}</span></div><div className="progress"><i style={{ width: `${rate}%` }} className={rate >= 90 ? 'danger' : ''} /></div><b>{rate.toFixed(0)}%</b></div>; })}</div>
@@ -186,10 +207,17 @@ function useSourceDocs(project: Project) {
       setSrcDocs(await listRegistryDocuments(searchKey));
     } catch (error) { alert(`업로드에 실패했습니다: ${error instanceof Error ? error.message : ''}`); }
   };
+  const deleteSourceDoc = async (doc: RegistryDocEntry) => {
+    if (!confirm(`"${doc.fileName}"을(를) 공유 규정 DB에서 삭제할까요? 같은 사업을 검색하는 다른 사용자에게도 더 이상 보이지 않습니다.`)) return;
+    try {
+      await deleteRegistryDocument(doc);
+      setSrcDocs((prev) => prev?.filter((item) => item.id !== doc.id) ?? prev);
+    } catch (error) { alert(`삭제에 실패했습니다: ${error instanceof Error ? error.message : ''}`); }
+  };
   // 규칙의 출처(문서명·근거 문구)와 가장 잘 맞는 원본 문서를 찾는다 (QnA 근거→질의응답 파일, 조문 근거→지침 파일).
   const docForSource = (source: { doc?: string; ref?: string; matchLevel: string }): RegistryDocEntry | undefined =>
     srcDocs?.length ? matchDocToSource(srcDocs, source) : undefined;
-  return { srcDocs, isAdmin, viewDoc, downloadDoc, uploadSourceDocs, docForSource, viewer, closeViewer };
+  return { srcDocs, isAdmin, viewDoc, downloadDoc, uploadSourceDocs, deleteSourceDoc, docForSource, viewer, closeViewer };
 }
 
 function DocViewerModal({ source }: { source: ReturnType<typeof useSourceDocs> }) {
@@ -221,9 +249,9 @@ function DocViewerModal({ source }: { source: ReturnType<typeof useSourceDocs> }
 
 function SourceDocsPanel({ source }: { source: ReturnType<typeof useSourceDocs> }) {
   if (!registryEnabled()) return null;
-  const { srcDocs, isAdmin, viewDoc, uploadSourceDocs } = source;
+  const { srcDocs, isAdmin, viewDoc, uploadSourceDocs, deleteSourceDoc } = source;
   return <section className="panel source-docs"><div className="panel-head"><div><h3><FileText /> 근거 원본 문서</h3><p>공유 규정 DB에 저장된 이 사업의 원본 자료입니다. 누르면 팝업으로 바로 확인할 수 있어요.</p></div>{isAdmin && <label className="upload-button"><Upload /> 원본 문서 올리기<input type="file" multiple accept=".pdf,.hwp,.hwpx,.txt,.md,image/*" onChange={(e) => { uploadSourceDocs(e.target.files); e.target.value = ''; }} /></label>}</div>
-    {srcDocs === null ? <p className="doc-empty">불러오는 중…</p> : srcDocs.length ? <div className="source-doc-list">{srcDocs.map((doc) => <button type="button" key={doc.id} onClick={() => viewDoc(doc)}><FileText /><span><strong>{REGISTRY_ROLE_LABEL[doc.role]}</strong><small>{doc.fileName}{doc.year ? ` · ${doc.year}` : ''}</small></span><Eye /></button>)}</div> : <p className="doc-empty">아직 저장된 원본 문서가 없어요. {isAdmin ? '"원본 문서 올리기"로 공고문·지침·매뉴얼을 올리면 모든 근거 표시에서 바로 열 수 있습니다.' : '관리자가 원본 문서를 올리면 여기에 나타납니다.'}</p>}
+    {srcDocs === null ? <p className="doc-empty">불러오는 중…</p> : srcDocs.length ? <div className="source-doc-list">{srcDocs.map((doc) => <div className="source-doc-row" key={doc.id}><button type="button" onClick={() => viewDoc(doc)}><FileText /><span><strong>{REGISTRY_ROLE_LABEL[doc.role]}</strong><small>{doc.fileName}{doc.year ? ` · ${doc.year}` : ''}</small></span><Eye /></button>{isAdmin && <button type="button" className="doc-delete" aria-label={`${doc.fileName} 삭제`} onClick={() => deleteSourceDoc(doc)}><Trash2 /></button>}</div>)}</div> : <p className="doc-empty">아직 저장된 원본 문서가 없어요. {isAdmin ? '"원본 문서 올리기"로 공고문·지침·매뉴얼을 올리면 모든 근거 표시에서 바로 열 수 있습니다.' : '관리자가 원본 문서를 올리면 여기에 나타납니다.'}</p>}
     <DocViewerModal source={source} />
   </section>;
 }
@@ -264,11 +292,15 @@ function Budget({ project, update }: { project: Project; update: (p: Project) =>
         const amount = project.budgets.find((b) => b.categoryId === category.id)?.amount ?? 0;
         const rate = project.totalBudget ? amount / project.totalBudget * 100 : 0;
         const cap = capFor(pack, project.budgets, project.totalBudget, category.id);
+        const min = minFor(pack, category.id);
         const over = cap?.amount != null && amount > cap.amount;
-        return <div className={`table-row ${over ? 'row-danger' : ''}`} key={category.id}><div><strong>{category.name}</strong><small>{category.definition ?? `초안 ${category.draftRate}%`}</small></div><span className="cap-cell">{cap ? (cap.amount != null ? `${formatWon(cap.amount)} (${cap.label})` : cap.label) : '제한 없음'}</span><label className="money-input"><input aria-label={`${category.name} 편성 금액`} inputMode="numeric" value={withCommas(String(amount))} disabled={confirmed} onChange={(e) => changeAmount(category.id, Number(digitsOnly(e.target.value)) || 0)} /><b>원</b></label><div className="rate-cell"><div className="mini-progress"><i style={{ width: `${cap?.amount ? Math.min(amount / cap.amount * 100, 100) : Math.min(rate, 100)}%` }} /></div><b>{rate.toFixed(1)}%</b></div><span className={`status ${over ? 'bad' : 'good'}`}>{over ? <><AlertCircle /> 상한 초과</> : <><Check /> 정상</>}</span></div>;
+        const under = min != null && amount < min.amount;
+        return <div className={`table-row ${over || under ? 'row-danger' : ''}`} key={category.id}><div><strong>{category.name}</strong><small>{category.definition ?? `초안 ${category.draftRate}%`}</small></div><div className="cap-cell">{cap
+          ? <>{cap.amount != null && <strong>{formatWon(cap.amount)}</strong>}<small>{cap.label}</small>{cap.rule.note && <small className="cap-note">{cap.rule.note}</small>}</>
+          : '제한 없음'}{min && <small className="cap-min">{min.label}</small>}</div><label className="money-input"><input aria-label={`${category.name} 편성 금액`} inputMode="numeric" value={withCommas(String(amount))} disabled={confirmed} onChange={(e) => changeAmount(category.id, Number(digitsOnly(e.target.value)) || 0)} /><b>원</b></label><div className="rate-cell"><div className="mini-progress"><i style={{ width: `${cap?.amount ? Math.min(amount / cap.amount * 100, 100) : Math.min(rate, 100)}%` }} /></div><b>{rate.toFixed(1)}%</b></div><span className={`status ${over || under ? 'bad' : 'good'}`}>{over ? <><AlertCircle /> 상한 초과</> : under ? <><AlertCircle /> 필수 금액 미달</> : <><Check /> 정상</>}</span></div>;
       })}</div>
     </section>
-    <section><div className="section-title"><h3>항목별 기준 · 주의사항</h3><p>모든 기준에 원문 근거(조문·QnA 위치)가 표시됩니다.</p></div><div className="criteria-grid">{cats.map((category) => { const rules = rulesFor(pack, category.id); return <details key={category.id}><summary><div className="category-dot" />{category.name}<ChevronRight /></summary><div>{category.definition && <p><CheckCircle2 />{category.definition}</p>}{rules.map((rule) => <p key={rule.id} className={rule.kind === 'warning' ? 'rule-warn' : ''}>{rule.kind === 'warning' ? <AlertCircle /> : <CheckCircle2 />}{rule.message} {refLink(rule)}</p>)}{!category.definition && rules.length === 0 && <p><CheckCircle2 />등록된 세부 기준이 없습니다. 공고·협약 원문을 확인하세요.</p>}</div></details>; })}</div></section>
+    <section><div className="section-title"><h3>항목별 기준 · 주의사항</h3><p>모든 기준에 원문 근거(조문·QnA 위치)가 표시됩니다.</p></div><div className="criteria-grid">{cats.map((category) => { const rules = rulesFor(pack, category.id); return <details key={category.id}><summary><div className="category-dot" />{category.name}<ChevronRight /></summary><div>{category.definition && <p><CheckCircle2 />{category.definition}</p>}{rules.map((rule) => <div key={rule.id}><p className={rule.kind === 'warning' ? 'rule-warn' : ''}>{rule.kind === 'warning' ? <AlertCircle /> : <CheckCircle2 />}{rule.message} {refLink(rule)}</p>{rule.note && <p className="rule-note">{rule.note}</p>}</div>)}{!category.definition && rules.length === 0 && <p><CheckCircle2 />등록된 세부 기준이 없습니다. 공고·협약 원문을 확인하세요.</p>}</div></details>; })}</div></section>
     {globalRules(pack, 'warning').length > 0 && <section><div className="section-title"><h3>과제 공통 주의사항</h3><p>비목과 무관하게 적용되는 금지·주의 규정입니다.</p></div><div className="global-warnings">{globalRules(pack, 'warning').map((rule) => <div key={rule.id} className={`warn-item ${rule.severity ?? 'medium'}`}><AlertCircle /><div><strong>{rule.trigger ?? rule.item}</strong><span>{rule.message} {refLink(rule)}</span></div></div>)}</div></section>}
     <SourceDocsPanel source={sourceDocs} />
   </div>;
@@ -425,19 +457,182 @@ function Team({ project, update }: { project: Project; update: (p: Project) => v
   </div>;
 }
 
+const RULE_KIND_LABEL = { ratio: '상한', warning: '금지·주의', funding: '재원', info: '참고' } as const;
+interface LateDocItem { id: string; file: File; status: 'reading' | 'done' | 'error'; text?: string; error?: string }
+
+// 과제 등록 때 공고문을 올리지 못한 경우, 설정 화면에서 나중에 올려 AI로 규정(비목·상한·금지)을 추출·반영한다.
+function DocUpdatePanel({ project, update }: { project: Project; update: (p: Project) => void }) {
+  const [docs, setDocs] = useState<LateDocItem[]>([]);
+  const [ai, setAi] = useState<{ status: 'idle' | 'working' | 'done' | 'error'; extraction?: Extraction; cached?: boolean; message?: string }>({ status: 'idle' });
+  const [acceptedRules, setAcceptedRules] = useState<Set<number>>(new Set());
+  const [useDocCats, setUseDocCats] = useState(false);
+  const [applied, setApplied] = useState(false);
+  const [rateSuggestion, setRateSuggestion] = useState<ReturnType<typeof suggestedFundingRates> | null>(null);
+  const [rateForm, setRateForm] = useState<{ subsidyRate: string; matchingCashRate: string } | null>(null);
+  const [rateApplied, setRateApplied] = useState(false);
+  const [admin, setAdmin] = useState(false);
+  const [share, setShare] = useState(false);
+  const [shareYear, setShareYear] = useState('');
+  const [applying, setApplying] = useState(false);
+
+  useEffect(() => { if (registryEnabled()) isRegistryAdmin().then(setAdmin).catch(() => setAdmin(false)); }, []);
+
+  const docsText = () => docs.filter((item) => item.status === 'done').map((item) => item.text).join('\n');
+
+  const addFiles = async (list: FileList | null) => {
+    if (!list?.length) return;
+    const added: LateDocItem[] = [...list].map((file) => ({ id: crypto.randomUUID(), file, status: 'reading' }));
+    setDocs((prev) => [...prev, ...added]);
+    const { extractDocumentText } = await import('./extract');
+    const finished: LateDocItem[] = [];
+    for (const item of added) {
+      try {
+        const { text } = await extractDocumentText(item.file);
+        finished.push({ ...item, status: 'done', text });
+      } catch (error) {
+        finished.push({ ...item, status: 'error', error: error instanceof Error ? error.message : '읽기 실패' });
+      }
+    }
+    setDocs((prev) => prev.map((item) => finished.find((f) => f.id === item.id) ?? item));
+  };
+
+  const removeDoc = (id: string) => setDocs((prev) => prev.filter((item) => item.id !== id));
+
+  const runAi = async () => {
+    setAi({ status: 'working' });
+    try {
+      const { extraction, cached } = await runExtraction(docsText(), project.packId);
+      const verified = annotateVerification(extraction, docsText());
+      setAi({ status: 'done', extraction: verified, cached });
+      setAcceptedRules(new Set(verified.rules.map((rule, index) => rule.verified ? index : -1).filter((index) => index >= 0)));
+      setUseDocCats(false);
+      const suggestion = suggestedFundingRates(verified);
+      if (suggestion.subsidyRate || suggestion.matchingCashRate) {
+        setRateSuggestion(suggestion);
+        setRateForm({
+          subsidyRate: String(suggestion.subsidyRate?.pct ?? project.subsidyRate ?? 100),
+          matchingCashRate: String(suggestion.matchingCashRate?.pct ?? project.matchingCashRate ?? ''),
+        });
+      } else { setRateSuggestion(null); setRateForm(null); }
+      if (verified.year) setShareYear((prev) => prev || String(verified.year));
+    } catch (error) {
+      setAi({ status: 'error', message: error instanceof Error ? error.message : '추출에 실패했습니다.' });
+    }
+  };
+
+  const apply = async () => {
+    if (ai.status !== 'done' || !ai.extraction) return;
+    const base = useDocCats ? null : packFor(project);
+    const accepted = ai.extraction.rules.filter((_, index) => acceptedRules.has(index));
+    const pack = buildCustomPack(base, ai.extraction, accepted, useDocCats);
+    update({ ...project, customPack: pack, packId: pack.id });
+    if (admin && share && registryEnabled()) {
+      setApplying(true);
+      try {
+        const name = ai.extraction.programName || project.programName || packFor(project).name;
+        const year = Number(shareYear) || null;
+        const registryId = await saveRegistryEntry(name, year, pack, 'extracted');
+        for (const doc of docs) {
+          await uploadRegistryDocument(doc.file, { programName: name, year, role: guessDocRole(doc.file.name), registryId });
+        }
+      } catch (error) {
+        alert(`공유 DB 등록에 실패했습니다 (${error instanceof Error ? error.message : ''}). 이 과제에는 정상 반영됐습니다.`);
+      } finally { setApplying(false); }
+    }
+    setApplied(true); setTimeout(() => setApplied(false), 2500);
+  };
+
+  const applyRates = () => {
+    if (!rateForm) return;
+    const subsidyRate = Math.min(100, Math.max(1, Number(rateForm.subsidyRate) || 100));
+    const matchingCashRate = Math.min(100, Math.max(0, Number(rateForm.matchingCashRate) || 0));
+    const subsidyAmount = project.subsidyAmount ?? project.totalBudget;
+    const totalBudget = deriveTotalBudget(subsidyAmount, subsidyRate);
+    update({ ...project, totalBudget, subsidyAmount, subsidyRate, matchingCashRate });
+    setRateApplied(true); setTimeout(() => setRateApplied(false), 2500);
+  };
+
+  return <section className="panel docupdate-panel">
+    <div className="panel-head"><div><h3><FileSearch /> 공고문·지침 업로드 — 규정 나중에 반영</h3><p>과제 등록 때 공고문을 못 올렸다면 여기서 올려 비목·상한·금지 규정에 반영할 수 있어요.</p></div></div>
+    <div className="docupdate-body">
+      <label className="upload-button wide"><Upload /> 파일 추가 (PDF · HWP · 이미지)<input type="file" multiple accept=".pdf,.hwp,.hwpx,.txt,.md,image/*" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} /></label>
+      {docs.length > 0 && <div className="doc-list">{docs.map((doc) => <div key={doc.id} className={`doc-item ${doc.status}`}>
+        <span className="doc-name">{doc.file.name}</span>
+        <span className="doc-status">{doc.status === 'reading' ? '읽는 중…' : doc.status === 'done' ? '읽기 완료' : doc.error}</span>
+        <button type="button" aria-label={`${doc.file.name} 제거`} onClick={() => removeDoc(doc.id)}><Trash2 /></button>
+      </div>)}</div>}
+      {docs.some((doc) => doc.status === 'done') && <>
+        {ai.status === 'idle' && <button type="button" className="secondary" onClick={runAi}><Sparkles /> 문서에서 규정 추출하기</button>}
+        {ai.status === 'working' && <p className="wiz-hint">문서를 분석하는 중… (문서 크기에 따라 최대 1~2분 걸릴 수 있어요)</p>}
+        {ai.status === 'error' && <><p className="field-error"><AlertCircle /> {ai.message}</p><button type="button" className="secondary" onClick={runAi}>다시 시도</button></>}
+        {ai.status === 'done' && ai.extraction && <div className="ai-review">
+          {ai.cached && <p className="wiz-hint">이 문서는 이전에 분석된 적이 있어 캐시된 결과를 불러왔어요.</p>}
+          {rateForm && <div className="rate-suggestion">
+            <h4><Sparkles /> AI가 문서에서 찾은 재원 비율 <b>확인 후 수정 가능</b></h4>
+            {rateSuggestion?.subsidyRate && <p className="wiz-hint">지원비율 {rateSuggestion.subsidyRate.pct}% — "{rateSuggestion.subsidyRate.rule.quote.slice(0, 80)}{rateSuggestion.subsidyRate.rule.quote.length > 80 ? '…' : ''}" ({rateSuggestion.subsidyRate.rule.ref})</p>}
+            {rateSuggestion?.matchingCashRate && <p className="wiz-hint">민간부담금 중 현금 최소비율 {rateSuggestion.matchingCashRate.pct}% — "{rateSuggestion.matchingCashRate.rule.quote.slice(0, 80)}{rateSuggestion.matchingCashRate.rule.quote.length > 80 ? '…' : ''}" ({rateSuggestion.matchingCashRate.rule.ref})</p>}
+            <div className="field-grid">
+              <label><span className="label-line">지원비율(%)</span><input inputMode="numeric" value={rateForm.subsidyRate} onChange={(e) => setRateForm({ ...rateForm, subsidyRate: e.target.value.replace(/\D/g, '').slice(0, 3) })} /></label>
+              <label><span className="label-line">민간부담금 중 현금 비율(%)</span><input inputMode="numeric" value={rateForm.matchingCashRate} onChange={(e) => setRateForm({ ...rateForm, matchingCashRate: e.target.value.replace(/\D/g, '').slice(0, 3) })} /></label>
+            </div>
+            <div className="settings-save"><button type="button" className="secondary" onClick={applyRates}><Check /> 재원 비율 반영</button>{rateApplied && <span className="save-ok"><CheckCircle2 /> 반영됐어요</span>}</div>
+          </div>}
+          {ai.extraction.fundingSchedule && (() => {
+            const sched = ai.extraction.fundingSchedule!;
+            const totalWon = fundingScheduleAmountWon(sched, sched.totalSubsidyMax);
+            const currentSubsidy = project.subsidyAmount ?? project.totalBudget;
+            return <div className={`funding-cap ${sched.verified ? '' : 'unverified'}`}>
+              <h4>이 공고의 지원금 한도</h4>
+              <p className="wiz-hint">"{sched.quote.slice(0, 80)}{sched.quote.length > 80 ? '…' : ''}" ({sched.ref}) {sched.verified ? '· 원문 확인됨' : '· ⚠ 원문에서 찾지 못한 인용 — 직접 확인하세요'}</p>
+              {totalWon != null
+                ? <p><strong>합계 한도 {formatWon(totalWon)}</strong></p>
+                : sched.totalSubsidyMax != null && <p><strong>합계 한도 {sched.totalSubsidyMax.toLocaleString('ko-KR')}{sched.unit ?? ''}</strong> (단위를 자동 환산하지 못했어요 — 원문을 확인하세요)</p>}
+              {sched.years.length > 0 && <ul className="funding-cap-years">{sched.years.map((y, i) => {
+                const subsidyWon = fundingScheduleAmountWon(sched, y.subsidy);
+                return <li key={i}>{y.label}: 정부지원 {subsidyWon != null ? formatWon(subsidyWon) : `${y.subsidy ?? '-'}${sched.unit ?? ''}`}</li>;
+              })}</ul>}
+              {totalWon != null && currentSubsidy > totalWon && <p className="field-error"><AlertCircle /> 현재 입력된 지원금({formatWon(currentSubsidy)})이 공고 한도({formatWon(totalWon)})를 초과했어요.</p>}
+            </div>;
+          })()}
+          {ai.extraction.categories.length > 0 && <label className="share-toggle"><input type="checkbox" checked={useDocCats} onChange={(e) => setUseDocCats(e.target.checked)} /><span><strong>문서의 비목 구성 사용</strong> ({ai.extraction.categories.length}개: {ai.extraction.categories.map((c) => c.name).join(', ').slice(0, 60)})</span></label>}
+          <div className="ai-rules">{ai.extraction.rules.map((rule, index) => <label key={index} className={`ai-rule ${rule.verified ? '' : 'unverified'}`}>
+            <input type="checkbox" checked={acceptedRules.has(index)} onChange={(e) => setAcceptedRules((prev) => { const next = new Set(prev); if (e.target.checked) next.add(index); else next.delete(index); return next; })} />
+            <span><strong>[{rule.minAmount != null ? '필수계상' : RULE_KIND_LABEL[rule.kind]}] {rule.message}{rule.minAmount != null && ` (${formatWon(rule.minAmount)})`}</strong><em>"{rule.quote.slice(0, 90)}{rule.quote.length > 90 ? '…' : ''}" ({rule.ref}) {rule.verified ? '· 원문 확인됨' : '· ⚠ 원문에서 찾지 못한 인용 — 직접 확인 후 선택하세요'}</em></span>
+          </label>)}</div>
+          {ai.extraction.uncertain.length > 0 && <p className="wiz-hint">AI가 판단을 보류한 항목: {ai.extraction.uncertain.join(' / ')}</p>}
+          {admin && registryEnabled() && <div className="wiz-block share-block">
+            <label className="share-toggle"><input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} /><span><CloudUpload /> <strong>공유 규정 DB에도 등록</strong> — 업로드한 공고문·지침을 다른 사용자도 사업명 검색으로 쓸 수 있게 합니다 (관리자 전용)</span></label>
+            {share && <label>연도<input inputMode="numeric" value={shareYear} onChange={(e) => setShareYear(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="2026" /></label>}
+          </div>}
+          <div className="settings-save"><button type="button" className="primary" onClick={apply} disabled={(acceptedRules.size === 0 && !useDocCats) || applying}><Check /> {applying ? '반영 중…' : `선택한 규정 적용 (${acceptedRules.size}건${useDocCats ? ' + 비목 구성' : ''})`}</button>{applied && <span className="save-ok"><CheckCircle2 /> 반영됐어요{share && admin ? ' · 공유 DB에도 등록됐어요' : ''}</span>}</div>
+          {ai.extraction.referencedRegulations && ai.extraction.referencedRegulations.length > 0 && <div className="ref-regs">
+            <h4>이 공고가 참고하라고 명시한 규정</h4>
+            <p className="wiz-hint">예산 편성 기준은 대개 공고문·사업계획서에 있지만, 증빙 서류는 아래 규정도 함께 확인해야 할 수 있어요. 정부 사이트에 원문이 흩어져 있어 자동으로 가져오지는 못하니, 직접 찾아 "공유 규정 DB"에 올려두면 다음부터 검색으로 바로 쓸 수 있어요.</p>
+            <ul className="ref-reg-list">{ai.extraction.referencedRegulations.map((reg, index) => <li key={index} className={reg.verified ? '' : 'unverified'}><strong>{reg.name}</strong><em>"{reg.quote.slice(0, 70)}{reg.quote.length > 70 ? '…' : ''}" ({reg.ref})</em></li>)}</ul>
+          </div>}
+        </div>}
+      </>}
+    </div>
+  </section>;
+}
+
 function Settings({ project, update, onReset }: { project: Project; update: (p: Project) => void; onReset: () => void }) {
-  const [form, setForm] = useState({ name: project.name, company: project.companyName, total: String(project.totalBudget), start: project.startDate, end: project.endDate, deadline: project.settlementDeadline, programName: project.programName ?? '' });
+  const initialForm = (p: Project) => ({ name: p.name, company: p.companyName, subsidy: String(p.subsidyAmount ?? p.totalBudget), subsidyRate: String(p.subsidyRate ?? 100), matchingCashRate: p.matchingCashRate != null ? String(p.matchingCashRate) : '', start: p.startDate, end: p.endDate, deadline: p.settlementDeadline, programName: p.programName ?? '' });
+  const [form, setForm] = useState(initialForm(project));
   const [saved, setSaved] = useState(false);
   const sourceDocs = useSourceDocs(project);
-  useEffect(() => {
-    setForm({ name: project.name, company: project.companyName, total: String(project.totalBudget), start: project.startDate, end: project.endDate, deadline: project.settlementDeadline, programName: project.programName ?? '' });
-  }, [project]);
+  useEffect(() => { setForm(initialForm(project)); }, [project]);
+  const subsidyAmount = Number(form.subsidy) || 0;
+  const subsidyRate = Math.min(100, Math.max(1, Number(form.subsidyRate) || 100));
+  const matchingCashRate = Math.min(100, Math.max(0, Number(form.matchingCashRate) || 0));
+  const { totalBudget: previewTotal, matching: previewMatching, matchingCash: previewCash, matchingInKind: previewInKind } = previewFunding(subsidyAmount, subsidyRate, matchingCashRate);
   const save = (event: React.FormEvent) => {
     event.preventDefault();
-    const totalBudget = Number(form.total) || 0;
-    if (!form.name.trim() || !form.company.trim() || !totalBudget) return;
+    if (!form.name.trim() || !form.company.trim() || !subsidyAmount) return;
     if (form.end < form.start) { alert('종료일이 시작일보다 빠릅니다. 날짜를 확인해주세요.'); return; }
-    update({ ...project, name: form.name.trim(), companyName: form.company.trim(), totalBudget, startDate: form.start, endDate: form.end, settlementDeadline: form.deadline, programName: form.programName.trim() || undefined });
+    // 비워두면 "확인됨(0 등)"으로 단정해 저장하지 않고 비워둔다 — 한눈에 보기에서 "확인 필요"로 표시된다.
+    const storedMatchingCashRate = form.matchingCashRate === '' ? undefined : matchingCashRate;
+    update({ ...project, name: form.name.trim(), companyName: form.company.trim(), totalBudget: previewTotal, subsidyAmount, subsidyRate, matchingCashRate: storedMatchingCashRate, startDate: form.start, endDate: form.end, settlementDeadline: form.deadline, programName: form.programName.trim() || undefined });
     setSaved(true); setTimeout(() => setSaved(false), 2500);
   };
   const importBackup = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -467,13 +662,20 @@ function Settings({ project, update, onReset }: { project: Project; update: (p: 
     <section className="panel settings-panel"><div className="panel-head"><div><h3>과제 기본 정보</h3><p>적용 규정: <strong>{packFor(project).name}</strong> ({packFor(project).guideline}) · 수정 후 저장을 누르면 모든 화면에 바로 반영됩니다.</p></div></div>
       <form className="settings-form" onSubmit={save}>
         <div className="field-grid"><label>과제명<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label><label>기업명<input required value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} /></label></div>
-        <div className="field-grid"><label>총 사업비<input required inputMode="numeric" value={withCommas(form.total)} onChange={(e) => setForm({ ...form, total: digitsOnly(e.target.value) })} /></label><label>정산 마감일<input required type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} /></label></div>
+        <div className="field-grid"><label>지원금(정부지원금)<input required inputMode="numeric" value={withCommas(form.subsidy)} onChange={(e) => setForm({ ...form, subsidy: digitsOnly(e.target.value) })} /></label><label><span className="label-line">지원비율(%) <b>공고문 기준</b></span><input required inputMode="numeric" value={form.subsidyRate} onChange={(e) => setForm({ ...form, subsidyRate: digitsOnly(e.target.value).slice(0, 3) })} placeholder="자기부담 없으면 100" /></label></div>
+        {subsidyRate < 100 && <div className="field-grid"><label><span className="label-line">민간부담금 중 현금 비율(%) <b>선택 · 아래 문서 업로드 시 AI가 자동 입력</b></span><input inputMode="numeric" value={form.matchingCashRate} onChange={(e) => setForm({ ...form, matchingCashRate: digitsOnly(e.target.value).slice(0, 3) })} placeholder="공고문 확인 후 알면 직접 입력 (예: 10)" /></label><div /></div>}
+        <div className="field-grid"><label>정산 마감일<input required type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} /></label><label>사업명 <input value={form.programName} onChange={(e) => setForm({ ...form, programName: e.target.value })} placeholder={`비워두면 규정 팩 이름(${packFor(project).name}) 사용`} /></label></div>
         <div className="field-grid"><label>시작일<input required type="date" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} /></label><label>종료일<input required type="date" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} /></label></div>
-        <label><span className="label-line">사업명 <b>근거 문서 검색 키</b></span><input value={form.programName} onChange={(e) => setForm({ ...form, programName: e.target.value })} placeholder={`비워두면 규정 팩 이름(${packFor(project).name}) 사용`} /></label>
-        {Number(form.total) !== project.totalBudget && <p className="field-hint">총 사업비를 바꾸면 편성 합계와 차이가 생길 수 있어요. 저장 후 예산 편성 화면에서 금액을 조정하거나, 아래 "예산 초안 재배분"을 사용하세요.</p>}
+        <p className="field-hint">{subsidyRate >= 100
+          ? `자기부담 없이 전액 지원 — 총사업비 ${formatWon(previewTotal)}`
+          : form.matchingCashRate === ''
+          ? '공고문의 "기업(민간)부담금 중 현금 비율"을 확인해 입력하면 현금·현물 금액이 계산돼요.'
+          : `총사업비 ${formatWon(previewTotal)} = 지원금 ${formatWon(subsidyAmount)} + 민간부담금 ${formatWon(previewMatching)} (현금 ${formatWon(previewCash)} · 현물 ${formatWon(previewInKind)})`}</p>
+        {previewTotal !== project.totalBudget && <p className="field-hint">총 사업비가 바뀌면 편성 합계와 차이가 생길 수 있어요. 저장 후 예산 편성 화면에서 금액을 조정하거나, 아래 "예산 초안 재배분"을 사용하세요.</p>}
         <div className="settings-save"><button className="primary" type="submit">과제 정보 저장</button>{saved && <span className="save-ok"><CheckCircle2 /> 저장됐어요</span>}</div>
       </form>
     </section>
+    <DocUpdatePanel project={project} update={update} />
     <SourceDocsPanel source={sourceDocs} />
     <section className="panel backup-panel"><div className="panel-head"><div><h3>백업 · 복원</h3><p>브라우저 데이터 삭제나 기기 변경에 대비해 주기적으로 백업 파일을 보관하세요. 증빙 파일 원본은 포함되지 않습니다.</p></div></div><div className="backup-actions"><button className="secondary" onClick={() => downloadBackup(project)}><Download /> 백업 JSON 내보내기</button><label className="upload-button"><Upload /> 백업으로 복원<input type="file" accept="application/json,.json" onChange={importBackup} /></label></div></section>
     <section className="panel danger-panel"><div className="panel-head"><div><h3>초기화 · 삭제</h3><p>아래 작업은 되돌릴 수 없습니다. 실행 전에 백업을 권장합니다.</p></div></div>

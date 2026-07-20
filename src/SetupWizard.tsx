@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, BookOpenCheck, Check, CheckCircle2, CloudUpload, FileSearch, Search, ShieldCheck, Sparkles, Trash2, Upload, Wand2 } from 'lucide-react';
-import { getPack, makeDraftBudgets, SELECTABLE_PACKS } from './rules';
+import { deriveTotalBudget, formatWon, getPack, makeDraftBudgets, previewFunding, SELECTABLE_PACKS } from './rules';
 import { classifyProgram, guessProgramName, guessYear, type MatchResult } from './matching';
 import { guessDocRole, isRegistryAdmin, REGISTRY_ROLE_LABEL, registryEnabled, saveRegistryEntry, searchRegistry, uploadRegistryDocument, type RegistryDocRole, type RegistryEntry } from './registry';
-import { annotateVerification, buildCustomPack, runExtraction, type Extraction } from './llmExtract';
+import { annotateVerification, buildCustomPack, fundingScheduleAmountWon, runExtraction, suggestedFundingRates, type Extraction } from './llmExtract';
 import type { Project, RulePack } from './types';
 
 const RULE_KIND_LABEL = { ratio: '상한', warning: '금지·주의', funding: '재원', info: '참고' } as const;
@@ -24,7 +24,7 @@ interface DocItem {
 
 export default function SetupWizard({ onCreate }: { onCreate: (project: Project) => void }) {
   const [step, setStep] = useState<1 | 2>(1);
-  const [form, setForm] = useState({ name: '', total: '100000000', start: today(), end: '', deadline: '', company: '', owner: '', email: '' });
+  const [form, setForm] = useState({ name: '', subsidy: '100000000', subsidyRate: '', matchingCashRate: '', start: today(), end: '', deadline: '', company: '', owner: '', email: '' });
   const [participant, setParticipant] = useState('');
   // ---- 2단계: 규정 선택 ----
   const [packId, setPackId] = useState('prestartup');
@@ -44,6 +44,8 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
   const [acceptedRules, setAcceptedRules] = useState<Set<number>>(new Set());
   const [useDocCats, setUseDocCats] = useState(false);
   const [extractedPack, setExtractedPack] = useState<RulePack | null>(null);
+  const [rateSuggestion, setRateSuggestion] = useState<ReturnType<typeof suggestedFundingRates> | null>(null);
+  const [rateFilled, setRateFilled] = useState(false);
 
   useEffect(() => {
     if (registryEnabled()) isRegistryAdmin().then(setAdmin).catch(() => setAdmin(false));
@@ -51,7 +53,7 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
 
   const next = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!form.name || !form.company || !form.owner || !form.email || !Number(form.total) || !form.end || !form.deadline) return;
+    if (!form.name || !form.company || !form.owner || !form.email || !Number(form.subsidy) || !form.end || !form.deadline) return;
     setStep(2);
   };
 
@@ -112,9 +114,21 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
       // 원문 대조에 성공한 규칙만 기본 선택 — 실패 항목은 사용자가 직접 확인 후 체크
       setAcceptedRules(new Set(verified.rules.map((rule, index) => rule.verified ? index : -1).filter((index) => index >= 0)));
       setUseDocCats(verified.categories.length > 0 && !match?.packId);
+      const suggestion = suggestedFundingRates(verified);
+      if (suggestion.subsidyRate || suggestion.matchingCashRate) setRateSuggestion(suggestion);
     } catch (error) {
       setAi({ status: 'error', message: error instanceof Error ? error.message : '추출에 실패했습니다.' });
     }
+  };
+
+  const fillRates = () => {
+    if (!rateSuggestion) return;
+    setForm((prev) => ({
+      ...prev,
+      subsidyRate: rateSuggestion.subsidyRate ? String(rateSuggestion.subsidyRate.pct) : prev.subsidyRate,
+      matchingCashRate: rateSuggestion.matchingCashRate ? String(rateSuggestion.matchingCashRate.pct) : prev.matchingCashRate,
+    }));
+    setRateFilled(true); setTimeout(() => setRateFilled(false), 2500);
   };
 
   const applyAi = () => {
@@ -146,9 +160,13 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
           alert(`공유 DB 등록에 실패했습니다 (${error instanceof Error ? error.message : ''}). 과제는 정상 생성됩니다.`);
         }
       }
-      const totalBudget = Number(form.total);
+      const subsidyAmount = Number(form.subsidy) || 0;
+      // 비워두면 나중에 AI·설정에서 채울 수 있도록 "확인됨(100 등)"으로 단정해 저장하지 않고 비워둔다.
+      const subsidyRate = form.subsidyRate === '' ? undefined : Math.min(100, Math.max(1, Number(form.subsidyRate) || 100));
+      const matchingCashRate = form.matchingCashRate === '' ? undefined : Math.min(100, Math.max(0, Number(form.matchingCashRate) || 0));
+      const totalBudget = deriveTotalBudget(subsidyAmount, subsidyRate ?? 100);
       onCreate({
-        id: uid(), name: form.name, totalBudget, startDate: form.start, endDate: form.end,
+        id: uid(), name: form.name, totalBudget, subsidyAmount, subsidyRate, matchingCashRate, startDate: form.start, endDate: form.end,
         settlementDeadline: form.deadline, agency: chosenPack.agency.split(' (')[0], companyName: form.company,
         packId: extractedPack ? extractedPack.id : registryPick ? `registry:${registryPick.id}` : packId,
         customPack: extractedPack ?? registryPick?.pack,
@@ -177,7 +195,20 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
       {step === 1 && <form className="setup-form" onSubmit={next}>
         <div><span className="step-pill">1 / 2</span><h2>기본 정보부터 알려주세요</h2><p>다음 단계에서 적용 규정을 정합니다.</p></div>
         <label>과제명<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="예: AI 기반 품질검사 시스템 개발" /></label>
-        <div className="field-grid"><label>기업명<input required value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="주식회사 과제온" /></label><label>총 사업비<input required inputMode="numeric" value={withCommas(form.total)} onChange={(e) => setForm({ ...form, total: digitsOnly(e.target.value) })} /></label></div>
+        <div className="field-grid"><label>기업명<input required value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="주식회사 과제온" /></label><label>지원금(정부지원금)<input required inputMode="numeric" value={withCommas(form.subsidy)} onChange={(e) => setForm({ ...form, subsidy: digitsOnly(e.target.value) })} /></label></div>
+        <div className="field-grid"><label><span className="label-line">지원비율(%) <b>선택 · 다음 단계 공고문 업로드 시 AI가 자동 입력</b></span><input inputMode="numeric" value={form.subsidyRate} onChange={(e) => setForm({ ...form, subsidyRate: digitsOnly(e.target.value).slice(0, 3) })} placeholder="공고문 확인 후 알면 직접 입력 (예: 75)" /></label>{form.subsidyRate !== '' && Number(form.subsidyRate) < 100 && <label><span className="label-line">민간부담금 중 현금 비율(%) <b>선택</b></span><input inputMode="numeric" value={form.matchingCashRate} onChange={(e) => setForm({ ...form, matchingCashRate: digitsOnly(e.target.value).slice(0, 3) })} placeholder="예: 10 (기업부담금 중 현금 10% 이상)" /></label>}</div>
+        <p className="fine-print">{form.subsidyRate === ''
+          ? '지원비율은 몰라도 다음 단계에서 공고문을 업로드하면 AI가 원문에서 찾아 채워드려요. 이미 아신다면 지금 입력하셔도 됩니다. (예: "연구개발비의 75% 이내" → 75)'
+          : Number(form.subsidyRate) < 100 && form.matchingCashRate === ''
+          ? '공고문의 "기업(민간)부담금 중 현금 비율"을 알면 입력하세요. 모르면 비워둬도 되고, 다음 단계에서 AI가 채워드려요. (예: "현금 10% 이상" → 10)'
+          : (() => {
+              const rate = Math.min(100, Math.max(1, Number(form.subsidyRate) || 100));
+              const cashRate = Math.min(100, Math.max(0, Number(form.matchingCashRate) || 0));
+              const { totalBudget, matching, matchingCash, matchingInKind } = previewFunding(Number(form.subsidy) || 0, rate, cashRate);
+              return rate >= 100
+                ? `자기부담 없이 전액 지원 — 총사업비 ${formatWon(totalBudget)}`
+                : `총사업비 ${formatWon(totalBudget)} = 지원금 ${formatWon(Number(form.subsidy) || 0)} + 민간부담금 ${formatWon(matching)} (현금 ${formatWon(matchingCash)} · 현물 ${formatWon(matchingInKind)})`;
+            })()}</p>
         <div className="field-grid three"><label>시작일<input required type="date" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} /></label><label>종료일<input required type="date" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} /></label><label>정산 마감일<input required type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} /></label></div>
         <div className="field-grid"><label>대표자 이름<input required value={form.owner} onChange={(e) => setForm({ ...form, owner: e.target.value })} /></label><label>알림 이메일<input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label></div>
         <label><span className="label-line">참여 인력 <b>선택</b></span><input value={participant} onChange={(e) => setParticipant(e.target.value)} placeholder="첫 참여 인력 이름" /></label>
@@ -220,12 +251,41 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
           {ai.status === 'error' && <><p className="field-error"><AlertCircle /> {ai.message}</p><button type="button" className="secondary" onClick={runAi}>다시 시도</button></>}
           {ai.status === 'done' && ai.extraction && <div className="ai-review">
             {ai.cached && <p className="wiz-hint">이 문서는 이전에 분석된 적이 있어 캐시된 결과를 불러왔어요.</p>}
+            {rateSuggestion && (rateSuggestion.subsidyRate || rateSuggestion.matchingCashRate) && <div className="rate-suggestion">
+              <h4><Sparkles /> AI가 문서에서 찾은 재원 비율 <b>확인 후 수정 가능</b></h4>
+              {rateSuggestion.subsidyRate && <p className="wiz-hint">지원비율 {rateSuggestion.subsidyRate.pct}% — "{rateSuggestion.subsidyRate.rule.quote.slice(0, 80)}{rateSuggestion.subsidyRate.rule.quote.length > 80 ? '…' : ''}" ({rateSuggestion.subsidyRate.rule.ref})</p>}
+              {rateSuggestion.matchingCashRate && <p className="wiz-hint">민간부담금 중 현금 최소비율 {rateSuggestion.matchingCashRate.pct}% — "{rateSuggestion.matchingCashRate.rule.quote.slice(0, 80)}{rateSuggestion.matchingCashRate.rule.quote.length > 80 ? '…' : ''}" ({rateSuggestion.matchingCashRate.rule.ref})</p>}
+              <button type="button" className="secondary" onClick={fillRates}><Check /> 1단계 지원비율·현금비율 칸에 채우기</button>
+              {rateFilled && <span className="save-ok"><CheckCircle2 /> 채웠어요 — 1단계에서 확인하세요</span>}
+            </div>}
+            {ai.extraction.fundingSchedule && (() => {
+              const sched = ai.extraction.fundingSchedule!;
+              const totalWon = fundingScheduleAmountWon(sched, sched.totalSubsidyMax);
+              const currentSubsidy = Number(form.subsidy) || 0;
+              return <div className={`funding-cap ${sched.verified ? '' : 'unverified'}`}>
+                <h4>이 공고의 지원금 한도</h4>
+                <p className="wiz-hint">"{sched.quote.slice(0, 80)}{sched.quote.length > 80 ? '…' : ''}" ({sched.ref}) {sched.verified ? '· 원문 확인됨' : '· ⚠ 원문에서 찾지 못한 인용 — 직접 확인하세요'}</p>
+                {totalWon != null
+                  ? <p><strong>합계 한도 {formatWon(totalWon)}</strong></p>
+                  : sched.totalSubsidyMax != null && <p><strong>합계 한도 {sched.totalSubsidyMax.toLocaleString('ko-KR')}{sched.unit ?? ''}</strong> (단위를 자동 환산하지 못했어요 — 원문을 확인하세요)</p>}
+                {sched.years.length > 0 && <ul className="funding-cap-years">{sched.years.map((y, i) => {
+                  const subsidyWon = fundingScheduleAmountWon(sched, y.subsidy);
+                  return <li key={i}>{y.label}: 정부지원 {subsidyWon != null ? formatWon(subsidyWon) : `${y.subsidy ?? '-'}${sched.unit ?? ''}`}</li>;
+                })}</ul>}
+                {totalWon != null && currentSubsidy > totalWon && <p className="field-error"><AlertCircle /> 1단계에 입력한 지원금({formatWon(currentSubsidy)})이 공고 한도({formatWon(totalWon)})를 초과했어요.</p>}
+              </div>;
+            })()}
             {ai.extraction.categories.length > 0 && <label className="share-toggle"><input type="checkbox" checked={useDocCats} onChange={(e) => setUseDocCats(e.target.checked)} /><span><strong>문서의 비목 구성 사용</strong> ({ai.extraction.categories.length}개: {ai.extraction.categories.map((c) => c.name).join(', ').slice(0, 60)})</span></label>}
             <div className="ai-rules">{ai.extraction.rules.map((rule, index) => <label key={index} className={`ai-rule ${rule.verified ? '' : 'unverified'}`}>
               <input type="checkbox" checked={acceptedRules.has(index)} onChange={(e) => setAcceptedRules((prev) => { const next = new Set(prev); if (e.target.checked) next.add(index); else next.delete(index); return next; })} />
-              <span><strong>[{RULE_KIND_LABEL[rule.kind]}] {rule.message}</strong><em>"{rule.quote.slice(0, 90)}{rule.quote.length > 90 ? '…' : ''}" ({rule.ref}) {rule.verified ? '· 원문 확인됨' : '· ⚠ 원문에서 찾지 못한 인용 — 직접 확인 후 선택하세요'}</em></span>
+              <span><strong>[{rule.minAmount != null ? '필수계상' : RULE_KIND_LABEL[rule.kind]}] {rule.message}{rule.minAmount != null && ` (${formatWon(rule.minAmount)})`}</strong><em>"{rule.quote.slice(0, 90)}{rule.quote.length > 90 ? '…' : ''}" ({rule.ref}) {rule.verified ? '· 원문 확인됨' : '· ⚠ 원문에서 찾지 못한 인용 — 직접 확인 후 선택하세요'}</em></span>
             </label>)}</div>
             {ai.extraction.uncertain.length > 0 && <p className="wiz-hint">AI가 판단을 보류한 항목: {ai.extraction.uncertain.join(' / ')}</p>}
+            {ai.extraction.referencedRegulations && ai.extraction.referencedRegulations.length > 0 && <div className="ref-regs">
+              <h4>이 공고가 참고하라고 명시한 규정</h4>
+              <p className="wiz-hint">예산 편성 기준은 대개 공고문·사업계획서에 있지만, 증빙 서류는 아래 규정도 확인이 필요할 수 있어요. 정부 사이트에 흩어져 있어 자동으로 가져오지는 못하니, 직접 찾아 공유 규정 DB에 올려두면 다음부터 검색으로 바로 쓸 수 있어요.</p>
+              <ul className="ref-reg-list">{ai.extraction.referencedRegulations.map((reg, index) => <li key={index} className={reg.verified ? '' : 'unverified'}><strong>{reg.name}</strong><em>"{reg.quote.slice(0, 70)}{reg.quote.length > 70 ? '…' : ''}" ({reg.ref})</em></li>)}</ul>
+            </div>}
             <button type="button" className="primary" onClick={applyAi} disabled={acceptedRules.size === 0 && !useDocCats}><Check /> 선택한 규정 적용 ({acceptedRules.size}건{useDocCats ? ' + 비목 구성' : ''})</button>
           </div>}
         </div>}

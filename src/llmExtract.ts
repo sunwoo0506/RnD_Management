@@ -12,7 +12,19 @@ export interface ExtractedCategory {
 export interface ExtractedRule {
   kind: 'ratio' | 'warning' | 'funding' | 'info';
   item: string | null; message: string;
-  limitPct: number | null; basis: string | null; severity: 'high' | 'medium' | 'low' | null;
+  limitPct: number | null; minAmount: number | null; basis: string | null; severity: 'high' | 'medium' | 'low' | null;
+  quote: string; ref: string;
+  verified?: boolean;
+}
+export interface ReferencedRegulation {
+  name: string; quote: string; ref: string;
+  verified?: boolean;
+}
+export interface FundingScheduleYear {
+  label: string; subsidy: number | null; matchingCash: number | null; matchingInKind: number | null;
+}
+export interface FundingSchedule {
+  unit: string | null; totalSubsidyMax: number | null; years: FundingScheduleYear[];
   quote: string; ref: string;
   verified?: boolean;
 }
@@ -21,16 +33,51 @@ export interface Extraction {
   programType: 'startup' | 'rnd' | 'other' | 'unknown';
   categories: ExtractedCategory[];
   rules: ExtractedRule[];
+  referencedRegulations: ReferencedRegulation[];
+  fundingSchedule: FundingSchedule | null;
   uncertain: string[];
 }
+
+// fundingSchedule의 unit(천원/원 등)에 맞춰 실제 원(KRW) 금액으로 환산한다. 알 수 없는 단위면 null.
+export const fundingScheduleAmountWon = (schedule: FundingSchedule, value: number | null): number | null => {
+  if (value == null) return null;
+  const unit = (schedule.unit ?? '').replace(/\s/g, '');
+  if (unit === '천원' || unit === '천 원') return value * 1000;
+  if (unit === '원' || unit === '') return value;
+  return null; // 만원 등 못 다루는 단위 — 임의 추정 대신 미확인 처리
+};
+
+// kind:'funding' 규칙 중 item이 'subsidy_rate'/'matching_cash_min'인 항목에서 지원비율·현금최소비율을 읽는다.
+// 값을 찾으면 사용자가 그대로 쓰거나 고쳐서 적용할 수 있도록 제안값으로만 쓴다 — 절대 자동 확정하지 않는다.
+export const suggestedFundingRates = (extraction: Extraction): { subsidyRate?: { pct: number; rule: ExtractedRule }; matchingCashRate?: { pct: number; rule: ExtractedRule } } => {
+  const subsidyRule = extraction.rules.find((rule) => rule.kind === 'funding' && rule.item === 'subsidy_rate' && rule.limitPct != null);
+  const cashRule = extraction.rules.find((rule) => rule.kind === 'funding' && rule.item === 'matching_cash_min' && rule.limitPct != null);
+  return {
+    ...(subsidyRule ? { subsidyRate: { pct: subsidyRule.limitPct!, rule: subsidyRule } } : {}),
+    ...(cashRule ? { matchingCashRate: { pct: cashRule.limitPct!, rule: cashRule } } : {}),
+  };
+};
 
 export const runExtraction = async (text: string, packId: string | null): Promise<{ extraction: Extraction; cached: boolean }> => {
   if (!supabase) throw new Error('클라우드(로그인) 연결이 필요합니다.');
   const { data, error } = await supabase.functions.invoke('extract-rules', { body: { text, packId } });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(await describeFunctionError(error));
   if (data?.error) throw new Error(data.error);
   if (!data?.extraction) throw new Error('추출 결과가 비어 있습니다.');
   return { extraction: data.extraction as Extraction, cached: !!data.cached };
+};
+
+// FunctionsHttpError는 message가 "Edge Function returned a non-2xx status code"로 고정돼 있어
+// 실제 원인(함수가 응답한 JSON body)은 context(Response)를 직접 읽어야 나온다.
+const describeFunctionError = async (error: { message: string; context?: unknown }): Promise<string> => {
+  const context = error.context;
+  if (context instanceof Response) {
+    try {
+      const body = await context.clone().json();
+      if (typeof body?.error === 'string') return body.error;
+    } catch { /* JSON이 아니면 아래 기본 메시지로 */ }
+  }
+  return error.message;
 };
 
 // 공백·중점 차이를 무시하고 인용문이 원문에 실제로 존재하는지 확인한다.
@@ -46,6 +93,8 @@ export const annotateVerification = (extraction: Extraction, sourceText: string)
   ...extraction,
   categories: extraction.categories.map((category) => ({ ...category, verified: verifyQuote(category.quote, sourceText) })),
   rules: extraction.rules.map((rule) => ({ ...rule, verified: verifyQuote(rule.quote, sourceText) })),
+  referencedRegulations: (extraction.referencedRegulations ?? []).map((reg) => ({ ...reg, verified: verifyQuote(reg.quote, sourceText) })),
+  fundingSchedule: extraction.fundingSchedule ? { ...extraction.fundingSchedule, verified: verifyQuote(extraction.fundingSchedule.quote, sourceText) } : null,
 });
 
 const slug = (name: string, index: number) => `doc_${index}_${name.replace(/[^\p{L}\p{N}]/gu, '').slice(0, 12) || 'cat'}`;
@@ -80,22 +129,35 @@ export const buildCustomPack = (
     categories = base?.categories ?? [];
   }
 
-  // 규칙을 비목에 연결 (이름 포함 여부의 단순 매칭 — 못 찾으면 과제 공통 규칙)
-  const linkTo = (text: string): string[] | undefined => {
-    const ids = categories.filter((category) => text.includes(category.name) || (category.name.length >= 2 && text.includes(category.name.slice(0, 2)))).map((c) => c.id);
-    return ids.length ? ids : undefined;
+  // 규칙을 비목에 연결한다. 1순위 item(추출 시 지정된 정확한 비목/세부항목명), 2순위 message 안의 비목 "전체 이름".
+  // 예전에는 비목명 앞 2글자만 봤는데, "연구"처럼 R&D 비목명 대부분이 공유하는 접두어라 위탁연구개발비 규칙이
+  // 연구수당·연구실운영비 등 전혀 다른 비목에도 잘못 연결됐다 — 부분 접두어 매칭은 절대 하지 않는다.
+  const norm = (text: string) => text.replace(/\s/g, '');
+  const linkTo = (item: string | null | undefined, message: string): string[] | undefined => {
+    if (item) {
+      const ni = norm(item);
+      const exact = categories.filter((category) => norm(category.name) === ni);
+      if (exact.length) return exact.map((c) => c.id);
+      const partial = categories.filter((category) => { const nc = norm(category.name); return nc.includes(ni) || ni.includes(nc); });
+      if (partial.length) return partial.map((c) => c.id);
+    }
+    const nm = norm(message);
+    const byMessage = categories.filter((category) => nm.includes(norm(category.name)));
+    return byMessage.length ? byMessage.map((c) => c.id) : undefined;
   };
 
   const extractedRules: PackRule[] = acceptedRules.map((rule, index) => ({
     id: `ext_${index}`,
-    kind: rule.kind === 'funding' ? 'info' : rule.kind,
+    // minAmount가 있으면 %가 아니라 이 공고 특유의 정액 필수 계상 요구사항 — 별도 kind로 구분해 예산 편성 화면에서 최소 금액 미달을 표시한다.
+    kind: rule.minAmount != null ? 'minimum' : rule.kind === 'funding' ? 'info' : rule.kind,
     item: rule.item ?? undefined,
     message: rule.kind === 'funding' ? `[재원] ${rule.message}` : rule.message,
-    limitPct: rule.limitPct ?? undefined,
+    limitPct: rule.minAmount != null ? undefined : rule.limitPct ?? undefined,
+    minAmount: rule.minAmount ?? undefined,
     basis: rule.basis ?? undefined,
     severity: rule.severity ?? undefined,
     quote: rule.quote,
-    categoryIds: linkTo(`${rule.item ?? ''} ${rule.message}`),
+    categoryIds: linkTo(rule.item, rule.message),
     source: source(rule.ref),
   }));
 

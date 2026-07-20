@@ -57,11 +57,21 @@ export const visibleCategories = (pack: RulePack, project: Project): PackCategor
     return amount > 0 || used;
   });
 
+// 공고문에서 온 "OO비목에 반드시 N원 이상 계상" 같은 정액 필수 계상 요구사항.
+export interface CategoryMin { amount: number; label: string; rule: PackRule }
+export const minFor = (pack: RulePack, categoryId: BudgetCategoryId): CategoryMin | null => {
+  const rule = pack.rules.find((r) => r.kind === 'minimum' && r.minAmount != null && r.categoryIds?.includes(categoryId));
+  if (!rule || rule.minAmount == null) return null;
+  return { amount: rule.minAmount, label: `${rule.item ? `${rule.item}: ` : ''}${formatWon(rule.minAmount)} 이상 필수 계상`, rule };
+};
+
+// 초안 배분 후 필수 계상 항목이 있으면 최소 금액 이상이 되도록 끌어올린다 (전체 합계는 재조정하지 않음 — 편성 화면에서 확인 후 조정).
 export const makeDraftBudgets = (pack: RulePack, total: number): BudgetItem[] =>
-  pack.categories.filter((category) => category.allowed).map((category) => ({
-    categoryId: category.id,
-    amount: Math.round(total * category.draftRate / 100),
-  }));
+  pack.categories.filter((category) => category.allowed).map((category) => {
+    const amount = Math.round(total * category.draftRate / 100);
+    const min = minFor(pack, category.id);
+    return { categoryId: category.id, amount: min && amount < min.amount ? min.amount : amount };
+  });
 
 // 카드 결제는 카드 영수증이 세금계산서·계좌이체 확인증 역할을 대신하므로 해당 서류를 요구하지 않는다.
 export const documentsFor = (category: PackCategory, payment: PaymentMethod): string[] => {
@@ -121,6 +131,50 @@ export const transferLimitError = (pack: RulePack, budgets: BudgetItem[], totalB
 
 // ---- 공용 유틸 ----
 export const formatWon = (value: number) => `${Math.round(value).toLocaleString('ko-KR')}원`;
+
+// ---- 재원 구성 (지원금 / 민간부담금 현금·현물) ----
+// 정산 관행상 금액은 천 원 단위에서 올림 처리한다.
+const ceilThousand = (value: number) => Math.ceil(value / 1000) * 1000;
+
+// 공고문에 나온 지원금 실액과 지원비율(%)로 총사업비를 역산한다. 지원비율 100(자기부담 없음)이면 지원금=총사업비.
+export const deriveTotalBudget = (subsidyAmount: number, subsidyRate: number): number =>
+  subsidyRate > 0 && subsidyRate < 100 ? ceilThousand(subsidyAmount / (subsidyRate / 100)) : subsidyAmount;
+
+// 민간부담금 중 현금은 "비율 이상" 최소 기준이므로 올림, 현물은 나머지(= 민간부담금 합계 - 현금)로 계산해 합계가 항상 일치하도록 한다.
+const splitMatching = (matching: number, matchingCashRate: number) => {
+  if (matching <= 0) return { matchingCash: 0, matchingInKind: 0 };
+  const matchingCash = Math.min(ceilThousand(matching * matchingCashRate / 100), matching);
+  return { matchingCash, matchingInKind: matching - matchingCash };
+};
+
+export interface FundingBreakdown {
+  subsidy: number;          // 지원금(정부지원금)
+  matching: number;         // 민간부담금 합계
+  matchingCash: number;     // 민간부담금 — 현금 (matchingCashRateKnown=false면 미확정, 0)
+  matchingInKind: number;   // 민간부담금 — 현물 (matchingCashRateKnown=false면 미확정, 0)
+  matchingCashRate: number; // 적용된 현금 비율 %
+  matchingCashRateKnown: boolean; // false면 현금 비율을 아직 확인하지 못해 현금·현물을 나누지 않은 상태
+}
+
+// 저장된 totalBudget·subsidyAmount로 지원금/민간부담금(현금·현물)을 계산한다.
+// subsidyAmount가 없는 구버전 과제는 자기부담 없음(지원금 = 총사업비)으로 취급한다.
+// 민간부담금이 있는데 현금 비율을 아직 모르면(matchingCashRate 미입력) 임의로 100%나 0%로 단정하지 않고 "확인 필요" 상태로 둔다.
+export const fundingBreakdown = (project: Project): FundingBreakdown => {
+  const subsidy = Math.min(project.subsidyAmount ?? project.totalBudget, project.totalBudget);
+  const matching = Math.max(project.totalBudget - subsidy, 0);
+  const matchingCashRateKnown = matching === 0 || project.matchingCashRate != null;
+  const matchingCashRate = matchingCashRateKnown ? (project.matchingCashRate ?? 100) : 0;
+  const { matchingCash, matchingInKind } = matchingCashRateKnown ? splitMatching(matching, matchingCashRate) : { matchingCash: 0, matchingInKind: 0 };
+  return { subsidy, matching, matchingCash, matchingInKind, matchingCashRate, matchingCashRateKnown };
+};
+
+// 과제 등록·설정 화면에서 저장 전 입력값으로 같은 계산을 미리보기할 때 쓴다.
+export const previewFunding = (subsidyAmount: number, subsidyRate: number, matchingCashRate: number) => {
+  const totalBudget = deriveTotalBudget(subsidyAmount, subsidyRate);
+  const matching = Math.max(totalBudget - subsidyAmount, 0);
+  const { matchingCash, matchingInKind } = splitMatching(matching, matchingCashRate);
+  return { totalBudget, matching, matchingCash, matchingInKind };
+};
 
 export const REASON_TEMPLATES = [
   { key: 'outsource-inhouse', label: '외주 → 자체 수행 전환', text: '외부 용역으로 계획한 개발 범위를 내부 연구인력의 역량 확보에 따라 자체 수행으로 전환하고, 이에 필요한 인건비를 증액하고자 합니다.' },
