@@ -18,6 +18,7 @@ vite.config.d.ts
 # Claude Code local settings
 .claude/settings.local.json
 .agents/
+.worktrees/
 
 # Local browser verification artifacts
 .chrome-verify/
