@@ -70,7 +70,7 @@ describe('HWPX 섹션 XML 텍스트 추출', () => {
     expect(collectHwpxSectionText(xml)).toBe('2026년 예비창업패키지 모집공고\n사업비 상한은 40% <예시> & 안내');
   });
 
-  it('표 등 중첩 구조 안의 텍스트도 문단 단위로 수집한다', () => {
+  it('collectHwpxSectionText는 표 태그를 특수 취급하지 않고 안의 텍스트만 모은다 (구조 보존은 collectHwpxSectionContent 담당)', () => {
     const xml = `<hp:p a="1"><hp:tbl><hp:tr><hp:tc><hp:subList><hp:p><hp:run><hp:t>비목</hp:t></hp:run></hp:p></hp:subList></hp:tc></hp:tr></hp:tbl><hp:run><hp:t>재료비</hp:t></hp:run></hp:p>`;
     const text = collectHwpxSectionText(xml);
     expect(text).toContain('비목');

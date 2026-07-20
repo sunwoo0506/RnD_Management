@@ -195,7 +195,7 @@ const extractHwpx = async (file: File): Promise<string> => {
     .filter((name) => /^Contents\/section\d+\.xml$/i.test(name))
     .sort((a, b) => Number(/(\d+)/.exec(a)?.[1] ?? 0) - Number(/(\d+)/.exec(b)?.[1] ?? 0));
   if (!sectionNames.length) throw new Error('HWPX 본문(section*.xml)을 찾지 못했습니다. PDF로 변환해 업로드해주세요.');
-  const text = sectionNames.map((name) => collectHwpxSectionText(strFromU8(entries[name]))).join('\n');
+  const text = sectionNames.map((name) => collectHwpxSectionContent(strFromU8(entries[name]))).join('\n');
   if (text.replace(/\s/g, '').length < 20) throw new Error('HWPX에서 텍스트를 읽지 못했습니다. PDF로 변환해 업로드해주세요.');
   return text;
 };
