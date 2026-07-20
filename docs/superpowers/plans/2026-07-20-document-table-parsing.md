@@ -1210,3 +1210,4 @@ git commit -m "test: 표 구조 보존 기능 전체 회귀 확인"
 - ✅ 인터페이스 불변 — Task 6, 9, 12에서 기존 `extractHwpx`/`extractPdf`/`collectHwpSectionText`의 시그니처 유지
 - ✅ 회귀 테스트(표 없는 문서는 기존과 동일) — Task 5, 9, 12에 각각 포함
 - ⚠️ 표 중첩, 다단 레이아웃 오탐 — 스펙에서 이미 "비목표"로 명시, 별도 태스크 없음 (의도됨)
+- ⚠️ **후속 필요**: PDF는 HWPX(Task 6 체크포인트 리뷰에서 추가된 zip 기반 end-to-end 테스트)와 달리, `extractPdf`/`extractDocumentText`를 실제 PDF 파일로 처음부터 끝까지 검증하는 테스트가 없다 (Task 9 체크포인트 리뷰에서 발견, `pdfjs-dist` 워커를 jsdom 테스트 환경에서 띄우는 비용 때문에 이번엔 보류함). Task 13의 수동 확인(실제 PDF 업로드)이 임시로 이 공백을 메우지만, 자동화된 회귀 테스트로 남기는 게 이상적 — 별도 후속 작업으로 추적.
