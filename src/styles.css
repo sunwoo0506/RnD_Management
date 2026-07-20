@@ -270,4 +270,24 @@ input[readonly] { background: #f7f8fa; color: #667087; pointer-events: none; }
   .setup-copy { padding: 32px 26px; }
   .setup-copy h1 { font-size: 30px; letter-spacing: -1px; }
   .setup-form { padding: 26px 22px; }
+  .setup-form.wizard { max-height: none; overflow-y: visible; }
+
+  /* 입력창 — 16px 미만이면 iOS가 포커스 시 화면을 강제 확대한다 */
+  label { min-width: 0; }
+  input, select, textarea { font-size: 16px; padding: 10px 12px; min-height: 46px; width: 100%; min-width: 0; }
+  input[type='checkbox'], input[type='radio'] { width: auto; min-height: 0; padding: 0; }
+  input[type='date'] { -webkit-appearance: none; appearance: none; display: flex; align-items: center; }
+  select { -webkit-appearance: none; appearance: none; background: white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23758096' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center; padding-right: 28px; }
+  .money-input { height: 46px; }
+  .money-input input { min-height: 0; font-size: 16px; }
+  .search-row input, .person-add input { width: auto; }
+  .search-row .secondary { flex: none; }
+  .doc-item { flex-wrap: wrap; }
+  .doc-item .doc-name { flex: 1 1 100%; }
+  .doc-item .doc-status { flex: 1; max-width: none; }
+  .doc-item select { width: auto; min-height: 40px; padding: 6px 24px 6px 8px; font-size: 13px; }
+  .participant label b { bottom: 14px; }
+  .doc-item button { padding: 8px; }
+  .auth-card { margin: 20px 14px 0; padding: 28px 20px; }
+  .primary.large { height: 50px; }
 }
