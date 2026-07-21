@@ -124,6 +124,23 @@ export interface EmailLog {
   incompleteCount: number;
 }
 
+export type DocumentApplicationType = 'COMMON' | 'MINISTRY' | 'AGENCY' | 'PROGRAM' | 'AGREEMENT' | 'INTERNAL' | 'REFERENCE';
+
+// 과제 전용 문서함 항목 — 공유 문서고의 특정 버전을 연결(link)했거나, 이 과제만의 비공개 파일을 올린(upload) 것.
+export interface ProjectDocumentLink {
+  id: string;
+  kind: 'link' | 'upload';
+  documentVersionId?: string; // kind='link' — 공유 문서고 document_versions.id 참조
+  storagePath?: string;       // kind='link' — 연결 시점의 파일 위치 스냅샷(승인된 버전 파일은 불변이라 안전)
+  fileId?: string;            // kind='upload' — project-documents 버킷의 파일 id
+  fileName: string;
+  documentType?: string;      // kind='upload'일 때 사용자가 고른 문서유형 (DocumentType 코드)
+  title: string;
+  applicationType: DocumentApplicationType;
+  isConfirmed: boolean;
+  createdAt: string;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -138,6 +155,7 @@ export interface Project {
   subsidyRate?: number;         // 총사업비 중 지원금 비율 % (공고문 기준) — 지원금으로 총사업비를 역산할 때 사용. 미입력 시 100 = 전액 지원(자기부담 없음)
   matchingCashRate?: number;    // 민간부담금 중 현금 비율 % (공고문 기준). 미입력 시 100 = 전액 현금
   programName?: string;         // 사업명 — 공유 DB에서 근거 원본 문서를 찾는 검색 키
+  programRegistryId?: string;   // program_registry.id 수동 연결 — packId가 공유 팩이 아닐 때(내장·AI추출 팩)만 사용
   customPack?: RulePack;        // 공유 레지스트리에서 불러온 팩 스냅샷 (있으면 내장 팩보다 우선)
   budgetConfirmed?: boolean;    // 편성 확정 시 미사용(0원) 비목을 화면에서 숨긴다
   members: Member[];
@@ -146,6 +164,7 @@ export interface Project {
   expenses: Expense[];
   changes: BudgetChange[];
   emailLogs: EmailLog[];
+  documents?: ProjectDocumentLink[];
   createdAt: string;
 }
 

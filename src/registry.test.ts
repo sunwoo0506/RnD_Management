@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { guessDocRole, matchDocToSource, type RegistryDocEntry } from './registry';
+import { guessDocumentType, matchDocToSource, type DocumentEntry } from './registry';
 
-const doc = (id: string, fileName: string, role: RegistryDocEntry['role']): RegistryDocEntry =>
-  ({ id, fileName, role, storagePath: `${id}.bin`, year: 2026 });
+const doc = (id: string, fileName: string, documentType: DocumentEntry['documentType']): DocumentEntry =>
+  ({ id, documentId: id, title: fileName, documentType, fileName, storagePath: `${id}.bin`, versionLabel: null, effectiveFrom: null });
 
 const docs = [
-  doc('a', '2026 예비창업패키지 모집공고.hwp', 'notice'),
-  doc('b', '예비창업패키지 주요 질의응답(QnA).hwp', 'notice'),
-  doc('c', '중소기업창업 지원사업 통합관리지침 제14차.pdf', 'guideline'),
-  doc('d', '별첨2 증빙서류 제출목록.hwp', 'form'),
+  doc('a', '2026 예비창업패키지 모집공고.hwp', 'PROGRAM_NOTICE'),
+  doc('b', '예비창업패키지 주요 질의응답(QnA).hwp', 'QNA_RESPONSE'),
+  doc('c', '중소기업창업 지원사업 통합관리지침 제14차.pdf', 'ADMINISTRATIVE_RULE'),
+  doc('d', '별첨2 증빙서류 제출목록.hwp', 'PROGRAM_ATTACHMENT'),
 ];
 
 describe('근거 → 원본 문서 매칭', () => {
@@ -33,10 +33,16 @@ describe('근거 → 원본 문서 매칭', () => {
   });
 });
 
-describe('문서 역할 추정', () => {
-  it('질의응답·QnA 파일은 공고 계열로 분류한다', () => {
-    expect(guessDocRole('주요 질의응답.hwp')).toBe('notice');
-    expect(guessDocRole('사업 QnA 모음.pdf')).toBe('notice');
-    expect(guessDocRole('집행 교육 매뉴얼.pdf')).toBe('manual');
+describe('문서 유형 추정', () => {
+  it('질의응답·QnA 파일은 질의회신으로, 매뉴얼·교육 자료는 전문기관 지침으로 분류한다', () => {
+    expect(guessDocumentType('주요 질의응답.hwp')).toBe('QNA_RESPONSE');
+    expect(guessDocumentType('사업 QnA 모음.pdf')).toBe('QNA_RESPONSE');
+    expect(guessDocumentType('집행 교육 매뉴얼.pdf')).toBe('AGENCY_GUIDELINE');
+  });
+
+  it('협약서·사업계획서·공고문은 각각의 유형으로 분류한다', () => {
+    expect(guessDocumentType('2026년 지원사업 협약서.pdf')).toBe('AGREEMENT');
+    expect(guessDocumentType('사업계획서(수정).hwp')).toBe('BUSINESS_PLAN');
+    expect(guessDocumentType('2026 예비창업패키지 모집공고.hwp')).toBe('PROGRAM_NOTICE');
   });
 });

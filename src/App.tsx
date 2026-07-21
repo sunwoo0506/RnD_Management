@@ -8,12 +8,12 @@ import {
 import type { Session } from '@supabase/supabase-js';
 import { capFor, categoryOf, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, rulesFor, transferLimitError, visibleCategories } from './rules';
 import { collectEvidenceIds, downloadBackup, loadProject, parseBackup, saveProject } from './storage';
-import { authErrorKo, deleteEvidence, fetchCloudProject, getEvidence, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence } from './cloud';
+import { authErrorKo, deleteEvidence, deleteProjectDocuments, fetchCloudProject, getEvidence, getProjectDocument, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
 import { isCloudEnabled, supabase } from './supabase';
-import { deleteRegistryDocument, downloadRegistryDocument, guessDocRole, isRegistryAdmin, listRegistryDocuments, matchDocToSource, REGISTRY_ROLE_LABEL, registryEnabled, saveRegistryEntry, uploadRegistryDocument, type RegistryDocEntry } from './registry';
+import { DOCUMENT_TYPE_LABEL, downloadRegistryDocument, getProgramById, guessDocumentType, matchDocToSource, myPendingSubmissions, projectRegistryId, registryEnabled, searchDocumentsByProgram, searchRegistry, submitRegistryShare, type DocumentEntry, type DocumentType, type RegistryEntry } from './registry';
 import { annotateVerification, buildCustomPack, fundingScheduleAmountWon, runExtraction, suggestedFundingRates, type Extraction } from './llmExtract';
 import SetupWizard from './SetupWizard';
-import type { BudgetCategoryId, BudgetItem, Evidence, Expense, Participant, PaymentMethod, Project, Screen } from './types';
+import type { BudgetCategoryId, BudgetItem, Evidence, Expense, Participant, PaymentMethod, Project, ProjectDocumentLink, Screen } from './types';
 
 // 문서 생성 라이브러리(docx·excel)는 무거워서 첫 화면 번들에서 제외하고 버튼 클릭 시에만 불러온다.
 const withExporters = async (run: (mod: typeof import('./exporters')) => Promise<void>) => {
@@ -103,7 +103,7 @@ function Overview({ project, setScreen }: { project: Project; setScreen: (s: Scr
 }
 
 // 공유 DB에 저장된 이 사업의 원본 문서(공고문·지침·매뉴얼)를 조회·업로드·미리보기하는 공용 훅.
-interface DocViewer { doc: RegistryDocEntry; kind: 'loading' | 'pdf' | 'image' | 'text'; url?: string; text?: string; highlights?: string[] }
+interface DocViewer { doc: DocumentEntry; kind: 'loading' | 'pdf' | 'image' | 'text'; url?: string; text?: string; highlights?: string[] }
 
 // 근거 문구에서 팝업 하이라이트용 위치 패턴(제65조, 사업비 3번, 별표 1...)을 뽑는다.
 const refPatternTerms = (ref: string): string[] => {
@@ -154,19 +154,38 @@ const renderHighlighted = (text: string, terms?: string[]) => {
   return parts;
 };
 
-function useSourceDocs(project: Project) {
-  const pack = packFor(project);
-  const searchKey = project.programName ?? pack.name;
-  const [srcDocs, setSrcDocs] = useState<RegistryDocEntry[] | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+// "근거 원본 문서" — project.documents(과제가 실제로 골라둔 문서 세트)가 유일한 출처다.
+// kind:'link'(공유 문서고에서 연결)만 규정 인용 매칭(docForSource)·팝업 미리보기 대상이 되고,
+// kind:'upload'(이 과제 전용 비공개 파일)는 목록·다운로드에만 쓰인다.
+function useSourceDocs(project: Project, update: (p: Project) => void) {
+  const docs = project.documents ?? [];
+  const linkedEntries: DocumentEntry[] = docs
+    .filter((d): d is ProjectDocumentLink & { documentVersionId: string; storagePath: string } => d.kind === 'link' && !!d.documentVersionId && !!d.storagePath)
+    .map((d) => ({
+      id: d.documentVersionId, documentId: d.documentVersionId, title: d.title,
+      documentType: (d.documentType ?? 'OTHER') as DocumentEntry['documentType'],
+      versionLabel: null, effectiveFrom: null, fileName: d.fileName, storagePath: d.storagePath,
+    }));
+  const [pendingCount, setPendingCount] = useState(0);
   const [viewer, setViewer] = useState<DocViewer | null>(null);
-  useEffect(() => {
-    if (!registryEnabled()) { setSrcDocs([]); return; }
-    listRegistryDocuments(searchKey).then(setSrcDocs).catch(() => setSrcDocs([]));
-  }, [searchKey]);
-  useEffect(() => { if (registryEnabled()) isRegistryAdmin().then(setIsAdmin).catch(() => {}); }, []);
+  const [uploading, setUploading] = useState(false);
+  const [programQuery, setProgramQuery] = useState('');
+  const [programResults, setProgramResults] = useState<RegistryEntry[] | null>(null);
+  const [programSearching, setProgramSearching] = useState(false);
+  const [programDocChecklist, setProgramDocChecklist] = useState<DocumentEntry[] | null>(null);
+  const [loadingProgramDocs, setLoadingProgramDocs] = useState(false);
+  const [checkedDocIds, setCheckedDocIds] = useState<Set<string>>(new Set());
+
+  const refreshPending = () => {
+    if (!registryEnabled()) return;
+    myPendingSubmissions().then((rows) => setPendingCount(rows.length)).catch(() => {});
+  };
+  useEffect(() => { refreshPending();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const closeViewer = () => setViewer((prev) => { if (prev?.url) URL.revokeObjectURL(prev.url); return null; });
-  const downloadDoc = async (doc: RegistryDocEntry) => {
+  const downloadDoc = async (doc: DocumentEntry) => {
     try {
       const blob = await downloadRegistryDocument(doc.storagePath);
       const url = URL.createObjectURL(blob);
@@ -174,9 +193,19 @@ function useSourceDocs(project: Project) {
       URL.revokeObjectURL(url);
     } catch (error) { alert(`다운로드에 실패했습니다: ${error instanceof Error ? error.message : ''}`); }
   };
+  // kind에 따라 버킷이 다르다 — 업로드 파일은 미리보기 인프라가 없어 바로 다운로드로 처리한다.
+  const downloadAny = async (link: ProjectDocumentLink) => {
+    try {
+      const blob = link.kind === 'upload' && link.fileId ? await getProjectDocument(link.fileId) : await downloadRegistryDocument(link.storagePath!);
+      if (!blob) throw new Error('파일을 찾을 수 없습니다.');
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a'); anchor.href = url; anchor.download = link.fileName; anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) { alert(`다운로드에 실패했습니다: ${error instanceof Error ? error.message : ''}`); }
+  };
   // 팝업 미리보기: PDF·이미지·텍스트는 그대로, HWP/HWPX는 본문 텍스트를 추출해 보여준다.
   // highlights가 있으면 텍스트 미리보기에서 해당 부분을 빨간색으로 강조한다.
-  const viewDoc = async (doc: RegistryDocEntry, highlights?: string[]) => {
+  const viewDoc = async (doc: DocumentEntry, highlights?: string[]) => {
     setViewer({ doc, kind: 'loading', highlights });
     try {
       const blob = await downloadRegistryDocument(doc.storagePath);
@@ -198,26 +227,96 @@ function useSourceDocs(project: Project) {
       alert(`미리보기에 실패했습니다: ${error instanceof Error ? error.message : ''} — 다운로드로 확인해주세요.`);
     }
   };
-  const uploadSourceDocs = async (files: FileList | null) => {
+
+  const setDocs = (next: ProjectDocumentLink[]) => update({ ...project, documents: next });
+
+  // 이 과제 전용으로 즉시 저장(목록에 바로 뜬다). share가 true면 공유 문서고에도 추가로 신청한다
+  // (관리자 검토 후 다른 사용자에게도 노출 — 업로드 자체와는 별개라 신청만 실패해도 업로드는 유지).
+  const uploadDocs = async (files: FileList | null, share: boolean) => {
     if (!files?.length) return;
+    if (!registryEnabled()) { alert('로그인 후 이용할 수 있어요.'); return; }
+    // 배열로 한 번에 복사해둔다 — input이 비동기 처리 중간에 초기화되면(호출부에서
+    // e.target.value = '' 처리) 원본 FileList가 그 즉시 비어버려서, 나중에(await 이후)
+    // files를 다시 읽으면 빈 배열이 된다. 그래서 공유 신청 쪽 docs가 조용히 빈 배열로
+    // 전달돼 아무 것도 안 올라가는데 에러도 안 나는 문제가 있었다.
+    const fileArray = [...files];
+    setUploading(true);
     try {
-      for (const file of [...files]) {
-        await uploadRegistryDocument(file, { programName: searchKey, year: null, role: guessDocRole(file.name) });
+      const added: ProjectDocumentLink[] = [];
+      for (const file of fileArray) {
+        const fileId = crypto.randomUUID();
+        await storeProjectDocument(fileId, file);
+        added.push({
+          id: crypto.randomUUID(), kind: 'upload', fileId, fileName: file.name,
+          documentType: guessDocumentType(file.name), title: file.name.replace(/\.[^./]+$/, ''),
+          applicationType: 'REFERENCE', isConfirmed: false, createdAt: new Date().toISOString(),
+        });
       }
-      setSrcDocs(await listRegistryDocuments(searchKey));
+      setDocs([...docs, ...added]);
+      if (share) {
+        try {
+          const shareDocs = fileArray.map((file) => ({ file, documentType: guessDocumentType(file.name) }));
+          await submitRegistryShare({ programName: project.programName ?? packFor(project).name, year: null, docs: shareDocs });
+          refreshPending();
+        } catch (shareError) { alert(`업로드는 됐지만 공유 신청에는 실패했습니다: ${shareError instanceof Error ? shareError.message : ''}`); }
+      }
     } catch (error) { alert(`업로드에 실패했습니다: ${error instanceof Error ? error.message : ''}`); }
+    finally { setUploading(false); }
   };
-  const deleteSourceDoc = async (doc: RegistryDocEntry) => {
-    if (!confirm(`"${doc.fileName}"을(를) 공유 규정 DB에서 삭제할까요? 같은 사업을 검색하는 다른 사용자에게도 더 이상 보이지 않습니다.`)) return;
-    try {
-      await deleteRegistryDocument(doc);
-      setSrcDocs((prev) => prev?.filter((item) => item.id !== doc.id) ?? prev);
-    } catch (error) { alert(`삭제에 실패했습니다: ${error instanceof Error ? error.message : ''}`); }
+
+  const searchPrograms = async () => {
+    if (!programQuery.trim()) return;
+    setProgramSearching(true);
+    try { setProgramResults(await searchRegistry(programQuery)); }
+    catch (error) { alert(`검색에 실패했습니다: ${error instanceof Error ? error.message : ''}`); }
+    finally { setProgramSearching(false); }
   };
+
+  // 사업명을 고르면 그 사업의 문서 체크박스 목록을 불러온다. 과제가 아직 사업명에 연결돼
+  // 있지 않으면(내장·AI추출 팩) 이 선택이 곧 그 연결이 된다.
+  const pickProgram = async (entry: RegistryEntry) => {
+    if (!projectRegistryId(project.packId) && !project.programRegistryId) update({ ...project, programRegistryId: entry.id });
+    setCheckedDocIds(new Set());
+    setLoadingProgramDocs(true);
+    try { setProgramDocChecklist(await searchDocumentsByProgram(entry.id)); }
+    catch (error) { alert(`불러오기에 실패했습니다: ${error instanceof Error ? error.message : ''}`); }
+    finally { setLoadingProgramDocs(false); }
+  };
+
+  const toggleChecked = (id: string) => setCheckedDocIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+
+  const addCheckedDocs = () => {
+    if (!programDocChecklist) return;
+    const chosen = programDocChecklist.filter((doc) => checkedDocIds.has(doc.id) && !docs.some((d) => d.documentVersionId === doc.id));
+    if (!chosen.length) return;
+    const added: ProjectDocumentLink[] = chosen.map((doc) => ({
+      id: crypto.randomUUID(), kind: 'link', documentVersionId: doc.id, storagePath: doc.storagePath,
+      fileName: doc.fileName, title: doc.title, documentType: doc.documentType,
+      applicationType: 'COMMON', isConfirmed: false, createdAt: new Date().toISOString(),
+    }));
+    setDocs([...docs, ...added]);
+    setCheckedDocIds(new Set());
+  };
+
+  const toggleConfirm = (id: string) => setDocs(docs.map((item) => item.id === id ? { ...item, isConfirmed: !item.isConfirmed } : item));
+
+  const removeDoc = async (link: ProjectDocumentLink) => {
+    if (!confirm(`"${link.title}"을(를) 목록에서 삭제할까요?`)) return;
+    if (link.kind === 'upload' && link.fileId) {
+      try { await deleteProjectDocuments([link.fileId]); } catch { /* 파일 삭제 실패해도 목록에서는 제거 */ }
+    }
+    setDocs(docs.filter((item) => item.id !== link.id));
+  };
+
   // 규칙의 출처(문서명·근거 문구)와 가장 잘 맞는 원본 문서를 찾는다 (QnA 근거→질의응답 파일, 조문 근거→지침 파일).
-  const docForSource = (source: { doc?: string; ref?: string; matchLevel: string }): RegistryDocEntry | undefined =>
-    srcDocs?.length ? matchDocToSource(srcDocs, source) : undefined;
-  return { srcDocs, isAdmin, viewDoc, downloadDoc, uploadSourceDocs, deleteSourceDoc, docForSource, viewer, closeViewer };
+  const docForSource = (source: { doc?: string; ref?: string; matchLevel: string }): DocumentEntry | undefined =>
+    linkedEntries.length ? matchDocToSource(linkedEntries, source) : undefined;
+
+  return {
+    docs, linkedEntries, pendingCount, viewer, closeViewer, viewDoc, downloadDoc, downloadAny, docForSource,
+    uploading, uploadDocs, programQuery, setProgramQuery, programResults, programSearching, searchPrograms, pickProgram,
+    programDocChecklist, loadingProgramDocs, checkedDocIds, toggleChecked, addCheckedDocs, toggleConfirm, removeDoc,
+  };
 }
 
 function DocViewerModal({ source }: { source: ReturnType<typeof useSourceDocs> }) {
@@ -237,7 +336,7 @@ function DocViewerModal({ source }: { source: ReturnType<typeof useSourceDocs> }
   const highlighted = viewer.kind === 'text' && !!viewer.highlights?.length;
   return <div className="doc-viewer-overlay" onClick={closeViewer}>
     <div className="doc-viewer" role="dialog" aria-label={viewer.doc.fileName} onClick={(event) => event.stopPropagation()}>
-      <header><div><strong>{REGISTRY_ROLE_LABEL[viewer.doc.role]}</strong><span>{viewer.doc.fileName}</span></div>
+      <header><div><strong>{DOCUMENT_TYPE_LABEL[viewer.doc.documentType]}</strong><span>{viewer.doc.fileName}</span></div>
         <div className="viewer-actions"><button type="button" className="secondary" onClick={() => downloadDoc(viewer.doc)}><Download /> 원본 다운로드</button><button type="button" className="close" aria-label="닫기" onClick={closeViewer}>×</button></div></header>
       {viewer.kind === 'loading' && <div className="viewer-scroll"><p className="viewer-note">문서를 불러오는 중…</p></div>}
       {viewer.kind === 'pdf' && <iframe title={viewer.doc.fileName} src={viewer.url} />}
@@ -249,9 +348,68 @@ function DocViewerModal({ source }: { source: ReturnType<typeof useSourceDocs> }
 
 function SourceDocsPanel({ source }: { source: ReturnType<typeof useSourceDocs> }) {
   if (!registryEnabled()) return null;
-  const { srcDocs, isAdmin, viewDoc, uploadSourceDocs, deleteSourceDoc } = source;
-  return <section className="panel source-docs"><div className="panel-head"><div><h3><FileText /> 근거 원본 문서</h3><p>공유 규정 DB에 저장된 이 사업의 원본 자료입니다. 누르면 팝업으로 바로 확인할 수 있어요.</p></div>{isAdmin && <label className="upload-button"><Upload /> 원본 문서 올리기<input type="file" multiple accept=".pdf,.hwp,.hwpx,.txt,.md,image/*" onChange={(e) => { uploadSourceDocs(e.target.files); e.target.value = ''; }} /></label>}</div>
-    {srcDocs === null ? <p className="doc-empty">불러오는 중…</p> : srcDocs.length ? <div className="source-doc-list">{srcDocs.map((doc) => <div className="source-doc-row" key={doc.id}><button type="button" onClick={() => viewDoc(doc)}><FileText /><span><strong>{REGISTRY_ROLE_LABEL[doc.role]}</strong><small>{doc.fileName}{doc.year ? ` · ${doc.year}` : ''}</small></span><Eye /></button>{isAdmin && <button type="button" className="doc-delete" aria-label={`${doc.fileName} 삭제`} onClick={() => deleteSourceDoc(doc)}><Trash2 /></button>}</div>)}</div> : <p className="doc-empty">아직 저장된 원본 문서가 없어요. {isAdmin ? '"원본 문서 올리기"로 공고문·지침·매뉴얼을 올리면 모든 근거 표시에서 바로 열 수 있습니다.' : '관리자가 원본 문서를 올리면 여기에 나타납니다.'}</p>}
+  const {
+    docs, linkedEntries, pendingCount, viewDoc, downloadAny, uploading, uploadDocs,
+    programQuery, setProgramQuery, programResults, programSearching, searchPrograms, pickProgram,
+    programDocChecklist, loadingProgramDocs, checkedDocIds, toggleChecked, addCheckedDocs,
+    toggleConfirm, removeDoc,
+  } = source;
+  const [share, setShare] = useState(false);
+  const openDoc = (link: ProjectDocumentLink) => {
+    if (link.kind === 'link') {
+      const entry = linkedEntries.find((e) => e.id === link.documentVersionId);
+      if (entry) { viewDoc(entry); return; }
+    }
+    downloadAny(link);
+  };
+  return <section className="panel source-docs">
+    <div className="panel-head">
+      <div><h3><FileText /> 근거 원본 문서</h3><p>이 과제의 근거 자료입니다. 직접 올리거나, 사업명을 검색해 공유 문서고에서 불러올 수 있어요.</p></div>
+    </div>
+    {/* 파일 선택 즉시 업로드가 시작되므로, 공유 체크는 반드시 업로드 "전에" 눌러야 한다 —
+        순서를 놓치기 쉬워서 별도 안내 박스로 눈에 띄게 분리했다. */}
+    <div className="notice" style={{ margin: '0 22px 14px' }}>
+      <CloudUpload />
+      <div>
+        <strong>다른 사람과도 공유하려면 순서가 중요해요</strong>
+        <span>① "공유" 체크 → ② "문서 업로드" 클릭 — 이 순서로 눌러야 관리자 검토 후 공유돼요. 업로드부터 하면 이 과제에만 저장되고 공유되지 않아요.</span>
+      </div>
+    </div>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 14, padding: '0 22px 14px', flexWrap: 'wrap' }}>
+      <label className="share-toggle" style={{ padding: 0 }}><input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} /><span><b>① 공유</b> — 다른 사용자와도 공유(관리자 검토 후)</span></label>
+      <label className="upload-button"><Upload /> {uploading ? '업로드 중…' : '② 문서 업로드'}<input type="file" multiple disabled={uploading} accept=".pdf,.hwp,.hwpx,.txt,.md,image/*" onChange={(e) => { uploadDocs(e.target.files, share); e.target.value = ''; }} /></label>
+    </div>
+    {pendingCount > 0 && <p className="doc-empty">내가 올린 공유 신청 중 검토 대기 중인 것이 {pendingCount}건 있어요.</p>}
+
+    <div className="admin-card-fields">
+      <p className="wiz-hint">사업명을 검색하면 공유 문서고에 등록된 문서를 체크박스로 골라 불러올 수 있어요.</p>
+      <div className="search-row"><input value={programQuery} onChange={(e) => setProgramQuery(e.target.value)} placeholder="사업명 검색" onKeyDown={(e) => { if (e.key === 'Enter') searchPrograms(); }} /><button type="button" className="secondary" onClick={searchPrograms} disabled={programSearching}>{programSearching ? '검색 중…' : '검색'}</button></div>
+      {programResults && (programResults.length ? <div className="source-doc-list">{programResults.map((entry) => <div className="source-doc-row" key={entry.id}>
+        <button type="button" onClick={() => pickProgram(entry)}><FileText /><span><strong>{entry.programName}</strong><small>{entry.year ?? ''}</small></span></button>
+      </div>)}</div> : <p className="doc-empty">검색 결과가 없어요.</p>)}
+      {loadingProgramDocs && <p className="doc-empty">불러오는 중…</p>}
+      {programDocChecklist && !loadingProgramDocs && (programDocChecklist.length ? <>
+        <div className="source-doc-list">{programDocChecklist.map((doc) => {
+          const already = docs.some((d) => d.documentVersionId === doc.id);
+          return <label key={doc.id} className="share-toggle">
+            <input type="checkbox" disabled={already} checked={already || checkedDocIds.has(doc.id)} onChange={() => toggleChecked(doc.id)} />
+            <span><strong>{DOCUMENT_TYPE_LABEL[doc.documentType]}</strong> {doc.title}{doc.versionLabel ? ` · ${doc.versionLabel}` : ''}{already ? ' · 이미 추가됨' : ''}</span>
+          </label>;
+        })}</div>
+        <button type="button" className="secondary" disabled={checkedDocIds.size === 0} onClick={addCheckedDocs}>선택한 문서 추가 ({checkedDocIds.size})</button>
+      </> : <p className="doc-empty">이 사업에 등록된 문서가 없어요.</p>)}
+    </div>
+
+    {docs.length === 0 ? <p className="doc-empty">아직 등록된 문서가 없어요. 위에서 업로드하거나 사업명을 검색해 불러와보세요.</p> : <div className="source-doc-list">
+      {docs.map((link) => <div className="source-doc-row" key={link.id}>
+        <button type="button" onClick={() => openDoc(link)}>
+          <FileText /><span><strong>{DOCUMENT_TYPE_LABEL[(link.documentType as DocumentType) ?? 'OTHER']}</strong><small>{link.title} · {link.kind === 'link' ? '공유 문서' : '이 과제 전용'}{link.isConfirmed ? ' · 적용 확정' : ''}</small></span>
+          {link.kind === 'link' ? <Eye /> : <Download />}
+        </button>
+        <button type="button" className="secondary" onClick={() => toggleConfirm(link.id)}>{link.isConfirmed ? '확정 해제' : '적용 확정'}</button>
+        <button type="button" className="danger-button" onClick={() => removeDoc(link)}><Trash2 /> 삭제</button>
+      </div>)}
+    </div>}
     <DocViewerModal source={source} />
   </section>;
 }
@@ -260,7 +418,7 @@ function Budget({ project, update }: { project: Project; update: (p: Project) =>
   const pack = packFor(project);
   const cats = visibleCategories(pack, project);
   const confirmed = !!project.budgetConfirmed;
-  const sourceDocs = useSourceDocs(project);
+  const sourceDocs = useSourceDocs(project, update);
   const { viewDoc, docForSource } = sourceDocs;
   // 근거가 "공고 비목 정의 + QnA 사업비 7번"처럼 복수면 각각을 해당 문서로 여는 개별 링크로 나눈다.
   const refLink = (rule: { quote?: string; message?: string; source: { doc: string; ref: string; matchLevel: string } }) => {
@@ -302,7 +460,8 @@ function Budget({ project, update }: { project: Project; update: (p: Project) =>
     </section>
     <section><div className="section-title"><h3>항목별 기준 · 주의사항</h3><p>모든 기준에 원문 근거(조문·QnA 위치)가 표시됩니다.</p></div><div className="criteria-grid">{cats.map((category) => { const rules = rulesFor(pack, category.id); return <details key={category.id}><summary><div className="category-dot" />{category.name}<ChevronRight /></summary><div>{category.definition && <p><CheckCircle2 />{category.definition}</p>}{rules.map((rule) => <div key={rule.id}><p className={rule.kind === 'warning' ? 'rule-warn' : ''}>{rule.kind === 'warning' ? <AlertCircle /> : <CheckCircle2 />}{rule.message} {refLink(rule)}</p>{rule.note && <p className="rule-note">{rule.note}</p>}</div>)}{!category.definition && rules.length === 0 && <p><CheckCircle2 />등록된 세부 기준이 없습니다. 공고·협약 원문을 확인하세요.</p>}</div></details>; })}</div></section>
     {globalRules(pack, 'warning').length > 0 && <section><div className="section-title"><h3>과제 공통 주의사항</h3><p>비목과 무관하게 적용되는 금지·주의 규정입니다.</p></div><div className="global-warnings">{globalRules(pack, 'warning').map((rule) => <div key={rule.id} className={`warn-item ${rule.severity ?? 'medium'}`}><AlertCircle /><div><strong>{rule.trigger ?? rule.item}</strong><span>{rule.message} {refLink(rule)}</span></div></div>)}</div></section>}
-    <SourceDocsPanel source={sourceDocs} />
+    {/* 근거 원본 문서 관리는 과제 설정 화면에서만 — 여기서는 "원문 보기" 팝업만 뜬다. */}
+    <DocViewerModal source={sourceDocs} />
   </div>;
 }
 
@@ -458,11 +617,21 @@ function Team({ project, update }: { project: Project; update: (p: Project) => v
 }
 
 const RULE_KIND_LABEL = { ratio: '상한', warning: '금지·주의', funding: '재원', info: '참고' } as const;
-interface LateDocItem { id: string; file: File; status: 'reading' | 'done' | 'error'; text?: string; error?: string }
 
-// 과제 등록 때 공고문을 올리지 못한 경우, 설정 화면에서 나중에 올려 AI로 규정(비목·상한·금지)을 추출·반영한다.
+// "근거 원본 문서"에 이미 있는 문서 중 골라서 AI로 규정(비목·상한·금지)을 추출·반영한다.
+// 파일 업로드는 여기서 하지 않는다 — 문서 확보는 "근거 원본 문서" 패널의 역할이고, 여긴 그중
+// 무엇을 분석에 쓸지 고르기만 한다.
 function DocUpdatePanel({ project, update }: { project: Project; update: (p: Project) => void }) {
-  const [docs, setDocs] = useState<LateDocItem[]>([]);
+  const docs = project.documents ?? [];
+  // 과제가 이미 사업명에 연결돼 있으면(공유 팩을 쓰거나 "근거 원본 문서"에서 수동 연결) 그
+  // 사업명을 그대로 쓴다 — 사용자가 직접 타이핑하지 않게 해서 표기 차이로 인한 중복을 막는다.
+  const linkedProgramId = projectRegistryId(project.packId) ?? project.programRegistryId ?? null;
+  const [linkedProgramName, setLinkedProgramName] = useState<string | null>(null);
+  useEffect(() => {
+    if (!linkedProgramId) { setLinkedProgramName(null); return; }
+    getProgramById(linkedProgramId).then((p) => setLinkedProgramName(p?.programName ?? null)).catch(() => setLinkedProgramName(null));
+  }, [linkedProgramId]);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [ai, setAi] = useState<{ status: 'idle' | 'working' | 'done' | 'error'; extraction?: Extraction; cached?: boolean; message?: string }>({ status: 'idle' });
   const [acceptedRules, setAcceptedRules] = useState<Set<number>>(new Set());
   const [useDocCats, setUseDocCats] = useState(false);
@@ -470,39 +639,27 @@ function DocUpdatePanel({ project, update }: { project: Project; update: (p: Pro
   const [rateSuggestion, setRateSuggestion] = useState<ReturnType<typeof suggestedFundingRates> | null>(null);
   const [rateForm, setRateForm] = useState<{ subsidyRate: string; matchingCashRate: string } | null>(null);
   const [rateApplied, setRateApplied] = useState(false);
-  const [admin, setAdmin] = useState(false);
   const [share, setShare] = useState(false);
   const [shareYear, setShareYear] = useState('');
   const [applying, setApplying] = useState(false);
 
-  useEffect(() => { if (registryEnabled()) isRegistryAdmin().then(setAdmin).catch(() => setAdmin(false)); }, []);
-
-  const docsText = () => docs.filter((item) => item.status === 'done').map((item) => item.text).join('\n');
-
-  const addFiles = async (list: FileList | null) => {
-    if (!list?.length) return;
-    const added: LateDocItem[] = [...list].map((file) => ({ id: crypto.randomUUID(), file, status: 'reading' }));
-    setDocs((prev) => [...prev, ...added]);
-    const { extractDocumentText } = await import('./extract');
-    const finished: LateDocItem[] = [];
-    for (const item of added) {
-      try {
-        const { text } = await extractDocumentText(item.file);
-        finished.push({ ...item, status: 'done', text });
-      } catch (error) {
-        finished.push({ ...item, status: 'error', error: error instanceof Error ? error.message : '읽기 실패' });
-      }
-    }
-    setDocs((prev) => prev.map((item) => finished.find((f) => f.id === item.id) ?? item));
-  };
-
-  const removeDoc = (id: string) => setDocs((prev) => prev.filter((item) => item.id !== id));
+  const toggleChecked = (id: string) => setCheckedIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
 
   const runAi = async () => {
+    const chosen = docs.filter((link) => checkedIds.has(link.id));
+    if (!chosen.length) return;
     setAi({ status: 'working' });
     try {
-      const { extraction, cached } = await runExtraction(docsText(), project.packId);
-      const verified = annotateVerification(extraction, docsText());
+      const { extractDocumentText } = await import('./extract');
+      const texts = await Promise.all(chosen.map(async (link) => {
+        const blob = link.kind === 'upload' && link.fileId ? await getProjectDocument(link.fileId) : await downloadRegistryDocument(link.storagePath!);
+        if (!blob) throw new Error(`"${link.title}" 파일을 불러오지 못했습니다.`);
+        const { text } = await extractDocumentText(new File([blob], link.fileName, { type: blob.type }));
+        return text;
+      }));
+      const combined = texts.join('\n');
+      const { extraction, cached } = await runExtraction(combined, project.packId);
+      const verified = annotateVerification(extraction, combined);
       setAi({ status: 'done', extraction: verified, cached });
       setAcceptedRules(new Set(verified.rules.map((rule, index) => rule.verified ? index : -1).filter((index) => index >= 0)));
       setUseDocCats(false);
@@ -526,17 +683,16 @@ function DocUpdatePanel({ project, update }: { project: Project; update: (p: Pro
     const accepted = ai.extraction.rules.filter((_, index) => acceptedRules.has(index));
     const pack = buildCustomPack(base, ai.extraction, accepted, useDocCats);
     update({ ...project, customPack: pack, packId: pack.id });
-    if (admin && share && registryEnabled()) {
+    if (share && registryEnabled()) {
       setApplying(true);
       try {
-        const name = ai.extraction.programName || project.programName || packFor(project).name;
+        const name = linkedProgramName || ai.extraction.programName || project.programName || packFor(project).name;
         const year = Number(shareYear) || null;
-        const registryId = await saveRegistryEntry(name, year, pack, 'extracted');
-        for (const doc of docs) {
-          await uploadRegistryDocument(doc.file, { programName: name, year, role: guessDocRole(doc.file.name), registryId });
-        }
+        // 원본 파일은 이미 "근거 원본 문서"가 관리하므로 여기선 추출된 규정 팩만 신청한다.
+        // 과제가 이미 사업명에 연결돼 있으면 그 id를 같이 보내 관리자가 정확히 매칭하게 한다.
+        await submitRegistryShare({ programName: name, year, pack, origin: 'extracted', programRegistryId: linkedProgramId });
       } catch (error) {
-        alert(`공유 DB 등록에 실패했습니다 (${error instanceof Error ? error.message : ''}). 이 과제에는 정상 반영됐습니다.`);
+        alert(`공유 신청에 실패했습니다 (${error instanceof Error ? error.message : ''}). 이 과제에는 정상 반영됐습니다.`);
       } finally { setApplying(false); }
     }
     setApplied(true); setTimeout(() => setApplied(false), 2500);
@@ -553,16 +709,16 @@ function DocUpdatePanel({ project, update }: { project: Project; update: (p: Pro
   };
 
   return <section className="panel docupdate-panel">
-    <div className="panel-head"><div><h3><FileSearch /> 공고문·지침 업로드 — 규정 나중에 반영</h3><p>과제 등록 때 공고문을 못 올렸다면 여기서 올려 비목·상한·금지 규정에 반영할 수 있어요.</p></div></div>
+    <div className="panel-head"><div><h3><FileSearch /> AI 규정 추출</h3><p>"근거 원본 문서"에 등록된 문서 중 골라서 비목·상한·금지 규정을 추출·반영해요.</p></div></div>
     <div className="docupdate-body">
-      <label className="upload-button wide"><Upload /> 파일 추가 (PDF · HWP · 이미지)<input type="file" multiple accept=".pdf,.hwp,.hwpx,.txt,.md,image/*" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} /></label>
-      {docs.length > 0 && <div className="doc-list">{docs.map((doc) => <div key={doc.id} className={`doc-item ${doc.status}`}>
-        <span className="doc-name">{doc.file.name}</span>
-        <span className="doc-status">{doc.status === 'reading' ? '읽는 중…' : doc.status === 'done' ? '읽기 완료' : doc.error}</span>
-        <button type="button" aria-label={`${doc.file.name} 제거`} onClick={() => removeDoc(doc.id)}><Trash2 /></button>
-      </div>)}</div>}
-      {docs.some((doc) => doc.status === 'done') && <>
-        {ai.status === 'idle' && <button type="button" className="secondary" onClick={runAi}><Sparkles /> 문서에서 규정 추출하기</button>}
+      {docs.length === 0 ? <p className="doc-empty">아직 근거 원본 문서가 없어요. 아래 "근거 원본 문서"에서 먼저 업로드하거나 불러와주세요.</p> : <div className="source-doc-list">
+        {docs.map((link) => <label key={link.id} className="share-toggle">
+          <input type="checkbox" checked={checkedIds.has(link.id)} onChange={() => toggleChecked(link.id)} />
+          <span><strong>{link.title}</strong> <em>{link.kind === 'link' ? '· 공유 문서' : '· 이 과제 전용'}</em></span>
+        </label>)}
+      </div>}
+      {docs.length > 0 && <>
+        {ai.status === 'idle' && <button type="button" className="secondary" disabled={checkedIds.size === 0} onClick={runAi}><Sparkles /> 선택한 문서에서 규정 추출하기 ({checkedIds.size})</button>}
         {ai.status === 'working' && <p className="wiz-hint">문서를 분석하는 중… (문서 크기에 따라 최대 1~2분 걸릴 수 있어요)</p>}
         {ai.status === 'error' && <><p className="field-error"><AlertCircle /> {ai.message}</p><button type="button" className="secondary" onClick={runAi}>다시 시도</button></>}
         {ai.status === 'done' && ai.extraction && <div className="ai-review">
@@ -600,11 +756,13 @@ function DocUpdatePanel({ project, update }: { project: Project; update: (p: Pro
             <span><strong>[{rule.minAmount != null ? '필수계상' : RULE_KIND_LABEL[rule.kind]}] {rule.message}{rule.minAmount != null && ` (${formatWon(rule.minAmount)})`}</strong><em>"{rule.quote.slice(0, 90)}{rule.quote.length > 90 ? '…' : ''}" ({rule.ref}) {rule.verified ? '· 원문 확인됨' : '· ⚠ 원문에서 찾지 못한 인용 — 직접 확인 후 선택하세요'}</em></span>
           </label>)}</div>
           {ai.extraction.uncertain.length > 0 && <p className="wiz-hint">AI가 판단을 보류한 항목: {ai.extraction.uncertain.join(' / ')}</p>}
-          {admin && registryEnabled() && <div className="wiz-block share-block">
-            <label className="share-toggle"><input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} /><span><CloudUpload /> <strong>공유 규정 DB에도 등록</strong> — 업로드한 공고문·지침을 다른 사용자도 사업명 검색으로 쓸 수 있게 합니다 (관리자 전용)</span></label>
-            {share && <label>연도<input inputMode="numeric" value={shareYear} onChange={(e) => setShareYear(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="2026" /></label>}
+          {registryEnabled() && <div className="wiz-block share-block">
+            <label className="share-toggle"><input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} /><span><CloudUpload /> <strong>추출한 규정 팩 공유 신청</strong> — 관리자 검토 후 다른 사용자도 이 사업명 검색으로 쓸 수 있게 합니다</span></label>
+            {share && (linkedProgramId
+              ? <p className="wiz-hint">"{linkedProgramName ?? '연결된 사업'}" 사업으로 신청됩니다 — 사업명은 관리자가 근거 문서 승인 때 이미 정리해뒀어요, 직접 입력할 필요 없습니다.</p>
+              : <label>연도<input inputMode="numeric" value={shareYear} onChange={(e) => setShareYear(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="2026" /></label>)}
           </div>}
-          <div className="settings-save"><button type="button" className="primary" onClick={apply} disabled={(acceptedRules.size === 0 && !useDocCats) || applying}><Check /> {applying ? '반영 중…' : `선택한 규정 적용 (${acceptedRules.size}건${useDocCats ? ' + 비목 구성' : ''})`}</button>{applied && <span className="save-ok"><CheckCircle2 /> 반영됐어요{share && admin ? ' · 공유 DB에도 등록됐어요' : ''}</span>}</div>
+          <div className="settings-save"><button type="button" className="primary" onClick={apply} disabled={(acceptedRules.size === 0 && !useDocCats) || applying}><Check /> {applying ? '반영 중…' : `선택한 규정 적용 (${acceptedRules.size}건${useDocCats ? ' + 비목 구성' : ''})`}</button>{applied && <span className="save-ok"><CheckCircle2 /> 반영됐어요{share ? ' · 공유 신청도 접수됐어요' : ''}</span>}</div>
           {ai.extraction.referencedRegulations && ai.extraction.referencedRegulations.length > 0 && <div className="ref-regs">
             <h4>이 공고가 참고하라고 명시한 규정</h4>
             <p className="wiz-hint">예산 편성 기준은 대개 공고문·사업계획서에 있지만, 증빙 서류는 아래 규정도 함께 확인해야 할 수 있어요. 정부 사이트에 원문이 흩어져 있어 자동으로 가져오지는 못하니, 직접 찾아 "공유 규정 DB"에 올려두면 다음부터 검색으로 바로 쓸 수 있어요.</p>
@@ -620,7 +778,7 @@ function Settings({ project, update, onReset }: { project: Project; update: (p: 
   const initialForm = (p: Project) => ({ name: p.name, company: p.companyName, subsidy: String(p.subsidyAmount ?? p.totalBudget), subsidyRate: String(p.subsidyRate ?? 100), matchingCashRate: p.matchingCashRate != null ? String(p.matchingCashRate) : '', start: p.startDate, end: p.endDate, deadline: p.settlementDeadline, programName: p.programName ?? '' });
   const [form, setForm] = useState(initialForm(project));
   const [saved, setSaved] = useState(false);
-  const sourceDocs = useSourceDocs(project);
+  const sourceDocs = useSourceDocs(project, update);
   useEffect(() => { setForm(initialForm(project)); }, [project]);
   const subsidyAmount = Number(form.subsidy) || 0;
   const subsidyRate = Math.min(100, Math.max(1, Number(form.subsidyRate) || 100));

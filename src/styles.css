@@ -152,9 +152,11 @@ mark.hl { background: #ffe3e0; color: #b3362f; font-weight: 800; border-radius: 
 .source-doc-row button:hover { border-color: var(--blue); }
 .source-doc-row > button:first-child > svg:first-child { color: var(--blue); width: 16px; flex: none; }
 .source-doc-row > button:first-child > svg:last-child { color: #a2abb9; width: 14px; flex: none; margin-left: auto; }
-.doc-delete { flex: none; width: 38px; justify-content: center; color: #a2abb9; }
-.doc-delete:hover { border-color: #d6453d; color: #d6453d; }
-.doc-delete svg { width: 14px; }
+
+.admin-groups { display: grid; gap: 16px; }
+.admin-card-fields { padding: 0 22px 14px; }
+.admin-card-docs { padding-top: 0; }
+.admin-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 0 22px 20px; }
 .source-doc-list span { display: grid; gap: 1px; min-width: 0; }
 .source-doc-list strong { font-size: 12px; }
 .source-doc-list small { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

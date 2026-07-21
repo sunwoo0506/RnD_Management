@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, BookOpenCheck, Check, CheckCircle2, CloudUpload, FileSearch, Search, ShieldCheck, Sparkles, Trash2, Upload, Wand2 } from 'lucide-react';
 import { deriveTotalBudget, formatWon, getPack, makeDraftBudgets, previewFunding, SELECTABLE_PACKS } from './rules';
 import { classifyProgram, guessProgramName, guessYear, type MatchResult } from './matching';
-import { guessDocRole, isRegistryAdmin, REGISTRY_ROLE_LABEL, registryEnabled, saveRegistryEntry, searchRegistry, uploadRegistryDocument, type RegistryDocRole, type RegistryEntry } from './registry';
+import { DOCUMENT_TYPE_LABEL, type DocumentType, guessDocumentType, registryEnabled, searchRegistry, submitRegistryShare, type RegistryEntry } from './registry';
 import { annotateVerification, buildCustomPack, fundingScheduleAmountWon, runExtraction, suggestedFundingRates, type Extraction } from './llmExtract';
 import type { Project, RulePack } from './types';
 
@@ -16,7 +16,7 @@ const withCommas = (value: string) => value ? Number(value).toLocaleString('ko-K
 interface DocItem {
   id: string;
   file: File;
-  role: RegistryDocRole;
+  role: DocumentType;
   status: 'reading' | 'done' | 'error';
   text?: string;
   error?: string;
@@ -36,7 +36,6 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
   const [searchQ, setSearchQ] = useState('');
   const [searchResults, setSearchResults] = useState<RegistryEntry[] | null>(null);
   const [searchBusy, setSearchBusy] = useState(false);
-  const [admin, setAdmin] = useState(false);
   const [share, setShare] = useState(false);
   const [creating, setCreating] = useState(false);
   // ---- AI 세부 규정 추출 ----
@@ -46,10 +45,6 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
   const [extractedPack, setExtractedPack] = useState<RulePack | null>(null);
   const [rateSuggestion, setRateSuggestion] = useState<ReturnType<typeof suggestedFundingRates> | null>(null);
   const [rateFilled, setRateFilled] = useState(false);
-
-  useEffect(() => {
-    if (registryEnabled()) isRegistryAdmin().then(setAdmin).catch(() => setAdmin(false));
-  }, []);
 
   const next = (event: React.FormEvent) => {
     event.preventDefault();
@@ -67,7 +62,7 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
 
   const addFiles = async (list: FileList | null) => {
     if (!list?.length) return;
-    const added: DocItem[] = [...list].map((file) => ({ id: uid(), file, role: guessDocRole(file.name), status: 'reading' }));
+    const added: DocItem[] = [...list].map((file) => ({ id: uid(), file, role: guessDocumentType(file.name), status: 'reading' }));
     setDocs((prev) => [...prev, ...added]);
     const { extractDocumentText } = await import('./extract');
     const finished: DocItem[] = [];
@@ -147,17 +142,19 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
     if (creating) return;
     setCreating(true);
     try {
-      // 관리자이고 공유를 선택했으면 팩·문서를 공유 레지스트리에 저장한다 (실패해도 과제 생성은 진행).
-      if (admin && share && registryEnabled()) {
+      // 공유를 선택했으면 팩·문서를 공유 신청 대기열에 올린다 (관리자 승인 후 반영, 실패해도 과제 생성은 진행).
+      if (share && registryEnabled()) {
         try {
           const name = programName.trim() || form.name;
           const year = Number(programYear) || null;
-          const registryId = registryPick?.id ?? await saveRegistryEntry(name, year, chosenPack, extractedPack ? 'extracted' : 'pack');
-          for (const doc of docs) {
-            await uploadRegistryDocument(doc.file, { programName: name, year, role: doc.role, registryId });
-          }
+          const shareDocs = docs.map((doc) => ({ file: doc.file, documentType: doc.role }));
+          // 이미 공유 DB에 있는 규정 팩을 골랐다면(registryPick) 새 팩을 다시 신청하지 않고 문서만 신청한다.
+          await submitRegistryShare({
+            programName: name, year, docs: shareDocs,
+            ...(registryPick ? {} : { pack: chosenPack, origin: extractedPack ? 'extracted' : 'pack' }),
+          });
         } catch (error) {
-          alert(`공유 DB 등록에 실패했습니다 (${error instanceof Error ? error.message : ''}). 과제는 정상 생성됩니다.`);
+          alert(`공유 신청에 실패했습니다 (${error instanceof Error ? error.message : ''}). 과제는 정상 생성됩니다.`);
         }
       }
       const subsidyAmount = Number(form.subsidy) || 0;
@@ -232,7 +229,7 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
           <label className="upload-button wide"><Upload /> 파일 추가 (PDF · HWP · 이미지)<input type="file" multiple accept=".pdf,.hwp,.hwpx,.txt,.md,image/*" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} /></label>
           {docs.length > 0 && <div className="doc-list">{docs.map((doc) => <div key={doc.id} className={`doc-item ${doc.status}`}>
             <span className="doc-name">{doc.file.name}</span>
-            <select aria-label={`${doc.file.name} 문서 역할`} value={doc.role} onChange={(e) => setDocs((prev) => prev.map((item) => item.id === doc.id ? { ...item, role: e.target.value as RegistryDocRole } : item))}>{Object.entries(REGISTRY_ROLE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
+            <select aria-label={`${doc.file.name} 문서 유형`} value={doc.role} onChange={(e) => setDocs((prev) => prev.map((item) => item.id === doc.id ? { ...item, role: e.target.value as DocumentType } : item))}>{Object.entries(DOCUMENT_TYPE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
             <span className="doc-status">{doc.status === 'reading' ? '읽는 중…' : doc.status === 'done' ? '읽기 완료' : doc.error}</span>
             <button type="button" aria-label={`${doc.file.name} 제거`} onClick={() => removeDoc(doc.id)}><Trash2 /></button>
           </div>)}</div>}
@@ -299,8 +296,8 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
             : <div className="pack-select" role="radiogroup" aria-label="사업 유형">{SELECTABLE_PACKS.map((pack) => <button type="button" key={pack.id} role="radio" aria-checked={packId === pack.id} className={packId === pack.id ? 'active' : ''} onClick={() => setPackId(pack.id)}><strong>{pack.name}</strong><span>{pack.guideline}</span></button>)}</div>}
         </div>
 
-        {admin && <div className="wiz-block share-block">
-          <label className="share-toggle"><input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} /><span><CloudUpload /> <strong>공유 규정 DB에 등록</strong> — 다른 사용자도 사업명 검색으로 이 규정·문서를 쓸 수 있게 합니다 (관리자 전용)</span></label>
+        {registryEnabled() && <div className="wiz-block share-block">
+          <label className="share-toggle"><input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} /><span><CloudUpload /> <strong>공유 규정 DB에 공유 신청</strong> — 관리자 검토 후 다른 사용자도 사업명 검색으로 이 규정·문서를 쓸 수 있게 합니다</span></label>
           {share && <div className="field-grid"><label>사업명 (검색 키)<input value={programName} onChange={(e) => setProgramName(e.target.value)} placeholder="예: 예비창업패키지" /></label><label>연도<input inputMode="numeric" value={programYear} onChange={(e) => setProgramYear(digitsOnly(e.target.value).slice(0, 4))} placeholder="2026" /></label></div>}
         </div>}
 

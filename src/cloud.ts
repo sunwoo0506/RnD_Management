@@ -57,3 +57,24 @@ export const deleteEvidence = async (ids: string[]): Promise<void> => {
   const { error } = await supabase!.storage.from('evidence').remove(ids.map((id) => `${userId}/${id}`));
   if (error) throw error;
 };
+
+// 과제 전용 문서(협약서·사업계획서 등): evidence와 같은 패턴이지만 공유 문서고 기능 자체가
+// 클라우드 로그인 전제라 로컬 폴백은 두지 않는다 — 비로그인 시 화면에서 기능을 숨긴다.
+export const storeProjectDocument = async (id: string, file: File): Promise<void> => {
+  if (!cloudActive()) throw new Error('로그인이 필요합니다.');
+  const { error } = await supabase!.storage.from('project-documents').upload(`${userId}/${id}`, file, { upsert: true, contentType: file.type });
+  if (error) throw error;
+};
+
+export const getProjectDocument = async (id: string): Promise<File | undefined> => {
+  if (!cloudActive()) return undefined;
+  const { data, error } = await supabase!.storage.from('project-documents').download(`${userId}/${id}`);
+  if (error || !data) return undefined;
+  return new File([data], id, { type: data.type });
+};
+
+export const deleteProjectDocuments = async (ids: string[]): Promise<void> => {
+  if (!ids.length || !cloudActive()) return;
+  const { error } = await supabase!.storage.from('project-documents').remove(ids.map((id) => `${userId}/${id}`));
+  if (error) throw error;
+};
