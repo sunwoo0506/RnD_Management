@@ -1,0 +1,13 @@
+[
+ { "category_code": "DIRECT", "category_name": "사업화 자금", "parent_code": "ALL", "cost_class": "DIRECT", "level": 1, "is_leaf_category": false, "child_category_count": 9, "allowed_item_count": 0, "display_order": 10, "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+
+ { "category_code": "PRE_MATERIAL", "category_name": "재료비", "parent_code": "DIRECT", "cost_class": "DIRECT", "level": 2, "is_leaf_category": true, "child_category_count": 0, "allowed_item_count": 2, "display_order": 110, "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "category_code": "PRE_OUTSOURCING", "category_name": "외주용역비", "parent_code": "DIRECT", "cost_class": "DIRECT", "level": 2, "is_leaf_category": true, "child_category_count": 0, "allowed_item_count": 1, "display_order": 120, "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "category_code": "PRE_EQUIPMENT", "category_name": "기계장치 (공구·기구, 비품, SW 등)", "parent_code": "DIRECT", "cost_class": "DIRECT", "level": 2, "is_leaf_category": true, "child_category_count": 0, "allowed_item_count": 3, "display_order": 130, "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "category_code": "PRE_IP", "category_name": "특허권 등 무형자산 취득비", "parent_code": "DIRECT", "cost_class": "DIRECT", "level": 2, "is_leaf_category": true, "child_category_count": 0, "allowed_item_count": 2, "display_order": 140, "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "category_code": "PRE_LABOR", "category_name": "인건비", "parent_code": "DIRECT", "cost_class": "DIRECT", "level": 2, "is_leaf_category": true, "child_category_count": 0, "allowed_item_count": 1, "display_order": 150, "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "category_code": "PRE_FEE", "category_name": "지급수수료", "parent_code": "DIRECT", "cost_class": "DIRECT", "level": 2, "is_leaf_category": true, "child_category_count": 0, "allowed_item_count": 6, "display_order": 160, "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "category_code": "PRE_TRAVEL", "category_name": "여비", "parent_code": "DIRECT", "cost_class": "DIRECT", "level": 2, "is_leaf_category": true, "child_category_count": 0, "allowed_item_count": 1, "display_order": 170, "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "category_code": "PRE_TRAINING", "category_name": "교육훈련비", "parent_code": "DIRECT", "cost_class": "DIRECT", "level": 2, "is_leaf_category": true, "child_category_count": 0, "allowed_item_count": 1, "display_order": 180, "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "category_code": "PRE_MARKETING", "category_name": "광고선전비", "parent_code": "DIRECT", "cost_class": "DIRECT", "level": 2, "is_leaf_category": true, "child_category_count": 0, "allowed_item_count": 4, "display_order": 190, "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" }
+]

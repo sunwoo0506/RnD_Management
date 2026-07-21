@@ -1,0 +1,159 @@
+﻿item_code,category_code,item_name,description,institution_scope,availability_status,condition_summary,eligibility_condition,requires_approval,requires_recognition,restriction_summary,evidence_summary,source_article,effective_from,display_order,is_active
+LABOR_PARTICIPANT_SALARY,DIRECT_LABOR,참여연구자 급여,과제 참여기간 동안 참여연구자에게 지급하는 급여와 4대보험 본인부담금,ALL,ALLOWED,,{},False,False,,,제6조,2026-05-06,1,True
+LABOR_NEAR_SUPPORT_SALARY,DIRECT_LABOR,연구근접지원인력 급여,비영리기관 연구부서에서 과제 수행을 지원하는 연구근접지원인력 급여,ALL,ALLOWED,,{},False,False,,,제6조,2026-05-06,2,True
+LABOR_PARTICIPANT_INSURANCE,DIRECT_LABOR,참여연구자 4대보험 기관부담금,참여연구자의 국민연금·건강보험·고용보험·산재보험 기관부담금,ALL,ALLOWED,,{},False,False,,,제6조,2026-05-06,3,True
+LABOR_PARTICIPANT_RETIREMENT,DIRECT_LABOR,참여연구자 퇴직급여충당금,참여연구자에 대한 퇴직급여충당금,ALL,ALLOWED,,{},False,False,,,제6조,2026-05-06,4,True
+LABOR_SUPPORT_INSURANCE,DIRECT_LABOR,연구근접지원인력 4대보험 기관부담금,연구근접지원인력의 4대보험 기관부담금,ALL,ALLOWED,,{},False,False,,,제6조,2026-05-06,5,True
+LABOR_SUPPORT_RETIREMENT,DIRECT_LABOR,연구근접지원인력 퇴직급여충당금,연구근접지원인력의 퇴직급여충당금,ALL,ALLOWED,,{},False,False,,,제6조,2026-05-06,6,True
+LABOR_EXISTING_CASH,DIRECT_LABOR,영리기관 기존 참여연구자 현금 인건비,영리기관 기존 인력의 현금 인건비. 고시상 인정 요건 또는 사업별 허용 요건 확인 필요,FOR_PROFIT,CONDITIONAL,중앙행정기관 인정 또는 고시상 특별요건 충족,{},False,True,,,제65조제4항,2026-05-06,20,True
+LABOR_NEW_HIRE_CASH,DIRECT_LABOR,중소·중견기업 신규채용 참여연구자 현금 인건비,중소·중견기업이 신규 채용한 참여연구자에게 지급하는 현금 인건비,FOR_PROFIT,CONDITIONAL,중소·중견기업이며 신규채용 요건 충족,"{""institution_size_in"": [""SME"", ""MID_SIZED""], ""is_new_hire"": true, ""hire_date_from_announcement_months_lte"": 6}",False,False,,,제65조제4항제1호,2026-05-06,21,True
+STUDENT_SALARY,DIRECT_STUDENT_LABOR,학생연구자 인건비,대학 등이 학생연구자에게 지급하는 인건비,ELIGIBLE_INSTITUTION,ALLOWED,고시에서 정한 대학 등 대상 기관과 학생연구자 요건 충족,{},False,False,,,제7조,2026-05-06,1,True
+STUDENT_COLLABORATIVE_PROGRAM,DIRECT_STUDENT_LABOR,학·연 협동과정 학생연구자 인건비,학·연 협동과정을 통해 참여하는 학생연구자 인건비,ELIGIBLE_INSTITUTION,ALLOWED,고시에서 정한 대학 등 대상 기관과 학생연구자 요건 충족,{},False,False,,,제7조,2026-05-06,2,True
+STUDENT_FOREIGN_UNIVERSITY,DIRECT_STUDENT_LABOR,외국대학 학생연구자 인건비,외국대학 소속 학생 신분 연구자에게 지급하는 인건비,ELIGIBLE_INSTITUTION,ALLOWED,고시에서 정한 대학 등 대상 기관과 학생연구자 요건 충족,{},False,False,,,제7조,2026-05-06,3,True
+STUDENT_TRAINING_PROGRAM,DIRECT_STUDENT_LABOR,6개월 이상 연수프로그램 학생연구자 인건비,해당 기관의 6개월 이상 연수프로그램 참여 학생연구자 인건비,ELIGIBLE_INSTITUTION,ALLOWED,고시에서 정한 대학 등 대상 기관과 학생연구자 요건 충족,{},False,False,,,제7조,2026-05-06,4,True
+STUDENT_INSURANCE,DIRECT_STUDENT_LABOR,학생연구자 4대보험 기관부담금,근로계약을 체결한 학생연구자의 4대보험 기관부담금,ELIGIBLE_INSTITUTION,ALLOWED,고시에서 정한 대학 등 대상 기관과 학생연구자 요건 충족,{},False,False,,,제7조,2026-05-06,5,True
+STUDENT_RETIREMENT,DIRECT_STUDENT_LABOR,학생연구자 퇴직급여충당금,근로계약을 체결한 학생연구자의 퇴직급여충당금,ELIGIBLE_INSTITUTION,ALLOWED,고시에서 정한 대학 등 대상 기관과 학생연구자 요건 충족,{},False,False,,,제7조,2026-05-06,6,True
+EQUIPMENT_PURCHASE,DIRECT_EQUIPMENT,연구시설·장비 구입비,과제 수행에 필요한 연구시설·장비 구입비,ALL,ALLOWED,금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용,{},False,False,,,제8조,2026-05-06,1,True
+EQUIPMENT_INSTALLATION,DIRECT_EQUIPMENT,연구시설·장비 설치비,연구시설·장비 설치 비용,ALL,ALLOWED,금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용,{},False,False,,,제8조,2026-05-06,2,True
+EQUIPMENT_ADDITIONAL_COST,DIRECT_EQUIPMENT,장비 구입·설치 부대비용,운송·설치 등 구입·설치 관련 부대비용,ALL,ALLOWED,금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용,{},False,False,,,제8조,2026-05-06,3,True
+EQUIPMENT_UPGRADE,DIRECT_EQUIPMENT,연구시설·장비 성능향상비,기존 시설·장비의 성능향상 비용,ALL,ALLOWED,금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용,{},False,False,,,제8조,2026-05-06,4,True
+EQUIPMENT_RENTAL,DIRECT_EQUIPMENT,연구시설·장비 임차비,과제 수행에 필요한 시설·장비 임차비,ALL,ALLOWED,금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용,{},False,False,,,제8조,2026-05-06,5,True
+EQUIPMENT_MAINTENANCE,DIRECT_EQUIPMENT,연구시설·장비 유지·보수비,시설·장비 유지 및 보수 비용,ALL,ALLOWED,금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용,{},False,False,,,제8조,2026-05-06,6,True
+EQUIPMENT_OPERATION,DIRECT_EQUIPMENT,연구시설·장비 운영비,시설·장비 운영에 필요한 비용,ALL,ALLOWED,금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용,{},False,False,,,제8조,2026-05-06,7,True
+EQUIPMENT_RELOCATION,DIRECT_EQUIPMENT,연구시설·장비 이전 설치비,타 기관 또는 기관 내 공동활용시설로 이전·설치하는 비용,ALL,ALLOWED,금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용,{},False,False,,,제8조,2026-05-06,8,True
+RESEARCH_INFRA_LAND,DIRECT_EQUIPMENT,연구인프라 부지·시설 매입·임차·조성비,연구인프라 목적 사업의 부지·시설 관련 비용,ALL,ALLOWED,금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용,{},False,False,,,제8조,2026-05-06,9,True
+RESEARCH_INFRA_CONSTRUCTION,DIRECT_EQUIPMENT,연구인프라 설계·건축·감리비,연구인프라 설계·건축·감리 비용,ALL,ALLOWED,금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용,{},False,False,,,제8조,2026-05-06,10,True
+RESEARCH_INFRA_EQUIPMENT,DIRECT_EQUIPMENT,연구인프라 장비 구입·설비비,연구인프라 장비 구입과 설비 비용,ALL,ALLOWED,금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용,{},False,False,,,제8조,2026-05-06,11,True
+RESEARCH_INFRA_PM,DIRECT_EQUIPMENT,연구인프라 종합사업관리비,연구인프라 기획·설계·건설·운영 과정의 자문·관리 비용,ALL,ALLOWED,금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용,{},False,False,,,제8조,2026-05-06,12,True
+MATERIAL_PURCHASE,DIRECT_MATERIAL,시약·재료 구입비,과제 수행에 필요한 시약과 재료 구입비,ALL,ALLOWED,,{},False,False,,,제9조,2026-05-06,1,True
+MATERIAL_ADDITIONAL_COST,DIRECT_MATERIAL,연구재료 구입 부대비용,시약·재료 구입과 관련된 운송 등 부대비용,ALL,ALLOWED,,{},False,False,,,제9조,2026-05-06,2,True
+PROJECT_MANAGEMENT_SYSTEM,DIRECT_MATERIAL,연구개발과제 관리시스템 운영비,과제 수행에 필요한 관리시스템 등의 운영비,ALL,ALLOWED,,{},False,False,,,제9조,2026-05-06,3,True
+PROTOTYPE_INTERNAL,DIRECT_MATERIAL,시험제품·시험설비 자체 제작비,기관 내부에서 시험제품·시험설비를 제작하는 비용,ALL,ALLOWED,,{},False,False,,,제9조,2026-05-06,4,True
+PROTOTYPE_EXTERNAL,DIRECT_MATERIAL,시험제품·시험설비 외부 제작비,외부기관을 통해 시험제품·시험설비를 제작하는 비용,ALL,ALLOWED,,{},False,False,,,제9조,2026-05-06,5,True
+IP_TECH_RESEARCH,ACTIVITY_IP,기술정보 조사·분석비,기술정보 조사 및 분석 비용,ALL,ALLOWED,,{},False,False,지식재산권 출원·등록·유지 비용은 성과활용지원비와 구분,,제10조제1호,2026-05-06,1,True
+IP_PATENT_RESEARCH,ACTIVITY_IP,특허정보 조사·분석비,특허정보 조사 및 분석 비용,ALL,ALLOWED,,{},False,False,지식재산권 출원·등록·유지 비용은 성과활용지원비와 구분,,제10조제1호,2026-05-06,2,True
+IP_STANDARD_RESEARCH,ACTIVITY_IP,표준정보 조사·분석비,표준정보 조사 및 분석 비용,ALL,ALLOWED,,{},False,False,지식재산권 출원·등록·유지 비용은 성과활용지원비와 구분,,제10조제1호,2026-05-06,3,True
+IP_CORE_PATENT_STRATEGY,ACTIVITY_IP,원천·핵심특허 확보전략 수립비,원천·핵심특허 확보전략 수립 비용,ALL,ALLOWED,,{},False,False,지식재산권 출원·등록·유지 비용은 성과활용지원비와 구분,,제10조제1호,2026-05-06,4,True
+TECH_INTRODUCTION,ACTIVITY_EXTERNAL_TECH,기술도입비,외부 기술을 도입하는 데 필요한 비용,ALL,ALLOWED,직접비 40% 범위 원칙. 중앙행정기관 인정 시 초과 가능,{},False,False,,,제10조제2호,2026-05-06,1,True
+EXPERT_CONSULTING,ACTIVITY_EXTERNAL_TECH,전문가 자문료,외부 전문가의 자문 비용,ALL,ALLOWED,직접비 40% 범위 원칙. 중앙행정기관 인정 시 초과 가능,{},False,False,,,제10조제2호,2026-05-06,2,True
+EXPERT_LECTURE,ACTIVITY_EXTERNAL_TECH,외부 전문가 강사료,외부 전문가의 강의 비용,ALL,ALLOWED,직접비 40% 범위 원칙. 중앙행정기관 인정 시 초과 가능,{},False,False,,,제10조제2호,2026-05-06,3,True
+EXPERT_MANUSCRIPT,ACTIVITY_EXTERNAL_TECH,외부 전문가 원고료,외부 전문가의 원고 작성 비용,ALL,ALLOWED,직접비 40% 범위 원칙. 중앙행정기관 인정 시 초과 가능,{},False,False,,,제10조제2호,2026-05-06,4,True
+EXPERT_OTHER,ACTIVITY_EXTERNAL_TECH,그 밖의 전문가 활용비,통역·평가 등 외부 전문가 활용 비용,ALL,ALLOWED,직접비 40% 범위 원칙. 중앙행정기관 인정 시 초과 가능,{},False,False,,,제10조제2호,2026-05-06,5,True
+RND_SERVICE,ACTIVITY_EXTERNAL_TECH,연구개발서비스 활용비,외부 연구개발서비스 활용 비용,ALL,ALLOWED,직접비 40% 범위 원칙. 중앙행정기관 인정 시 초과 가능,{},False,False,,,제10조제2호,2026-05-06,6,True
+FOREIGN_TECH_SERVICE,ACTIVITY_EXTERNAL_TECH,국외기관·외국인 전문기술 활용비,국외 소재 기관 또는 외국인의 전문기술 활용 비용,ALL,ALLOWED,직접비 40% 범위 원칙. 중앙행정기관 인정 시 초과 가능,{},False,False,,,제10조제2호,2026-05-06,7,True
+MEETING_VENUE,ACTIVITY_MEETING,회의장 임차료,회의·세미나 장소 임차 비용,ALL,ALLOWED,회의 식비는 참여연구자만 참석하는 회의에는 사용할 수 없음,{},False,False,,내부결재 또는 회의록과 영수증. 10만원 이하는 간소화 증명자료 가능,제10조제3호·제25조제4항·제5항,2026-05-06,1,True
+MEETING_STENOGRAPHY,ACTIVITY_MEETING,속기료,회의·세미나 속기 비용,ALL,ALLOWED,회의 식비는 참여연구자만 참석하는 회의에는 사용할 수 없음,{},False,False,,내부결재 또는 회의록과 영수증. 10만원 이하는 간소화 증명자료 가능,제10조제3호·제25조제4항·제5항,2026-05-06,2,True
+MEETING_INTERPRETATION,ACTIVITY_MEETING,통역료,회의·세미나 통역 비용,ALL,ALLOWED,회의 식비는 참여연구자만 참석하는 회의에는 사용할 수 없음,{},False,False,,내부결재 또는 회의록과 영수증. 10만원 이하는 간소화 증명자료 가능,제10조제3호·제25조제4항·제5항,2026-05-06,3,True
+MEETING_OPERATION,ACTIVITY_MEETING,회의·세미나 개최비,회의 또는 세미나 운영에 필요한 비용,ALL,ALLOWED,회의 식비는 참여연구자만 참석하는 회의에는 사용할 수 없음,{},False,False,,내부결재 또는 회의록과 영수증. 10만원 이하는 간소화 증명자료 가능,제10조제3호·제25조제4항·제5항,2026-05-06,4,True
+MEETING_MEAL,ACTIVITY_MEETING,회의 식비,외부 참석 요건 등을 충족하는 회의 식비,ALL,ALLOWED,회의 식비는 참여연구자만 참석하는 회의에는 사용할 수 없음,{},False,False,,내부결재 또는 회의록과 영수증. 10만원 이하는 간소화 증명자료 가능,제10조제3호·제25조제4항·제5항,2026-05-06,5,True
+DOMESTIC_TRAVEL_TRANSPORT,ACTIVITY_TRAVEL,국내출장 교통비,국내출장 이동 비용,ALL,ALLOWED,기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감,{},False,True,,국외출장은 출장계획서와 출장결과보고서 필요,제10조제4호·제25조제6항부터제8항,2026-05-06,1,True
+DOMESTIC_TRAVEL_LODGING,ACTIVITY_TRAVEL,국내출장 숙박비,국내출장 숙박 비용,ALL,ALLOWED,기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감,{},False,True,,국외출장은 출장계획서와 출장결과보고서 필요,제10조제4호·제25조제6항부터제8항,2026-05-06,2,True
+DOMESTIC_TRAVEL_MEAL,ACTIVITY_TRAVEL,국내출장 식비·일비,국내출장 식비 및 일비,ALL,ALLOWED,기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감,{},False,True,,국외출장은 출장계획서와 출장결과보고서 필요,제10조제4호·제25조제6항부터제8항,2026-05-06,3,True
+OVERSEAS_TRAVEL_TRANSPORT,ACTIVITY_TRAVEL,국외출장 교통비,항공료 등 국외출장 이동 비용,ALL,ALLOWED,기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감,{},False,True,,국외출장은 출장계획서와 출장결과보고서 필요,제10조제4호·제25조제6항부터제8항,2026-05-06,4,True
+OVERSEAS_TRAVEL_LODGING,ACTIVITY_TRAVEL,국외출장 숙박비,국외출장 숙박 비용,ALL,ALLOWED,기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감,{},False,True,,국외출장은 출장계획서와 출장결과보고서 필요,제10조제4호·제25조제6항부터제8항,2026-05-06,5,True
+OVERSEAS_TRAVEL_MEAL,ACTIVITY_TRAVEL,국외출장 식비·일비,국외출장 식비 및 일비,ALL,ALLOWED,기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감,{},False,True,,국외출장은 출장계획서와 출장결과보고서 필요,제10조제4호·제25조제6항부터제8항,2026-05-06,6,True
+DISPATCH_SUPPORT,ACTIVITY_TRAVEL,파견 관련 지원비,과제 수행을 위한 타 기관 파견 관련 비용,ALL,ALLOWED,기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감,{},False,True,,국외출장은 출장계획서와 출장결과보고서 필요,제10조제4호·제25조제6항부터제8항,2026-05-06,7,True
+TRANSFER_SUPPORT,ACTIVITY_TRAVEL,전보 관련 지원비,과제 수행을 위한 인력 전보 관련 비용,ALL,ALLOWED,기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감,{},False,True,,국외출장은 출장계획서와 출장결과보고서 필요,제10조제4호·제25조제6항부터제8항,2026-05-06,8,True
+HOUSING_SUPPORT,ACTIVITY_TRAVEL,파견·전보 주거지원비,파견 또는 전보 인력의 주거 관련 지원 비용,ALL,ALLOWED,기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감,{},False,True,,국외출장은 출장계획서와 출장결과보고서 필요,제10조제4호·제25조제6항부터제8항,2026-05-06,9,True
+SOFTWARE_PURCHASE,ACTIVITY_SOFTWARE,소프트웨어 구입비,과제 수행용 소프트웨어 구입 비용,ALL,ALLOWED,일반 과제는 종료 2개월 전까지 계약. 최소 계약단위 소명 시 기간 초과 가능,{},False,False,,,제10조제5호·제25조제9항·제10항,2026-05-06,1,True
+SOFTWARE_INSTALLATION,ACTIVITY_SOFTWARE,소프트웨어 설치비,과제 수행용 소프트웨어 설치 비용,ALL,ALLOWED,일반 과제는 종료 2개월 전까지 계약. 최소 계약단위 소명 시 기간 초과 가능,{},False,False,,,제10조제5호·제25조제9항·제10항,2026-05-06,2,True
+SOFTWARE_RENTAL,ACTIVITY_SOFTWARE,소프트웨어 임차비,과제 수행용 소프트웨어 임차 비용,ALL,ALLOWED,일반 과제는 종료 2개월 전까지 계약. 최소 계약단위 소명 시 기간 초과 가능,{},False,False,,,제10조제5호·제25조제9항·제10항,2026-05-06,3,True
+SOFTWARE_LICENSE,ACTIVITY_SOFTWARE,소프트웨어 사용권·구독료,라이선스 또는 구독형 소프트웨어 비용,ALL,ALLOWED,일반 과제는 종료 2개월 전까지 계약. 최소 계약단위 소명 시 기간 초과 가능,{},False,False,,,제10조제5호·제25조제9항·제10항,2026-05-06,4,True
+DATABASE_USAGE,ACTIVITY_SOFTWARE,데이터베이스 이용료,연구용 데이터베이스 이용 비용,ALL,ALLOWED,일반 과제는 종료 2개월 전까지 계약. 최소 계약단위 소명 시 기간 초과 가능,{},False,False,,,제10조제5호·제25조제9항·제10항,2026-05-06,5,True
+NETWORK_USAGE,ACTIVITY_SOFTWARE,네트워크 이용료,연구용 네트워크 이용 비용,ALL,ALLOWED,일반 과제는 종료 2개월 전까지 계약. 최소 계약단위 소명 시 기간 초과 가능,{},False,False,,,제10조제5호·제25조제9항·제10항,2026-05-06,6,True
+CLOUD_COMPUTE,ACTIVITY_CLOUD,클라우드 컴퓨팅 이용료,클라우드 연산 자원 이용 비용,ALL,ALLOWED,이용지원시스템 확인 후 서비스 선정. 정액제는 소프트웨어 계약기준 준용,{},False,False,,,제10조제6호·제25조제11항·제12항,2026-05-06,1,True
+CLOUD_STORAGE,ACTIVITY_CLOUD,클라우드 저장공간 이용료,클라우드 스토리지 이용 비용,ALL,ALLOWED,이용지원시스템 확인 후 서비스 선정. 정액제는 소프트웨어 계약기준 준용,{},False,False,,,제10조제6호·제25조제11항·제12항,2026-05-06,2,True
+CLOUD_DATABASE,ACTIVITY_CLOUD,클라우드 데이터베이스 이용료,클라우드 DB 이용 비용,ALL,ALLOWED,이용지원시스템 확인 후 서비스 선정. 정액제는 소프트웨어 계약기준 준용,{},False,False,,,제10조제6호·제25조제11항·제12항,2026-05-06,3,True
+CLOUD_NETWORK,ACTIVITY_CLOUD,클라우드 네트워크 이용료,클라우드 네트워크 이용 비용,ALL,ALLOWED,이용지원시스템 확인 후 서비스 선정. 정액제는 소프트웨어 계약기준 준용,{},False,False,,,제10조제6호·제25조제11항·제12항,2026-05-06,4,True
+CLOUD_SUBSCRIPTION,ACTIVITY_CLOUD,정액제·구독형 클라우드 비용,정액제 또는 구독형 클라우드 서비스 비용,ALL,ALLOWED,이용지원시스템 확인 후 서비스 선정. 정액제는 소프트웨어 계약기준 준용,{},False,False,,,제10조제6호·제25조제11항·제12항,2026-05-06,5,True
+OFFICE_DEVICE_PURCHASE,ACTIVITY_LAB_OPERATION,사무용 기기 구입비,과제 수행에 필요한 사무용 기기 구입 비용,ALL,ALLOWED,기관 자체규정 적용. 영리기관은 소모성 비용 제외 및 원래계획 범위 확인,{},False,False,,,제10조제7호·제25조제13항,2026-05-06,1,True
+OFFICE_DEVICE_RENTAL,ACTIVITY_LAB_OPERATION,사무용 기기 임차비,사무용 기기 임차 비용,ALL,ALLOWED,기관 자체규정 적용. 영리기관은 소모성 비용 제외 및 원래계획 범위 확인,{},False,False,,,제10조제7호·제25조제13항,2026-05-06,2,True
+OFFICE_SOFTWARE,ACTIVITY_LAB_OPERATION,사무용 소프트웨어 비용,사무용 소프트웨어 구입·설치·임차·사용대차 비용,ALL,ALLOWED,기관 자체규정 적용. 영리기관은 소모성 비용 제외 및 원래계획 범위 확인,{},False,False,,,제10조제7호·제25조제13항,2026-05-06,3,True
+OFFICE_SUPPLIES,ACTIVITY_LAB_OPERATION,사무용품비,과제 수행에 필요한 사무용품 비용,ALL,ALLOWED,기관 자체규정 적용. 영리기관은 소모성 비용 제외 및 원래계획 범위 확인,{},False,False,,,제10조제7호·제25조제13항,2026-05-06,4,True
+LAB_CONSUMABLES,ACTIVITY_LAB_OPERATION,연구실 운영 소모성 비용,연구실 운영에 필요한 소모성 비용,ALL,ALLOWED,기관 자체규정 적용. 영리기관은 소모성 비용 제외 및 원래계획 범위 확인,{},False,False,,,제10조제7호·제25조제13항,2026-05-06,5,True
+LAB_HEATING_COOLING,ACTIVITY_LAB_OPERATION,연구실 냉난방 기기 비용,연구실 냉난방 환경 유지 기기 비용,ALL,ALLOWED,기관 자체규정 적용. 영리기관은 소모성 비용 제외 및 원래계획 범위 확인,{},False,False,,,제10조제7호·제25조제13항,2026-05-06,6,True
+LAB_CLEANING_ENVIRONMENT,ACTIVITY_LAB_OPERATION,연구실 청결 환경 유지 기기·비품,청결한 환경 유지에 필요한 기기·비품,ALL,ALLOWED,기관 자체규정 적용. 영리기관은 소모성 비용 제외 및 원래계획 범위 확인,{},False,False,,,제10조제7호·제25조제13항,2026-05-06,7,True
+LAB_ENVIRONMENT_MAINTENANCE,ACTIVITY_LAB_OPERATION,연구실 환경유지 기기·비품 유지비,냉난방·청결 관련 기기·비품 유지 비용,ALL,ALLOWED,기관 자체규정 적용. 영리기관은 소모성 비용 제외 및 원래계획 범위 확인,{},False,False,,,제10조제7호·제25조제13항,2026-05-06,8,True
+PERSONNEL_TRAINING,ACTIVITY_PERSONNEL_SUPPORT,과제 관련 교육·훈련비,과제 수행과 직접 관련된 참여인력 교육·훈련 비용,ALL,ALLOWED,,{},False,False,"비참여자, 종신 학회비, 무관한 교육, 학위과정, 환급 가능 교육비, 평일 점심 등 제외",,제10조제8호·제25조제14항,2026-05-06,1,True
+ACADEMIC_CONFERENCE_FEE,ACTIVITY_PERSONNEL_SUPPORT,학회 참가비,과제 수행과 직접 관련된 학회 참가비,ALL,ALLOWED,,{},False,False,"비참여자, 종신 학회비, 무관한 교육, 학위과정, 환급 가능 교육비, 평일 점심 등 제외",,제10조제8호·제25조제14항,2026-05-06,2,True
+SEMINAR_FEE,ACTIVITY_PERSONNEL_SUPPORT,세미나 참가비,과제 수행과 직접 관련된 세미나 참가비,ALL,ALLOWED,,{},False,False,"비참여자, 종신 학회비, 무관한 교육, 학위과정, 환급 가능 교육비, 평일 점심 등 제외",,제10조제8호·제25조제14항,2026-05-06,3,True
+OVERTIME_MEAL,ACTIVITY_PERSONNEL_SUPPORT,야근·특근 식대,과제 수행을 위해 지출한 야근·특근 식대,ALL,ALLOWED,,{},False,False,"비참여자, 종신 학회비, 무관한 교육, 학위과정, 환급 가능 교육비, 평일 점심 등 제외",,제10조제8호·제25조제14항,2026-05-06,4,True
+FOREIGN_RESEARCHER_INCENTIVE,ACTIVITY_FOREIGN_RESEARCHER,해외연구자 유치 장려금,해외 연구자의 국내 유치를 위한 장려금,ALL,CONDITIONAL,"6개월 이상 국내 거주·과제 참여, 친족 제한, 자체절차 및 인정 필요",{},False,True,,,제10조제9호·제25조제15항·제16항,2026-05-06,1,True
+FOREIGN_RESEARCHER_STAY,ACTIVITY_FOREIGN_RESEARCHER,해외연구자 체재비,국내 체류에 필요한 체재 비용,ALL,CONDITIONAL,"6개월 이상 국내 거주·과제 참여, 친족 제한, 자체절차 및 인정 필요",{},False,True,,,제10조제9호·제25조제15항·제16항,2026-05-06,2,True
+FOREIGN_RESEARCHER_HOUSING,ACTIVITY_FOREIGN_RESEARCHER,해외연구자 주거지원비,국내 거주에 필요한 주거 관련 비용,ALL,CONDITIONAL,"6개월 이상 국내 거주·과제 참여, 친족 제한, 자체절차 및 인정 필요",{},False,True,,,제10조제9호·제25조제15항·제16항,2026-05-06,3,True
+FOREIGN_RESEARCHER_TRAVEL,ACTIVITY_FOREIGN_RESEARCHER,해외연구자 유치 이동비,국내 유치를 위한 이동 관련 비용,ALL,CONDITIONAL,"6개월 이상 국내 거주·과제 참여, 친족 제한, 자체절차 및 인정 필요",{},False,True,,,제10조제9호·제25조제15항·제16항,2026-05-06,4,True
+FOREIGN_RESEARCHER_OTHER,ACTIVITY_FOREIGN_RESEARCHER,그 밖의 해외연구자 유치 지원비,국내 유치에 직접 필요한 기타 비용,ALL,CONDITIONAL,"6개월 이상 국내 거주·과제 참여, 친족 제한, 자체절차 및 인정 필요",{},False,True,,,제10조제9호·제25조제15항·제16항,2026-05-06,5,True
+PROGRAM_PLANNING,ACTIVITY_PROGRAM_MANAGEMENT,연구인프라 사업 기획비,연구인프라 조성 사업의 기획 비용,ALL,ALLOWED,연구인프라 조성을 목적으로 하는 사업에 적용,{},False,False,,,제10조제10호,2026-05-06,1,True
+PROGRAM_COORDINATION,ACTIVITY_PROGRAM_MANAGEMENT,연구인프라 사업 조정비,연구인프라 사업의 조정 비용,ALL,ALLOWED,연구인프라 조성을 목적으로 하는 사업에 적용,{},False,False,,,제10조제10호,2026-05-06,2,True
+PROGRAM_CONSULTING,ACTIVITY_PROGRAM_MANAGEMENT,연구인프라 추진과정 자문비,추진과정에 대한 외부 자문 비용,ALL,ALLOWED,연구인프라 조성을 목적으로 하는 사업에 적용,{},False,False,,,제10조제10호,2026-05-06,3,True
+PROGRAM_MANAGEMENT,ACTIVITY_PROGRAM_MANAGEMENT,연구인프라 종합사업관리비,추진과정 전반에 대한 관리 비용,ALL,ALLOWED,연구인프라 조성을 목적으로 하는 사업에 적용,{},False,False,,,제10조제10호,2026-05-06,4,True
+BOOKS_DOCUMENTS,ACTIVITY_OTHER,문헌구입비,과제 관련 도서·문헌 구입 비용,ALL,ALLOWED,,{},False,False,,,제10조제11호,2026-05-06,1,True
+PAPER_PUBLICATION,ACTIVITY_OTHER,논문 게재료,과제 성과 논문 게재 비용,ALL,ALLOWED,,{},False,False,,,제10조제11호,2026-05-06,2,True
+PRINTING,ACTIVITY_OTHER,인쇄비,과제 관련 인쇄 비용,ALL,ALLOWED,,{},False,False,,,제10조제11호,2026-05-06,3,True
+COPYING,ACTIVITY_OTHER,복사비,과제 관련 복사 비용,ALL,ALLOWED,,{},False,False,,,제10조제11호,2026-05-06,4,True
+PHOTO_PRINTING,ACTIVITY_OTHER,인화비,과제 관련 인화 비용,ALL,ALLOWED,,{},False,False,,,제10조제11호,2026-05-06,5,True
+SLIDE_PRODUCTION,ACTIVITY_OTHER,슬라이드 제작비,발표자료 슬라이드 제작 비용,ALL,ALLOWED,,{},False,False,,,제10조제11호,2026-05-06,6,True
+TAXES_DUTIES,ACTIVITY_OTHER,세금 및 공과금,과제와 직접 관련된 세금 및 공과금,ALL,ALLOWED,,{},False,False,,,제10조제11호,2026-05-06,7,True
+POSTAGE,ACTIVITY_OTHER,우편요금,과제 관련 우편 발송 비용,ALL,ALLOWED,,{},False,False,,,제10조제11호,2026-05-06,8,True
+DELIVERY,ACTIVITY_OTHER,택배비,과제 관련 물품 배송 비용,ALL,ALLOWED,,{},False,False,,,제10조제11호,2026-05-06,9,True
+FEES,ACTIVITY_OTHER,각종 수수료,과제 수행에 직접 필요한 각종 수수료,ALL,ALLOWED,,{},False,False,,,제10조제11호,2026-05-06,10,True
+UTILITIES,ACTIVITY_OTHER,공공요금,과제와 직접 관련된 공공요금,ALL,ALLOWED,,{},False,False,,,제10조제11호,2026-05-06,11,True
+DAILY_WORKER,ACTIVITY_OTHER,일용직 활용비,과제 수행을 위해 활용한 일용직 비용,ALL,ALLOWED,,{},False,False,,,제10조제11호,2026-05-06,12,True
+RESEARCH_DEMONSTRATION_PARTICIPANT,ACTIVITY_OTHER,연구실증 참여자 활용비,연구실증 등에 참여한 사람의 활용 비용,ALL,ALLOWED,,{},False,False,,,제10조제11호,2026-05-06,13,True
+OTHER_DIRECT_RELATED_COST,ACTIVITY_OTHER,그 밖의 과제 직접 관련 비용,과제와 직접 관련성이 입증되는 기타 비용,ALL,ALLOWED,,{},False,False,,,제10조제11호,2026-05-06,14,True
+INNOVATION_MATERIAL_PURCHASE,DIRECT_INNOVATION,연구혁신비-연구재료 구입비,연구재료비 사용용도 중 재료 구입 비용,ALL,ALLOWED,연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외,{},False,False,,,제10조의2·제25조의2,2026-06-11,1,True
+INNOVATION_PROJECT_SYSTEM,DIRECT_INNOVATION,연구혁신비-과제 관리비,연구개발과제 관리시스템 운영 비용,ALL,ALLOWED,연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외,{},False,False,,,제10조의2·제25조의2,2026-06-11,2,True
+INNOVATION_PROTOTYPE,DIRECT_INNOVATION,연구혁신비-재료 제작비,시험제품·시험설비 제작 비용,ALL,ALLOWED,연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외,{},False,False,,,제10조의2·제25조의2,2026-06-11,3,True
+INNOVATION_MEETING,DIRECT_INNOVATION,연구혁신비-회의비,회의·세미나 관련 비용,ALL,ALLOWED,연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외,{},False,False,,,제10조의2·제25조의2,2026-06-11,4,True
+INNOVATION_TRAVEL,DIRECT_INNOVATION,연구혁신비-출장비,국내외 출장 비용,ALL,ALLOWED,연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외,{},False,False,,,제10조의2·제25조의2,2026-06-11,5,True
+INNOVATION_SOFTWARE,DIRECT_INNOVATION,연구혁신비-소프트웨어 활용비,소프트웨어·DB·네트워크 비용,ALL,ALLOWED,연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외,{},False,False,,,제10조의2·제25조의2,2026-06-11,6,True
+INNOVATION_CLOUD,DIRECT_INNOVATION,연구혁신비-클라우드 활용비,클라우드컴퓨팅서비스 비용,ALL,ALLOWED,연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외,{},False,False,,,제10조의2·제25조의2,2026-06-11,7,True
+INNOVATION_LAB_OPERATION,DIRECT_INNOVATION,연구혁신비-연구실운영비,연구실 운영 관련 비용,ALL,ALLOWED,연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외,{},False,False,,,제10조의2·제25조의2,2026-06-11,8,True
+INNOVATION_PERSONNEL_SUPPORT,DIRECT_INNOVATION,연구혁신비-연구인력 지원비,교육·학회·야근식대 등,ALL,ALLOWED,연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외,{},False,False,,,제10조의2·제25조의2,2026-06-11,9,True
+INNOVATION_OTHER,DIRECT_INNOVATION,연구혁신비-그 밖의 연구활동비,제10조의 그 밖의 비용 등,ALL,ALLOWED,연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외,{},False,False,,,제10조의2·제25조의2,2026-06-11,10,True
+RESEARCH_INCENTIVE_PI,DIRECT_INCENTIVE,연구책임자 연구수당,연구책임자에게 지급하는 장려금,ALL,ALLOWED,수정인건비 20% 한도와 기여도 평가·개인별 지급한도 적용,{},False,False,,,제11조,2026-05-06,1,True
+RESEARCH_INCENTIVE_RESEARCHER,DIRECT_INCENTIVE,참여연구자 연구수당,참여연구자에게 지급하는 장려금,ALL,ALLOWED,수정인건비 20% 한도와 기여도 평가·개인별 지급한도 적용,{},False,False,,,제11조,2026-05-06,2,True
+RESEARCH_INCENTIVE_STUDENT,DIRECT_INCENTIVE,학생연구자 연구수당,학생연구자에게 지급하는 장려금,ALL,ALLOWED,수정인건비 20% 한도와 기여도 평가·개인별 지급한도 적용,{},False,False,,,제11조,2026-05-06,3,True
+SECURITY_INCENTIVE_PI,DIRECT_SECURITY,보안과제 연구책임자 보안수당,보안과제 연구책임자 장려금,ALL,ALLOWED,보안과제 참여인력에게만 지급하며 개인별 인건비 3% 범위,{},False,False,,,제11조의2,2026-05-06,1,True
+SECURITY_INCENTIVE_RESEARCHER,DIRECT_SECURITY,보안과제 참여연구자 보안수당,보안과제 참여연구자 장려금,ALL,ALLOWED,보안과제 참여인력에게만 지급하며 개인별 인건비 3% 범위,{},False,False,,,제11조의2,2026-05-06,2,True
+SECURITY_INCENTIVE_STUDENT,DIRECT_SECURITY,보안과제 학생연구자 보안수당,보안과제 학생연구자 장려금,ALL,ALLOWED,보안과제 참여인력에게만 지급하며 개인별 인건비 3% 범위,{},False,False,,,제11조의2,2026-05-06,3,True
+SECURITY_INCENTIVE_SUPPORT,DIRECT_SECURITY,보안과제 연구근접지원인력 보안수당,보안과제 연구근접지원인력 장려금,ALL,ALLOWED,보안과제 참여인력에게만 지급하며 개인별 인건비 3% 범위,{},False,False,,,제11조의2,2026-05-06,4,True
+SUBCONTRACT_RND_PAYMENT,DIRECT_SUBCONTRACT,위탁연구개발기관 지급 연구개발비,주관기관이 과제 일부를 위탁할 때 위탁기관에 지급하는 비용,ALL,ALLOWED,"조정 직접비 40% 원칙. 초과 시 인정, 원래계획 대비 20% 이상 증액 시 사전승인",{},False,False,,,제12조·제27조,2026-05-06,1,True
+INTERNATIONAL_INSTITUTION_PAYMENT,DIRECT_INTERNATIONAL,외국 소재 기관 공동연구비,외국 소재 기관에 지급하는 공동연구개발비,ALL,CONDITIONAL,협약에서 정하고 중앙행정기관의 승인·인정 필요,{},True,False,,국외기관 간 계약서와 계좌이체 증명,제13조·제28조,2026-05-06,1,True
+INTERNATIONAL_RESEARCHER_PAYMENT,DIRECT_INTERNATIONAL,외국인 공동연구비,외국인에게 지급하는 공동연구개발비,ALL,CONDITIONAL,협약에서 정하고 중앙행정기관의 승인·인정 필요,{},True,False,,국외기관 간 계약서와 계좌이체 증명,제13조·제28조,2026-05-06,2,True
+BASIC_PROGRAM_CONTRIBUTION,DIRECT_RND_CONTRIBUTION,기본사업 연구개발비 부담금,법률로 직접 설립된 기관이 기본사업 연구개발비에서 부담하는 비용,GOV_FUNDED_OR_DIRECTLY_ESTABLISHED,INSTITUTION_SPECIFIC,정부출연기관 등 고시상 적용 대상 기관에 한함,{},False,False,,,제14조·제29조,2026-05-06,1,True
+OTHER_INSTITUTION_PAYMENT,DIRECT_RND_CONTRIBUTION,기본사업 수행 타 연구개발기관 지급비,기본사업 수행을 위해 협약에 따라 다른 연구개발기관에 지급하는 비용,GOV_FUNDED_OR_DIRECTLY_ESTABLISHED,INSTITUTION_SPECIFIC,정부출연기관 등 고시상 적용 대상 기관에 한함,{},False,False,,,제14조·제29조,2026-05-06,2,True
+SUPPORT_STAFF_SALARY,INDIRECT_HR_SUPPORT,연구지원인력 인건비,연구지원인력에게 지급하는 인건비,FOR_PROFIT,ALLOWED,,{},False,False,,,제15조,2026-05-06,1,True
+RND_PERFORMANCE_BONUS,INDIRECT_HR_SUPPORT,연구개발능률성과급,우수 연구자·연구지원인력에게 지급하는 성과급,FOR_PROFIT,ALLOWED,,{},False,False,,,제15조,2026-05-06,2,True
+PARENTAL_LEAVE_INSURANCE,INDIRECT_HR_SUPPORT,육아휴직 기간 4대보험 기관부담금,참여연구자·연구지원인력 육아휴직 기간 기관부담금,FOR_PROFIT,ALLOWED,,{},False,False,,,제15조,2026-05-06,3,True
+PARENTAL_LEAVE_RETIREMENT,INDIRECT_HR_SUPPORT,육아휴직 기간 퇴직급여충당금,육아휴직 기간 퇴직급여충당금,FOR_PROFIT,ALLOWED,,{},False,False,,,제15조,2026-05-06,4,True
+NONPROFIT_HR_RELATED_COST,INDIRECT_HR_SUPPORT,비영리기관 연구자·연구지원인력 인건비 관련 비용,제15조 각 호 및 유사한 인건비 관련 비용,NON_PROFIT,INSTITUTION_SPECIFIC,대학 교원·이미 인건비 지급 연구자 등의 중복 인건비 및 학생 장학금 제외,{},False,False,"과제에서 이미 인건비를 받는 자의 중복 인건비, 우수학생·근로 장학금 제외",,제15조의2,2026-05-06,20,True
+INSTITUTION_COMMON_COST,INDIRECT_RESEARCH_SUPPORT,기관 공통 비용,연구개발 수행에 필요한 기관 공통 경비,FOR_PROFIT,ALLOWED,,{},False,False,,,제16조,2026-05-06,1,True
+PROJECT_GROUP_OPERATION,INDIRECT_RESEARCH_SUPPORT,사업단·연구단 운영비,전문적 과제관리 조직의 운영 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제16조,2026-05-06,2,True
+PROJECT_GROUP_EQUIPMENT,INDIRECT_RESEARCH_SUPPORT,사업단·연구단 비품 구입비,사업단·연구단 운영에 필요한 비품 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제16조,2026-05-06,3,True
+INFRA_CLOUD_COST,INDIRECT_RESEARCH_SUPPORT,기반시설·장비 운영 클라우드 비용,기반시설·장비 운영에 필요한 클라우드 이용료,FOR_PROFIT,ALLOWED,,{},False,False,,,제16조,2026-05-06,4,True
+LAB_SAFETY_COST,INDIRECT_RESEARCH_SUPPORT,연구실안전관리비,연구실 안전과 유지관리에 필요한 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제16조,2026-05-06,5,True
+SECURITY_EQUIPMENT,INDIRECT_RESEARCH_SUPPORT,연구보안 장비 구입비,연구보안을 위한 보안장비 구입 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제16조,2026-05-06,6,True
+SECURITY_EDUCATION,INDIRECT_RESEARCH_SUPPORT,연구보안 교육비,보안교육 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제16조,2026-05-06,7,True
+SECURITY_VULNERABILITY,INDIRECT_RESEARCH_SUPPORT,보안취약점 진단비,보안취약점 진단 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제16조,2026-05-06,8,True
+SECURITY_INCIDENT_RESPONSE,INDIRECT_RESEARCH_SUPPORT,보안사고 대응 지원비,보안사고 대응 지원 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제16조,2026-05-06,9,True
+SECURITY_CONSULTING,INDIRECT_RESEARCH_SUPPORT,보안컨설팅비,연구보안 컨설팅 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제16조,2026-05-06,10,True
+TECH_ESCROW_COST,INDIRECT_RESEARCH_SUPPORT,기술자료 임치 비용,기술자료 임치 관련 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제16조,2026-05-06,11,True
+CORE_TECH_PROTECTION,INDIRECT_RESEARCH_SUPPORT,국가핵심기술 보호조치 비용,국가핵심기술 보호조치 관련 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제16조,2026-05-06,12,True
+OTHER_SECURITY_COST,INDIRECT_RESEARCH_SUPPORT,그 밖의 연구보안 비용,과제 보안을 위해 직접 필요한 기타 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제16조,2026-05-06,13,True
+RESEARCH_ETHICS_COST,INDIRECT_RESEARCH_SUPPORT,연구윤리활동비,연구윤리규정·교육·인식확산 등 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제16조,2026-05-06,14,True
+NONPROFIT_RESEARCH_ENVIRONMENT_COST,INDIRECT_RESEARCH_SUPPORT,비영리기관 연구시설·장비 구축·운영 및 연구환경 유지비,제16조 각 호 및 이와 유사한 연구시설·장비·연구환경 관련 비용,NON_PROFIT,INSTITUTION_SPECIFIC,과제 수주 보상비와 건축물 신축·증축·개축·리모델링 제외,{},False,False,수주 보상 및 건축물 공사 비용 제외,,제16조의2,2026-05-06,30,True
+SCIENCE_PROMOTION,INDIRECT_OUTCOME_SUPPORT,과학홍보물 제작비,연구개발 관련 과학홍보물 제작 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제17조,2026-05-06,1,True
+SCIENCE_EVENT,INDIRECT_OUTCOME_SUPPORT,과학문화 행사프로그램비,과학기술문화 확산 행사 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제17조,2026-05-06,2,True
+LECTURE_EXPERIENCE,INDIRECT_OUTCOME_SUPPORT,강연·체험활동비,연구개발 관련 강연·체험활동 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제17조,2026-05-06,3,True
+LAB_OPENING,INDIRECT_OUTCOME_SUPPORT,연구실 개방 비용,연구실 개방 프로그램 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제17조,2026-05-06,4,True
+PROMOTION_EXPERT_TRAINING,INDIRECT_OUTCOME_SUPPORT,홍보전문가 양성비,과학기술 홍보전문가 양성 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제17조,2026-05-06,5,True
+OTHER_SCIENCE_CULTURE,INDIRECT_OUTCOME_SUPPORT,그 밖의 과학기술문화 확산비,과학기술문화 확산에 직접 필요한 기타 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제17조,2026-05-06,6,True
+IP_APPLICATION,INDIRECT_OUTCOME_SUPPORT,지식재산권 출원비,국가연구개발사업 관련 지식재산권 출원 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제17조,2026-05-06,7,True
+IP_REGISTRATION,INDIRECT_OUTCOME_SUPPORT,지식재산권 등록비,지식재산권 등록 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제17조,2026-05-06,8,True
+IP_MAINTENANCE,INDIRECT_OUTCOME_SUPPORT,지식재산권 유지비,지식재산권 유지 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제17조,2026-05-06,9,True
+TECH_VALUATION,INDIRECT_OUTCOME_SUPPORT,기술가치평가비,기술이전에 필요한 기술가치평가 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제17조,2026-05-06,10,True
+TECH_TRANSFER,INDIRECT_OUTCOME_SUPPORT,기술이전 지원비,기술이전에 필요한 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제17조,2026-05-06,11,True
+STANDARD_ACTIVITY,INDIRECT_OUTCOME_SUPPORT,표준 활동비,표준 활동에 필요한 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제17조,2026-05-06,12,True
+RESEARCH_NOTE,INDIRECT_OUTCOME_SUPPORT,연구노트 제정·운영·교육비,연구노트 규정·운영·교육·인식확산 비용,FOR_PROFIT,ALLOWED,,{},False,False,,,제17조,2026-05-06,13,True
+NONPROFIT_OUTCOME_SUPPORT,INDIRECT_OUTCOME_SUPPORT,비영리기관 과학기술문화·지식재산·성과활용 지원비,"과학기술문화 확산, 지식재산권 출원·등록, 연구성과 활용 지원 비용",NON_PROFIT,INSTITUTION_SPECIFIC,,{},False,False,,,제17조의2,2026-05-06,30,True

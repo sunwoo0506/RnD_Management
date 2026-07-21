@@ -1,0 +1,42 @@
+[
+  {
+    "case_code": "TC_EXT_TECH_40",
+    "description": "직접비 100,000,000원일 때 외부 전문기술 활용비 상한",
+    "inputs": {
+      "direct_cost": 100000000
+    },
+    "expected": {
+      "cap_amount": 40000000
+    }
+  },
+  {
+    "case_code": "TC_INCENTIVE_20",
+    "description": "수정인건비 59,980,400원일 때 연구수당 상한",
+    "inputs": {
+      "modified_labor_cost": 59980400
+    },
+    "expected": {
+      "cap_amount": 11996080
+    }
+  },
+  {
+    "case_code": "TC_INDIRECT_10",
+    "description": "수정직접비 83,234,000원일 때 영리기관 간접비 상한",
+    "inputs": {
+      "modified_direct_cost": 83234000
+    },
+    "expected": {
+      "cap_amount": 8323400
+    }
+  },
+  {
+    "case_code": "TC_SUBCONTRACT_40",
+    "description": "조정 직접비 83,234,000원일 때 위탁연구개발비 상한",
+    "inputs": {
+      "adjusted_direct_for_subcontract": 83234000
+    },
+    "expected": {
+      "cap_amount": 33293600
+    }
+  }
+]

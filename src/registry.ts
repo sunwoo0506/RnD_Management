@@ -143,6 +143,37 @@ export const submitRegistryShare = async (input: ShareSubmission): Promise<void>
   }
 };
 
+// 앱에서 만든 규정DB 패키지를 등록 신청한다 — 승인되면 사람이 만든 패키지와 똑같이
+// regulation_packages + regulation-db 버킷에 들어가 예산편성 화면의 비목이 된다.
+// 공유 데이터에 직접 쓰는 경로는 없다(schema.sql). 여기서 하는 일은 대기열에 넣는 것뿐이다.
+export interface RegulationPackageSubmission {
+  programName: string;
+  year: number | null;
+  pack: RulePack;                            // 변환된 규정 팩 (관리자 화면 미리보기용)
+  regulationPackage: unknown;                // manifest + 6개 JSON
+  diff?: unknown;                            // 기존 규정DB와의 변경사항 (있으면)
+  basePackId?: string | null;                // 그 비교의 기준이 된 팩
+  programRegistryId?: string | null;
+}
+
+export const submitRegulationPackage = async (input: RegulationPackageSubmission): Promise<void> => {
+  if (!supabase) throw new Error('클라우드가 연결되지 않았습니다.');
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('로그인이 필요합니다.');
+  const { error } = await supabase.from('program_registry_submissions').insert({
+    program_name: input.programName,
+    year: input.year,
+    pack: input.pack,
+    package: input.regulationPackage,
+    diff: input.diff ?? null,
+    base_pack_id: input.basePackId ?? null,
+    origin: 'extracted',
+    submitted_by: user.id,
+    program_registry_id: input.programRegistryId ?? null,
+  });
+  if (error) throw new Error(error.message);
+};
+
 export interface PendingSubmission { id: string; title: string; createdAt: string }
 
 // 본인이 올린 신청 중 아직 검토 대기 중인 것 — "공유 신청됨" 안내에 사용.

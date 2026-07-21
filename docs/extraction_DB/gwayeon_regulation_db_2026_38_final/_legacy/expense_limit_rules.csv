@@ -1,0 +1,24 @@
+﻿limit_code,category_code,limit_name,limit_type,limit_value,limit_unit,basis_code,formula_expression,ui_summary,over_limit_action,institution_scope,applicability_condition,source_article,effective_from,priority,is_active
+LABOR_MONTHLY_RATE_100,DIRECT_LABOR,월 총인건비계상률 100%,PERCENT,100,PERCENT,monthly_salary,monthly_salary * labor_cost_rate,"월 급여 × 인건비계상률, 월 총인건비계상률 100% 이내",NOT_ALLOWED,FOR_PROFIT,{},제65조제7항,2026-05-06,100,True
+EXISTING_LABOR_ELIGIBILITY,UI_EXISTING_LABOR_CASH,기존 인력 현금 계상 자격,ELIGIBILITY,,,,,고정 금액 상한 없음. 현금 계상 자격 또는 중앙행정기관 인정 필요,RECOGNITION_REQUIRED,FOR_PROFIT,{},제65조제4항,2026-05-06,100,True
+NEW_HIRE_LABOR_ELIGIBILITY,UI_NEW_HIRE_LABOR_CASH,신규채용 인력 현금 계상 자격,ELIGIBILITY,,,,,중소·중견기업 신규채용 참여연구자. 공고일 기준 채용 6개월 이내 포함,NOT_ALLOWED,FOR_PROFIT,{},제65조제4항제1호,2026-05-06,100,True
+LABOR_CASH_CHANGE_APPROVAL,DIRECT_LABOR,현금 인건비 변경 사전승인,APPROVAL,,,,,현금 인건비 총액 변경 또는 신규인력 현금 인건비 감액 시 사전승인,PRIOR_APPROVAL_REQUIRED,FOR_PROFIT,{},제65조제8항·제73조제1항제4호,2026-05-06,100,True
+EQUIPMENT_ZEUS_30M,DIRECT_EQUIPMENT,3천만원 이상 또는 공동활용 장비 ZEUS 확인,PROCEDURE_THRESHOLD,30000000,KRW,equipment_total_acquisition_cost,,3천만원 이상 또는 공동활용 가능 장비는 ZEUS 공동활용 여부 확인,PROCEDURE_REQUIRED,ALL,{},제23조제4항,2026-05-06,100,True
+EQUIPMENT_STANDARD_100M,DIRECT_EQUIPMENT,1억원 이상 장비 표준지침 적용,PROCEDURE_THRESHOLD,100000000,KRW,equipment_total_acquisition_cost,,1억원 이상은 시설·장비 관리 표준지침 적용,EXTERNAL_STANDARD_REQUIRED,ALL,{},제23조제3항,2026-05-06,100,True
+EQUIPMENT_UNPLANNED_APPROVAL_30M,DIRECT_EQUIPMENT,계획 외 3천만원 이상 장비 사전승인,APPROVAL_THRESHOLD,30000000,KRW,equipment_total_acquisition_cost,,계획 외 신규·변경·미구입 등은 사전승인,PRIOR_APPROVAL_REQUIRED,ALL,{},제73조제1항제5호,2026-05-06,100,True
+EQUIPMENT_IN_KIND_20,DIRECT_EQUIPMENT,영리기관 보유 장비 현물 20%,PERCENT,20,PERCENT,equipment_purchase_price,equipment_purchase_price * 0.20,구입가의 20% 이내 현물 계상,NOT_ALLOWED,FOR_PROFIT,{},제66조제1항,2026-05-06,100,True
+EXTERNAL_TECH_40,ACTIVITY_EXTERNAL_TECH,외부 전문기술 활용비 직접비 40%,PERCENT,40,PERCENT,direct_cost,direct_cost * 0.40,직접비의 40% 이내. 인정 시 초과 가능,RECOGNITION_REQUIRED,ALL,{},제25조제2항,2026-05-06,100,True
+MEETING_EVIDENCE_100K,ACTIVITY_MEETING,10만원 이하 회의비 간소화 증빙,FIXED_AMOUNT,100000,KRW,meeting_amount,,10만원 이하: 목적·일시·장소·내용·참석자 명단 자료로 회의록·내부결재 대체,FULL_EVIDENCE_REQUIRED,ALL,{},제25조제5항,2026-05-06,100,True
+TECH_IN_KIND_50,ACTIVITY_EXTERNAL_TECH,영리기관 기술도입비 현물 50%,PERCENT,50,PERCENT,actual_technology_introduction_cost,actual_technology_introduction_cost * 0.50,실제 기술도입비의 50% 이내 현물 계상,NOT_ALLOWED,FOR_PROFIT,{},제68조제1항,2026-05-06,100,True
+SOFTWARE_IN_KIND_20,ACTIVITY_SOFTWARE,영리기관 소프트웨어 현물 20%,PERCENT,20,PERCENT,software_purchase_price,software_purchase_price * 0.20,구입가의 20% 이내 현물 계상,NOT_ALLOWED,FOR_PROFIT,{},제68조제2항,2026-05-06,100,True
+LAB_OPERATION_PLAN,ACTIVITY_LAB_OPERATION,영리기관 연구실운영비 원래계획 범위,PLAN_BASED,,,,,활용·관리계획 범위. 소모성 비용 제외. 변경 시 사전승인,PRIOR_APPROVAL_REQUIRED,FOR_PROFIT,{},제68조제4항·제5항·제73조제1항제6호,2026-05-06,100,True
+INCENTIVE_20,DIRECT_INCENTIVE,연구수당 수정인건비 20%,FORMULA,20,PERCENT,modified_labor_cost,modified_labor_cost * 0.20,수정인건비의 20% 이내,NOT_ALLOWED,ALL,{},제26조제1항,2026-05-06,100,True
+INCENTIVE_PERSON_70,DIRECT_INCENTIVE,참여연구자 1인 연구수당 70%,PERCENT,70,PERCENT,total_research_incentive,total_research_incentive * 0.70,참여연구자 2명 이상이면 1인 지급액은 전체 연구수당의 70% 이하,NOT_ALLOWED,ALL,"{""participant_count_gte"": 2}",제26조제6항,2026-05-06,100,True
+SUBCONTRACT_40,DIRECT_SUBCONTRACT,위탁연구개발비 조정 직접비 40%,FORMULA,40,PERCENT,adjusted_direct_for_subcontract,(direct_cost - subcontract_cost - international_cost - rnd_contribution_cost) * 0.40,직접비에서 위탁·국제공동·연구개발부담비를 제외한 금액의 40% 이내,RECOGNITION_REQUIRED,ALL,{},제27조제1항,2026-05-06,100,True
+SUBCONTRACT_CHANGE_20,DIRECT_SUBCONTRACT,위탁연구개발비 20% 이상 증액 사전승인,CHANGE_RATE,20,PERCENT,original_plan_amount,,원래계획 대비 20% 이상 증액 시 사전승인,PRIOR_APPROVAL_REQUIRED,ALL,{},제27조제3항·제73조제1항제7호,2026-05-06,100,True
+INDIRECT_FOR_PROFIT_10,INDIRECT,영리기관 간접비 10%,FORMULA,10,PERCENT,modified_direct_cost,modified_direct_cost * 0.10,수정직접비의 10% 이내,NOT_ALLOWED,FOR_PROFIT,{},제2조제9호·제63조·제114조제4항,2026-05-06,100,True
+INDIRECT_BONUS_10,INDIRECT_HR_SUPPORT,연구개발능률성과급 간접비 10%,PERCENT,10,PERCENT,project_indirect_cost,project_indirect_cost * 0.10,해당 과제 간접비의 10% 이하,NOT_ALLOWED,FOR_PROFIT,{},제69조제3항,2026-05-06,100,True
+INNOVATION_10,DIRECT_INNOVATION,연구혁신비 재료비+활동비 10%,FORMULA,10,PERCENT,stage_start_material_plus_activity,(stage_start_material_cost + stage_start_activity_cost) * 0.10,단계 시작 시 연구재료비와 연구활동비 합계의 10% 이내,NOT_ALLOWED,ALL,{},제25조의2제1항,2026-06-11,100,True
+INNOVATION_AVG_50M,DIRECT_INNOVATION,연구혁신비 연차별 평균 5천만원,ANNUAL_AVERAGE,50000000,KRW,annual_average_innovation_cost,,연차별 평균 5천만원 초과 불가,NOT_ALLOWED,ALL,{},제25조의2제2항,2026-06-11,100,True
+INNOVATION_MATERIAL_3M,DIRECT_INNOVATION,연구혁신비 재료비 용도 건별 300만원,FIXED_AMOUNT,3000000,KRW,transaction_amount,,연구재료비 용도 건별 300만원 이하,NOT_ALLOWED,ALL,{},제25조의2제3항제1호,2026-06-11,100,True
+INNOVATION_ACTIVITY_500K,DIRECT_INNOVATION,연구혁신비 활동비 용도 건별 50만원,FIXED_AMOUNT,500000,KRW,transaction_amount,,연구활동비 용도 건별 50만원 이하,NOT_ALLOWED,ALL,{},제25조의2제3항제2호,2026-06-11,100,True

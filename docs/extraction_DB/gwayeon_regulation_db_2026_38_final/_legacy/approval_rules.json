@@ -1,0 +1,290 @@
+[
+  {
+    "approval_code": "EQP-002",
+    "category_code": "DIRECT_EQUIPMENT",
+    "rule_name": "원래계획에 없는 3천만원 이상 장비 신규 구입·임차 사전승인",
+    "condition": {
+      "all": [
+        {
+          "field": "equipment.total_acquisition_cost",
+          "operator": "gte",
+          "value": 30000000
+        },
+        {
+          "field": "equipment.in_original_plan",
+          "operator": "eq",
+          "value": false
+        }
+      ]
+    },
+    "result_status": "PRIOR_APPROVAL_REQUIRED",
+    "source_article": "제73조제1항제5호가목",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  },
+  {
+    "approval_code": "EQP-003",
+    "category_code": "DIRECT_EQUIPMENT",
+    "rule_name": "계획된 3천만원 이상 장비 변경 구입·임차 사전승인",
+    "condition": {
+      "all": [
+        {
+          "field": "equipment.total_acquisition_cost",
+          "operator": "gte",
+          "value": 30000000
+        },
+        {
+          "field": "equipment.in_original_plan",
+          "operator": "eq",
+          "value": true
+        },
+        {
+          "field": "equipment.is_changed_from_plan",
+          "operator": "eq",
+          "value": true
+        },
+        {
+          "not": {
+            "all": [
+              {
+                "field": "equipment.change_reason_unavoidable",
+                "operator": "eq",
+                "value": true
+              },
+              {
+                "field": "equipment.plan_change_rate",
+                "operator": "lte",
+                "value": 0.2
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "result_status": "PRIOR_APPROVAL_REQUIRED",
+    "source_article": "제73조제1항제5호나목",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  },
+  {
+    "approval_code": "EQP-004",
+    "category_code": "DIRECT_EQUIPMENT",
+    "rule_name": "계획된 3천만원 이상 장비 미구입·미임차 사전승인",
+    "condition": {
+      "all": [
+        {
+          "field": "equipment.total_acquisition_cost",
+          "operator": "gte",
+          "value": 30000000
+        },
+        {
+          "field": "equipment.in_original_plan",
+          "operator": "eq",
+          "value": true
+        },
+        {
+          "field": "equipment.is_cancelled",
+          "operator": "eq",
+          "value": true
+        },
+        {
+          "field": "equipment.free_transfer_via_zeus",
+          "operator": "eq",
+          "value": false
+        }
+      ]
+    },
+    "result_status": "PRIOR_APPROVAL_REQUIRED",
+    "source_article": "제73조제1항제5호다목",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  },
+  {
+    "approval_code": "EQP-005",
+    "category_code": "DIRECT_EQUIPMENT",
+    "rule_name": "장비구축 목적 과제의 설치장소 변경 사전승인",
+    "condition": {
+      "all": [
+        {
+          "field": "project.is_equipment_focused",
+          "operator": "eq",
+          "value": true
+        },
+        {
+          "field": "equipment.installation_location_changed",
+          "operator": "eq",
+          "value": true
+        }
+      ]
+    },
+    "result_status": "PRIOR_APPROVAL_REQUIRED",
+    "source_article": "제73조제1항제5호라목",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  },
+  {
+    "approval_code": "ACT-002",
+    "category_code": "ACTIVITY_EXTERNAL_TECH",
+    "rule_name": "외부 전문기술 활용비 직접비 40% 한도",
+    "condition": {
+      "formula": "external_tech.amount > budget.direct_cost * 0.40",
+      "and": {
+        "field": "approval.central_recognition",
+        "operator": "eq",
+        "value": false
+      }
+    },
+    "result_status": "RECOGNITION_REQUIRED",
+    "source_article": "제25조제2항",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  },
+  {
+    "approval_code": "ACT-009",
+    "category_code": "ACTIVITY_TRAVEL",
+    "rule_name": "파견·전보·주거 관련 지원비 중앙행정기관 인정",
+    "condition": {
+      "all": [
+        {
+          "field": "travel.cost_type",
+          "operator": "in",
+          "value": [
+            "DISPATCH",
+            "TRANSFER",
+            "HOUSING_SUPPORT"
+          ]
+        },
+        {
+          "field": "approval.central_recognition",
+          "operator": "eq",
+          "value": false
+        }
+      ]
+    },
+    "result_status": "RECOGNITION_REQUIRED",
+    "source_article": "제25조제6항",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  },
+  {
+    "approval_code": "ACT-031",
+    "category_code": "ACTIVITY_FOREIGN_RESEARCHER",
+    "rule_name": "해외연구자 유치 지원비 중앙행정기관 인정",
+    "condition": {
+      "field": "approval.central_recognition",
+      "operator": "eq",
+      "value": false
+    },
+    "result_status": "RECOGNITION_REQUIRED",
+    "source_article": "제25조제15항",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  },
+  {
+    "approval_code": "ACT-032",
+    "category_code": "ACTIVITY_FOREIGN_RESEARCHER",
+    "rule_name": "해외연구자 유치 지원비 증액 사전승인",
+    "condition": {
+      "all": [
+        {
+          "field": "foreign_researcher.increase_from_original_plan",
+          "operator": "gt",
+          "value": 0
+        },
+        {
+          "field": "approval.prior_approval",
+          "operator": "eq",
+          "value": false
+        }
+      ]
+    },
+    "result_status": "PRIOR_APPROVAL_REQUIRED",
+    "source_article": "제25조제16항·제73조제1항제12호",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  },
+  {
+    "approval_code": "INC-004",
+    "category_code": "DIRECT_INCENTIVE",
+    "rule_name": "총 연구개발비 증액 또는 기관 추가·변경에 따른 연구수당 증액 사전승인",
+    "condition": {
+      "all": [
+        {
+          "any": [
+            {
+              "field": "project.total_rnd_cost_increased",
+              "operator": "eq",
+              "value": true
+            },
+            {
+              "field": "project.institution_added_or_changed",
+              "operator": "eq",
+              "value": true
+            }
+          ]
+        },
+        {
+          "field": "budget.research_incentive",
+          "operator": "gt",
+          "field_ref": "budget.initial_research_incentive"
+        },
+        {
+          "field": "approval.prior_approval",
+          "operator": "eq",
+          "value": false
+        }
+      ]
+    },
+    "result_status": "PRIOR_APPROVAL_REQUIRED",
+    "source_article": "제26조제3항·제73조제1항제10호",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  },
+  {
+    "approval_code": "SUB-001",
+    "category_code": "DIRECT_SUBCONTRACT",
+    "rule_name": "위탁연구개발비 수정직접비 기준 40% 한도",
+    "condition": {
+      "all": [
+        {
+          "formula": "subcontract.amount > (budget.direct_cost - subcontract.amount - budget.international_cost - budget.rnd_contribution_cost) * 0.40"
+        },
+        {
+          "field": "approval.central_recognition",
+          "operator": "eq",
+          "value": false
+        },
+        {
+          "field": "project.is_government_funded_basic_program",
+          "operator": "eq",
+          "value": false
+        }
+      ]
+    },
+    "result_status": "RECOGNITION_REQUIRED",
+    "source_article": "제27조제1항",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  },
+  {
+    "approval_code": "SUB-003",
+    "category_code": "DIRECT_SUBCONTRACT",
+    "rule_name": "위탁연구개발비 원래계획 대비 20% 이상 증액 사전승인",
+    "condition": {
+      "all": [
+        {
+          "formula": "(subcontract.amount - subcontract.original_plan_amount) / subcontract.original_plan_amount >= 0.20"
+        },
+        {
+          "field": "approval.prior_approval",
+          "operator": "eq",
+          "value": false
+        }
+      ]
+    },
+    "result_status": "PRIOR_APPROVAL_REQUIRED",
+    "source_article": "제27조제3항·제73조제1항제7호",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  }
+]

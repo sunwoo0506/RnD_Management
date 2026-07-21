@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gwayeon.local/schemas/extraction_job.schema.json",
+  "title": "Guideline Extraction Job",
+  "type": "object",
+  "required": [
+    "job_id",
+    "file_id",
+    "status",
+    "pipeline_version"
+  ],
+  "properties": {
+    "job_id": {
+      "type": "string"
+    },
+    "file_id": {
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "QUEUED",
+        "PARSING",
+        "CLASSIFYING",
+        "EXTRACTING",
+        "NORMALIZING",
+        "VALIDATING",
+        "REVIEW_REQUIRED",
+        "COMPLETED",
+        "FAILED"
+      ]
+    },
+    "pipeline_version": {
+      "type": "string"
+    },
+    "started_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date-time"
+    },
+    "document_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "version_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "node_count": {
+          "type": "integer"
+        },
+        "candidate_count": {
+          "type": "integer"
+        },
+        "normalized_rule_count": {
+          "type": "integer"
+        },
+        "warning_count": {
+          "type": "integer"
+        },
+        "blocker_count": {
+          "type": "integer"
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

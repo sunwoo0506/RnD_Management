@@ -1,0 +1,2123 @@
+{
+  "document": {
+    "version_code": "NRD_COST_STANDARD_2026_38",
+    "notice_number": "과학기술정보통신부고시 제2026-38호",
+    "effective_from": "2026-05-06",
+    "special_effective_dates": [
+      {
+        "articles": [
+          "제5조",
+          "제10조의2",
+          "제25조의2"
+        ],
+        "effective_from": "2026-06-11",
+        "reason": "부칙 제1조 단서"
+      }
+    ]
+  },
+  "selection_context": {
+    "institution_type": "FOR_PROFIT",
+    "program_id": null,
+    "as_of_date": "2026-07-21"
+  },
+  "rows": [
+    {
+      "profile_code": "LEGAL_INDIRECT",
+      "category_code": "INDIRECT",
+      "display_name": "간접비",
+      "usage_summary": "간접비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 0,
+      "allowed_items": [],
+      "limit": {
+        "display_type": "INSTITUTION_FORMULA",
+        "summary": "기관 유형별 간접비비율",
+        "detail": "영리기관은 수정직접비의 10%, 비영리기관은 기관별 고시비율 등을 적용합니다.",
+        "formula_expression": "modified_direct_cost * 0.10",
+        "over_limit_action": "NOT_ALLOWED"
+      },
+      "source_articles": [
+        "제5조제2항·제63조·제114조"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_DIRECT_LABOR",
+      "category_code": "DIRECT_LABOR",
+      "display_name": "인건비",
+      "usage_summary": "인건비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 8,
+      "allowed_items": [
+        {
+          "item_code": "LABOR_PARTICIPANT_SALARY",
+          "item_name": "참여연구자 급여",
+          "description": "과제 참여기간 동안 참여연구자에게 지급하는 급여와 4대보험 본인부담금",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "LABOR_NEAR_SUPPORT_SALARY",
+          "item_name": "연구근접지원인력 급여",
+          "description": "비영리기관 연구부서에서 과제 수행을 지원하는 연구근접지원인력 급여",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "LABOR_PARTICIPANT_INSURANCE",
+          "item_name": "참여연구자 4대보험 기관부담금",
+          "description": "참여연구자의 국민연금·건강보험·고용보험·산재보험 기관부담금",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "LABOR_PARTICIPANT_RETIREMENT",
+          "item_name": "참여연구자 퇴직급여충당금",
+          "description": "참여연구자에 대한 퇴직급여충당금",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "LABOR_SUPPORT_INSURANCE",
+          "item_name": "연구근접지원인력 4대보험 기관부담금",
+          "description": "연구근접지원인력의 4대보험 기관부담금",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "LABOR_SUPPORT_RETIREMENT",
+          "item_name": "연구근접지원인력 퇴직급여충당금",
+          "description": "연구근접지원인력의 퇴직급여충당금",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "LABOR_EXISTING_CASH",
+          "item_name": "영리기관 기존 참여연구자 현금 인건비",
+          "description": "영리기관 기존 인력의 현금 인건비. 고시상 인정 요건 또는 사업별 허용 요건 확인 필요",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "CONDITIONAL",
+          "condition_summary": "중앙행정기관 인정 또는 고시상 특별요건 충족",
+          "requires_approval": false,
+          "requires_recognition": true
+        },
+        {
+          "item_code": "LABOR_NEW_HIRE_CASH",
+          "item_name": "중소·중견기업 신규채용 참여연구자 현금 인건비",
+          "description": "중소·중견기업이 신규 채용한 참여연구자에게 지급하는 현금 인건비",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "CONDITIONAL",
+          "condition_summary": "중소·중견기업이며 신규채용 요건 충족",
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "NO_FIXED_CAP",
+        "summary": "별도 정률 총액상한 없음",
+        "detail": "월 급여와 인건비계상률 및 기관 유형별 현금계상 조건을 적용합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제6조·제65조"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_DIRECT_STUDENT_LABOR",
+      "category_code": "DIRECT_STUDENT_LABOR",
+      "display_name": "학생인건비",
+      "usage_summary": "학생인건비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 6,
+      "allowed_items": [
+        {
+          "item_code": "STUDENT_SALARY",
+          "item_name": "학생연구자 인건비",
+          "description": "대학 등이 학생연구자에게 지급하는 인건비",
+          "institution_scope": "ELIGIBLE_INSTITUTION",
+          "availability_status": "ALLOWED",
+          "condition_summary": "고시에서 정한 대학 등 대상 기관과 학생연구자 요건 충족",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "STUDENT_COLLABORATIVE_PROGRAM",
+          "item_name": "학·연 협동과정 학생연구자 인건비",
+          "description": "학·연 협동과정을 통해 참여하는 학생연구자 인건비",
+          "institution_scope": "ELIGIBLE_INSTITUTION",
+          "availability_status": "ALLOWED",
+          "condition_summary": "고시에서 정한 대학 등 대상 기관과 학생연구자 요건 충족",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "STUDENT_FOREIGN_UNIVERSITY",
+          "item_name": "외국대학 학생연구자 인건비",
+          "description": "외국대학 소속 학생 신분 연구자에게 지급하는 인건비",
+          "institution_scope": "ELIGIBLE_INSTITUTION",
+          "availability_status": "ALLOWED",
+          "condition_summary": "고시에서 정한 대학 등 대상 기관과 학생연구자 요건 충족",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "STUDENT_TRAINING_PROGRAM",
+          "item_name": "6개월 이상 연수프로그램 학생연구자 인건비",
+          "description": "해당 기관의 6개월 이상 연수프로그램 참여 학생연구자 인건비",
+          "institution_scope": "ELIGIBLE_INSTITUTION",
+          "availability_status": "ALLOWED",
+          "condition_summary": "고시에서 정한 대학 등 대상 기관과 학생연구자 요건 충족",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "STUDENT_INSURANCE",
+          "item_name": "학생연구자 4대보험 기관부담금",
+          "description": "근로계약을 체결한 학생연구자의 4대보험 기관부담금",
+          "institution_scope": "ELIGIBLE_INSTITUTION",
+          "availability_status": "ALLOWED",
+          "condition_summary": "고시에서 정한 대학 등 대상 기관과 학생연구자 요건 충족",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "STUDENT_RETIREMENT",
+          "item_name": "학생연구자 퇴직급여충당금",
+          "description": "근로계약을 체결한 학생연구자의 퇴직급여충당금",
+          "institution_scope": "ELIGIBLE_INSTITUTION",
+          "availability_status": "ALLOWED",
+          "condition_summary": "고시에서 정한 대학 등 대상 기관과 학생연구자 요건 충족",
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "NO_FIXED_CAP",
+        "summary": "별도 정률 총액상한 없음",
+        "detail": "대상 기관과 학생연구자 자격 및 학생인건비 계상기준을 적용합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제7조"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_DIRECT_EQUIPMENT",
+      "category_code": "DIRECT_EQUIPMENT",
+      "display_name": "연구시설·장비비",
+      "usage_summary": "연구시설·장비비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 12,
+      "allowed_items": [
+        {
+          "item_code": "EQUIPMENT_PURCHASE",
+          "item_name": "연구시설·장비 구입비",
+          "description": "과제 수행에 필요한 연구시설·장비 구입비",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "EQUIPMENT_INSTALLATION",
+          "item_name": "연구시설·장비 설치비",
+          "description": "연구시설·장비 설치 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "EQUIPMENT_ADDITIONAL_COST",
+          "item_name": "장비 구입·설치 부대비용",
+          "description": "운송·설치 등 구입·설치 관련 부대비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "EQUIPMENT_UPGRADE",
+          "item_name": "연구시설·장비 성능향상비",
+          "description": "기존 시설·장비의 성능향상 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "EQUIPMENT_RENTAL",
+          "item_name": "연구시설·장비 임차비",
+          "description": "과제 수행에 필요한 시설·장비 임차비",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "EQUIPMENT_MAINTENANCE",
+          "item_name": "연구시설·장비 유지·보수비",
+          "description": "시설·장비 유지 및 보수 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "EQUIPMENT_OPERATION",
+          "item_name": "연구시설·장비 운영비",
+          "description": "시설·장비 운영에 필요한 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "EQUIPMENT_RELOCATION",
+          "item_name": "연구시설·장비 이전 설치비",
+          "description": "타 기관 또는 기관 내 공동활용시설로 이전·설치하는 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "RESEARCH_INFRA_LAND",
+          "item_name": "연구인프라 부지·시설 매입·임차·조성비",
+          "description": "연구인프라 목적 사업의 부지·시설 관련 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "RESEARCH_INFRA_CONSTRUCTION",
+          "item_name": "연구인프라 설계·건축·감리비",
+          "description": "연구인프라 설계·건축·감리 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "RESEARCH_INFRA_EQUIPMENT",
+          "item_name": "연구인프라 장비 구입·설비비",
+          "description": "연구인프라 장비 구입과 설비 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "RESEARCH_INFRA_PM",
+          "item_name": "연구인프라 종합사업관리비",
+          "description": "연구인프라 기획·설계·건설·운영 과정의 자문·관리 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "금액과 원래계획 반영 여부에 따라 ZEUS 확인·표준지침·사전승인 절차 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "PROCEDURE_BASED",
+        "summary": "별도 총액상한 없음",
+        "detail": "3천만원·1억원 절차기준과 원래계획 여부에 따른 사전승인 기준을 적용합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제8조·제23조"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_DIRECT_MATERIAL",
+      "category_code": "DIRECT_MATERIAL",
+      "display_name": "연구재료비",
+      "usage_summary": "연구재료비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 5,
+      "allowed_items": [
+        {
+          "item_code": "MATERIAL_PURCHASE",
+          "item_name": "시약·재료 구입비",
+          "description": "과제 수행에 필요한 시약과 재료 구입비",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "MATERIAL_ADDITIONAL_COST",
+          "item_name": "연구재료 구입 부대비용",
+          "description": "시약·재료 구입과 관련된 운송 등 부대비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "PROJECT_MANAGEMENT_SYSTEM",
+          "item_name": "연구개발과제 관리시스템 운영비",
+          "description": "과제 수행에 필요한 관리시스템 등의 운영비",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "PROTOTYPE_INTERNAL",
+          "item_name": "시험제품·시험설비 자체 제작비",
+          "description": "기관 내부에서 시험제품·시험설비를 제작하는 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "PROTOTYPE_EXTERNAL",
+          "item_name": "시험제품·시험설비 외부 제작비",
+          "description": "외부기관을 통해 시험제품·시험설비를 제작하는 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "NO_FIXED_CAP",
+        "summary": "별도 정률 총액상한 없음",
+        "detail": "과제 직접 관련성, 구매·검수 및 기관별 현금·현물 기준을 적용합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제9조·제24조"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_DIRECT_ACTIVITY",
+      "category_code": "DIRECT_ACTIVITY",
+      "display_name": "연구활동비",
+      "usage_summary": "연구활동비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 0,
+      "allowed_items": [],
+      "limit": {
+        "display_type": "CHILD_RULES",
+        "summary": "세부 항목별 기준 적용",
+        "detail": "연구활동비의 11개 세부 사용용도와 각 제한을 적용합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제10조·제25조"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_ACTIVITY_IP",
+      "category_code": "ACTIVITY_IP",
+      "display_name": "지식재산 창출 활동비",
+      "usage_summary": "지식재산 창출 활동비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 4,
+      "allowed_items": [
+        {
+          "item_code": "IP_TECH_RESEARCH",
+          "item_name": "기술정보 조사·분석비",
+          "description": "기술정보 조사 및 분석 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "IP_PATENT_RESEARCH",
+          "item_name": "특허정보 조사·분석비",
+          "description": "특허정보 조사 및 분석 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "IP_STANDARD_RESEARCH",
+          "item_name": "표준정보 조사·분석비",
+          "description": "표준정보 조사 및 분석 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "IP_CORE_PATENT_STRATEGY",
+          "item_name": "원천·핵심특허 확보전략 수립비",
+          "description": "원천·핵심특허 확보전략 수립 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "NO_FIXED_CAP",
+        "summary": "별도 정률 총액상한 없음",
+        "detail": "지식재산 창출 활동에 한하며 출원·등록·유지 비용과 구분합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제10조제1호·제25조제1항"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_ACTIVITY_EXTERNAL_TECH",
+      "category_code": "ACTIVITY_EXTERNAL_TECH",
+      "display_name": "외부 전문기술 활용비",
+      "usage_summary": "외부 전문기술 활용비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 7,
+      "allowed_items": [
+        {
+          "item_code": "TECH_INTRODUCTION",
+          "item_name": "기술도입비",
+          "description": "외부 기술을 도입하는 데 필요한 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "직접비 40% 범위 원칙. 중앙행정기관 인정 시 초과 가능",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "EXPERT_CONSULTING",
+          "item_name": "전문가 자문료",
+          "description": "외부 전문가의 자문 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "직접비 40% 범위 원칙. 중앙행정기관 인정 시 초과 가능",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "EXPERT_LECTURE",
+          "item_name": "외부 전문가 강사료",
+          "description": "외부 전문가의 강의 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "직접비 40% 범위 원칙. 중앙행정기관 인정 시 초과 가능",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "EXPERT_MANUSCRIPT",
+          "item_name": "외부 전문가 원고료",
+          "description": "외부 전문가의 원고 작성 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "직접비 40% 범위 원칙. 중앙행정기관 인정 시 초과 가능",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "EXPERT_OTHER",
+          "item_name": "그 밖의 전문가 활용비",
+          "description": "통역·평가 등 외부 전문가 활용 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "직접비 40% 범위 원칙. 중앙행정기관 인정 시 초과 가능",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "RND_SERVICE",
+          "item_name": "연구개발서비스 활용비",
+          "description": "외부 연구개발서비스 활용 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "직접비 40% 범위 원칙. 중앙행정기관 인정 시 초과 가능",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "FOREIGN_TECH_SERVICE",
+          "item_name": "국외기관·외국인 전문기술 활용비",
+          "description": "국외 소재 기관 또는 외국인의 전문기술 활용 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "직접비 40% 범위 원칙. 중앙행정기관 인정 시 초과 가능",
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "FORMULA",
+        "summary": "직접비의 40% 이내",
+        "detail": "중앙행정기관 인정 시 40%를 초과할 수 있습니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제10조제2호·제25조제2항"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_ACTIVITY_MEETING",
+      "category_code": "ACTIVITY_MEETING",
+      "display_name": "회의비",
+      "usage_summary": "회의비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 5,
+      "allowed_items": [
+        {
+          "item_code": "MEETING_VENUE",
+          "item_name": "회의장 임차료",
+          "description": "회의·세미나 장소 임차 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "회의 식비는 참여연구자만 참석하는 회의에는 사용할 수 없음",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "MEETING_STENOGRAPHY",
+          "item_name": "속기료",
+          "description": "회의·세미나 속기 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "회의 식비는 참여연구자만 참석하는 회의에는 사용할 수 없음",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "MEETING_INTERPRETATION",
+          "item_name": "통역료",
+          "description": "회의·세미나 통역 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "회의 식비는 참여연구자만 참석하는 회의에는 사용할 수 없음",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "MEETING_OPERATION",
+          "item_name": "회의·세미나 개최비",
+          "description": "회의 또는 세미나 운영에 필요한 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "회의 식비는 참여연구자만 참석하는 회의에는 사용할 수 없음",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "MEETING_MEAL",
+          "item_name": "회의 식비",
+          "description": "외부 참석 요건 등을 충족하는 회의 식비",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "회의 식비는 참여연구자만 참석하는 회의에는 사용할 수 없음",
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "CONDITION_BASED",
+        "summary": "별도 정률 총액상한 없음",
+        "detail": "내부 참여연구자만 참석하는 회의의 식비 제한과 증빙기준을 적용합니다.",
+        "formula_expression": null,
+        "over_limit_action": "FULL_EVIDENCE_REQUIRED"
+      },
+      "source_articles": [
+        "제10조제3호·제25조제4항·제5항"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_ACTIVITY_TRAVEL",
+      "category_code": "ACTIVITY_TRAVEL",
+      "display_name": "출장비",
+      "usage_summary": "출장비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 9,
+      "allowed_items": [
+        {
+          "item_code": "DOMESTIC_TRAVEL_TRANSPORT",
+          "item_name": "국내출장 교통비",
+          "description": "국내출장 이동 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감",
+          "requires_approval": false,
+          "requires_recognition": true
+        },
+        {
+          "item_code": "DOMESTIC_TRAVEL_LODGING",
+          "item_name": "국내출장 숙박비",
+          "description": "국내출장 숙박 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감",
+          "requires_approval": false,
+          "requires_recognition": true
+        },
+        {
+          "item_code": "DOMESTIC_TRAVEL_MEAL",
+          "item_name": "국내출장 식비·일비",
+          "description": "국내출장 식비 및 일비",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감",
+          "requires_approval": false,
+          "requires_recognition": true
+        },
+        {
+          "item_code": "OVERSEAS_TRAVEL_TRANSPORT",
+          "item_name": "국외출장 교통비",
+          "description": "항공료 등 국외출장 이동 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감",
+          "requires_approval": false,
+          "requires_recognition": true
+        },
+        {
+          "item_code": "OVERSEAS_TRAVEL_LODGING",
+          "item_name": "국외출장 숙박비",
+          "description": "국외출장 숙박 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감",
+          "requires_approval": false,
+          "requires_recognition": true
+        },
+        {
+          "item_code": "OVERSEAS_TRAVEL_MEAL",
+          "item_name": "국외출장 식비·일비",
+          "description": "국외출장 식비 및 일비",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감",
+          "requires_approval": false,
+          "requires_recognition": true
+        },
+        {
+          "item_code": "DISPATCH_SUPPORT",
+          "item_name": "파견 관련 지원비",
+          "description": "과제 수행을 위한 타 기관 파견 관련 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감",
+          "requires_approval": false,
+          "requires_recognition": true
+        },
+        {
+          "item_code": "TRANSFER_SUPPORT",
+          "item_name": "전보 관련 지원비",
+          "description": "과제 수행을 위한 인력 전보 관련 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감",
+          "requires_approval": false,
+          "requires_recognition": true
+        },
+        {
+          "item_code": "HOUSING_SUPPORT",
+          "item_name": "파견·전보 주거지원비",
+          "description": "파견 또는 전보 인력의 주거 관련 지원 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체 여비규정 또는 공무원 여비규정 적용. 제공받은 식대는 차감",
+          "requires_approval": false,
+          "requires_recognition": true
+        }
+      ],
+      "limit": {
+        "display_type": "POLICY_BASED",
+        "summary": "기관 여비규정 기준",
+        "detail": "기관 자체규정 또는 공무원 여비규정을 적용하고 제공 식대는 차감합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제10조제4호·제25조제6항부터제8항"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_ACTIVITY_SOFTWARE",
+      "category_code": "ACTIVITY_SOFTWARE",
+      "display_name": "소프트웨어 활용비",
+      "usage_summary": "소프트웨어 활용비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 6,
+      "allowed_items": [
+        {
+          "item_code": "SOFTWARE_PURCHASE",
+          "item_name": "소프트웨어 구입비",
+          "description": "과제 수행용 소프트웨어 구입 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "일반 과제는 종료 2개월 전까지 계약. 최소 계약단위 소명 시 기간 초과 가능",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "SOFTWARE_INSTALLATION",
+          "item_name": "소프트웨어 설치비",
+          "description": "과제 수행용 소프트웨어 설치 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "일반 과제는 종료 2개월 전까지 계약. 최소 계약단위 소명 시 기간 초과 가능",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "SOFTWARE_RENTAL",
+          "item_name": "소프트웨어 임차비",
+          "description": "과제 수행용 소프트웨어 임차 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "일반 과제는 종료 2개월 전까지 계약. 최소 계약단위 소명 시 기간 초과 가능",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "SOFTWARE_LICENSE",
+          "item_name": "소프트웨어 사용권·구독료",
+          "description": "라이선스 또는 구독형 소프트웨어 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "일반 과제는 종료 2개월 전까지 계약. 최소 계약단위 소명 시 기간 초과 가능",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "DATABASE_USAGE",
+          "item_name": "데이터베이스 이용료",
+          "description": "연구용 데이터베이스 이용 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "일반 과제는 종료 2개월 전까지 계약. 최소 계약단위 소명 시 기간 초과 가능",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "NETWORK_USAGE",
+          "item_name": "네트워크 이용료",
+          "description": "연구용 네트워크 이용 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "일반 과제는 종료 2개월 전까지 계약. 최소 계약단위 소명 시 기간 초과 가능",
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "DEADLINE_BASED",
+        "summary": "별도 정률 총액상한 없음",
+        "detail": "일반 과제는 종료 2개월 전까지 사용계약 체결이 원칙입니다.",
+        "formula_expression": "software_purchase_price * 0.20",
+        "over_limit_action": "NOT_ALLOWED"
+      },
+      "source_articles": [
+        "제10조제5호·제25조제9항·제10항"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_ACTIVITY_CLOUD",
+      "category_code": "ACTIVITY_CLOUD",
+      "display_name": "클라우드컴퓨팅서비스 활용비",
+      "usage_summary": "클라우드컴퓨팅서비스 활용비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 5,
+      "allowed_items": [
+        {
+          "item_code": "CLOUD_COMPUTE",
+          "item_name": "클라우드 컴퓨팅 이용료",
+          "description": "클라우드 연산 자원 이용 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "이용지원시스템 확인 후 서비스 선정. 정액제는 소프트웨어 계약기준 준용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "CLOUD_STORAGE",
+          "item_name": "클라우드 저장공간 이용료",
+          "description": "클라우드 스토리지 이용 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "이용지원시스템 확인 후 서비스 선정. 정액제는 소프트웨어 계약기준 준용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "CLOUD_DATABASE",
+          "item_name": "클라우드 데이터베이스 이용료",
+          "description": "클라우드 DB 이용 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "이용지원시스템 확인 후 서비스 선정. 정액제는 소프트웨어 계약기준 준용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "CLOUD_NETWORK",
+          "item_name": "클라우드 네트워크 이용료",
+          "description": "클라우드 네트워크 이용 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "이용지원시스템 확인 후 서비스 선정. 정액제는 소프트웨어 계약기준 준용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "CLOUD_SUBSCRIPTION",
+          "item_name": "정액제·구독형 클라우드 비용",
+          "description": "정액제 또는 구독형 클라우드 서비스 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "이용지원시스템 확인 후 서비스 선정. 정액제는 소프트웨어 계약기준 준용",
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "CONDITION_BASED",
+        "summary": "별도 정률 총액상한 없음",
+        "detail": "이용지원시스템 확인 및 정액제 계약기간 기준을 적용합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제10조제6호·제25조제11항·제12항"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_ACTIVITY_LAB_OPERATION",
+      "category_code": "ACTIVITY_LAB_OPERATION",
+      "display_name": "연구실운영비",
+      "usage_summary": "연구실운영비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 8,
+      "allowed_items": [
+        {
+          "item_code": "OFFICE_DEVICE_PURCHASE",
+          "item_name": "사무용 기기 구입비",
+          "description": "과제 수행에 필요한 사무용 기기 구입 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체규정 적용. 영리기관은 소모성 비용 제외 및 원래계획 범위 확인",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "OFFICE_DEVICE_RENTAL",
+          "item_name": "사무용 기기 임차비",
+          "description": "사무용 기기 임차 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체규정 적용. 영리기관은 소모성 비용 제외 및 원래계획 범위 확인",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "OFFICE_SOFTWARE",
+          "item_name": "사무용 소프트웨어 비용",
+          "description": "사무용 소프트웨어 구입·설치·임차·사용대차 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체규정 적용. 영리기관은 소모성 비용 제외 및 원래계획 범위 확인",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "OFFICE_SUPPLIES",
+          "item_name": "사무용품비",
+          "description": "과제 수행에 필요한 사무용품 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체규정 적용. 영리기관은 소모성 비용 제외 및 원래계획 범위 확인",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "LAB_CONSUMABLES",
+          "item_name": "연구실 운영 소모성 비용",
+          "description": "연구실 운영에 필요한 소모성 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체규정 적용. 영리기관은 소모성 비용 제외 및 원래계획 범위 확인",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "LAB_HEATING_COOLING",
+          "item_name": "연구실 냉난방 기기 비용",
+          "description": "연구실 냉난방 환경 유지 기기 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체규정 적용. 영리기관은 소모성 비용 제외 및 원래계획 범위 확인",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "LAB_CLEANING_ENVIRONMENT",
+          "item_name": "연구실 청결 환경 유지 기기·비품",
+          "description": "청결한 환경 유지에 필요한 기기·비품",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체규정 적용. 영리기관은 소모성 비용 제외 및 원래계획 범위 확인",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "LAB_ENVIRONMENT_MAINTENANCE",
+          "item_name": "연구실 환경유지 기기·비품 유지비",
+          "description": "냉난방·청결 관련 기기·비품 유지 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "기관 자체규정 적용. 영리기관은 소모성 비용 제외 및 원래계획 범위 확인",
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "PLAN_BASED",
+        "summary": "기관 자체규정·원래계획 범위",
+        "detail": "영리기관은 소모성 비용을 제외하고 활용·관리계획 범위에서 사용합니다.",
+        "formula_expression": null,
+        "over_limit_action": "PRIOR_APPROVAL_REQUIRED"
+      },
+      "source_articles": [
+        "제10조제7호·제25조제13항·제68조제4항·제5항"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_ACTIVITY_PERSONNEL_SUPPORT",
+      "category_code": "ACTIVITY_PERSONNEL_SUPPORT",
+      "display_name": "연구인력 지원비",
+      "usage_summary": "연구인력 지원비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 4,
+      "allowed_items": [
+        {
+          "item_code": "PERSONNEL_TRAINING",
+          "item_name": "과제 관련 교육·훈련비",
+          "description": "과제 수행과 직접 관련된 참여인력 교육·훈련 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "ACADEMIC_CONFERENCE_FEE",
+          "item_name": "학회 참가비",
+          "description": "과제 수행과 직접 관련된 학회 참가비",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "SEMINAR_FEE",
+          "item_name": "세미나 참가비",
+          "description": "과제 수행과 직접 관련된 세미나 참가비",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "OVERTIME_MEAL",
+          "item_name": "야근·특근 식대",
+          "description": "과제 수행을 위해 지출한 야근·특근 식대",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "CONDITION_BASED",
+        "summary": "별도 정률 총액상한 없음",
+        "detail": "과제 직접 관련성이 없는 교육·학회·학위과정·평일 점심 등은 제외합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제10조제8호·제25조제14항"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_ACTIVITY_FOREIGN_RESEARCHER",
+      "category_code": "ACTIVITY_FOREIGN_RESEARCHER",
+      "display_name": "해외연구자 유치 지원비",
+      "usage_summary": "해외연구자 유치 지원비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 5,
+      "allowed_items": [
+        {
+          "item_code": "FOREIGN_RESEARCHER_INCENTIVE",
+          "item_name": "해외연구자 유치 장려금",
+          "description": "해외 연구자의 국내 유치를 위한 장려금",
+          "institution_scope": "ALL",
+          "availability_status": "CONDITIONAL",
+          "condition_summary": "6개월 이상 국내 거주·과제 참여, 친족 제한, 자체절차 및 인정 필요",
+          "requires_approval": false,
+          "requires_recognition": true
+        },
+        {
+          "item_code": "FOREIGN_RESEARCHER_STAY",
+          "item_name": "해외연구자 체재비",
+          "description": "국내 체류에 필요한 체재 비용",
+          "institution_scope": "ALL",
+          "availability_status": "CONDITIONAL",
+          "condition_summary": "6개월 이상 국내 거주·과제 참여, 친족 제한, 자체절차 및 인정 필요",
+          "requires_approval": false,
+          "requires_recognition": true
+        },
+        {
+          "item_code": "FOREIGN_RESEARCHER_HOUSING",
+          "item_name": "해외연구자 주거지원비",
+          "description": "국내 거주에 필요한 주거 관련 비용",
+          "institution_scope": "ALL",
+          "availability_status": "CONDITIONAL",
+          "condition_summary": "6개월 이상 국내 거주·과제 참여, 친족 제한, 자체절차 및 인정 필요",
+          "requires_approval": false,
+          "requires_recognition": true
+        },
+        {
+          "item_code": "FOREIGN_RESEARCHER_TRAVEL",
+          "item_name": "해외연구자 유치 이동비",
+          "description": "국내 유치를 위한 이동 관련 비용",
+          "institution_scope": "ALL",
+          "availability_status": "CONDITIONAL",
+          "condition_summary": "6개월 이상 국내 거주·과제 참여, 친족 제한, 자체절차 및 인정 필요",
+          "requires_approval": false,
+          "requires_recognition": true
+        },
+        {
+          "item_code": "FOREIGN_RESEARCHER_OTHER",
+          "item_name": "그 밖의 해외연구자 유치 지원비",
+          "description": "국내 유치에 직접 필요한 기타 비용",
+          "institution_scope": "ALL",
+          "availability_status": "CONDITIONAL",
+          "condition_summary": "6개월 이상 국내 거주·과제 참여, 친족 제한, 자체절차 및 인정 필요",
+          "requires_approval": false,
+          "requires_recognition": true
+        }
+      ],
+      "limit": {
+        "display_type": "RECOGNITION_BASED",
+        "summary": "중앙행정기관 인정 후 계상",
+        "detail": "거주기간·친족관계·자체절차 요건을 모두 충족해야 합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제10조제9호·제25조제15항·제16항"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_ACTIVITY_PROGRAM_MANAGEMENT",
+      "category_code": "ACTIVITY_PROGRAM_MANAGEMENT",
+      "display_name": "종합사업관리비",
+      "usage_summary": "종합사업관리비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 4,
+      "allowed_items": [
+        {
+          "item_code": "PROGRAM_PLANNING",
+          "item_name": "연구인프라 사업 기획비",
+          "description": "연구인프라 조성 사업의 기획 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "연구인프라 조성을 목적으로 하는 사업에 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "PROGRAM_COORDINATION",
+          "item_name": "연구인프라 사업 조정비",
+          "description": "연구인프라 사업의 조정 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "연구인프라 조성을 목적으로 하는 사업에 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "PROGRAM_CONSULTING",
+          "item_name": "연구인프라 추진과정 자문비",
+          "description": "추진과정에 대한 외부 자문 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "연구인프라 조성을 목적으로 하는 사업에 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "PROGRAM_MANAGEMENT",
+          "item_name": "연구인프라 종합사업관리비",
+          "description": "추진과정 전반에 대한 관리 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "연구인프라 조성을 목적으로 하는 사업에 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "PROGRAM_BASED",
+        "summary": "사업 목적에 따른 계상",
+        "detail": "연구인프라 조성을 목적으로 하는 사업에 한해 적용합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제10조제10호"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_ACTIVITY_OTHER",
+      "category_code": "ACTIVITY_OTHER",
+      "display_name": "그 밖의 비용",
+      "usage_summary": "그 밖의 비용으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 14,
+      "allowed_items": [
+        {
+          "item_code": "BOOKS_DOCUMENTS",
+          "item_name": "문헌구입비",
+          "description": "과제 관련 도서·문헌 구입 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "PAPER_PUBLICATION",
+          "item_name": "논문 게재료",
+          "description": "과제 성과 논문 게재 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "PRINTING",
+          "item_name": "인쇄비",
+          "description": "과제 관련 인쇄 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "COPYING",
+          "item_name": "복사비",
+          "description": "과제 관련 복사 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "PHOTO_PRINTING",
+          "item_name": "인화비",
+          "description": "과제 관련 인화 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "SLIDE_PRODUCTION",
+          "item_name": "슬라이드 제작비",
+          "description": "발표자료 슬라이드 제작 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "TAXES_DUTIES",
+          "item_name": "세금 및 공과금",
+          "description": "과제와 직접 관련된 세금 및 공과금",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "POSTAGE",
+          "item_name": "우편요금",
+          "description": "과제 관련 우편 발송 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "DELIVERY",
+          "item_name": "택배비",
+          "description": "과제 관련 물품 배송 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "FEES",
+          "item_name": "각종 수수료",
+          "description": "과제 수행에 직접 필요한 각종 수수료",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "UTILITIES",
+          "item_name": "공공요금",
+          "description": "과제와 직접 관련된 공공요금",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "DAILY_WORKER",
+          "item_name": "일용직 활용비",
+          "description": "과제 수행을 위해 활용한 일용직 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "RESEARCH_DEMONSTRATION_PARTICIPANT",
+          "item_name": "연구실증 참여자 활용비",
+          "description": "연구실증 등에 참여한 사람의 활용 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "OTHER_DIRECT_RELATED_COST",
+          "item_name": "그 밖의 과제 직접 관련 비용",
+          "description": "과제와 직접 관련성이 입증되는 기타 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "NO_FIXED_CAP",
+        "summary": "별도 정률 총액상한 없음",
+        "detail": "과제와 직접 관련성이 입증되는 비용만 계상합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제10조제11호"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_DIRECT_INNOVATION",
+      "category_code": "DIRECT_INNOVATION",
+      "display_name": "연구혁신비",
+      "usage_summary": "연구혁신비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 10,
+      "allowed_items": [
+        {
+          "item_code": "INNOVATION_MATERIAL_PURCHASE",
+          "item_name": "연구혁신비-연구재료 구입비",
+          "description": "연구재료비 사용용도 중 재료 구입 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "INNOVATION_PROJECT_SYSTEM",
+          "item_name": "연구혁신비-과제 관리비",
+          "description": "연구개발과제 관리시스템 운영 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "INNOVATION_PROTOTYPE",
+          "item_name": "연구혁신비-재료 제작비",
+          "description": "시험제품·시험설비 제작 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "INNOVATION_MEETING",
+          "item_name": "연구혁신비-회의비",
+          "description": "회의·세미나 관련 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "INNOVATION_TRAVEL",
+          "item_name": "연구혁신비-출장비",
+          "description": "국내외 출장 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "INNOVATION_SOFTWARE",
+          "item_name": "연구혁신비-소프트웨어 활용비",
+          "description": "소프트웨어·DB·네트워크 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "INNOVATION_CLOUD",
+          "item_name": "연구혁신비-클라우드 활용비",
+          "description": "클라우드컴퓨팅서비스 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "INNOVATION_LAB_OPERATION",
+          "item_name": "연구혁신비-연구실운영비",
+          "description": "연구실 운영 관련 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "INNOVATION_PERSONNEL_SUPPORT",
+          "item_name": "연구혁신비-연구인력 지원비",
+          "description": "교육·학회·야근식대 등",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "INNOVATION_OTHER",
+          "item_name": "연구혁신비-그 밖의 연구활동비",
+          "description": "제10조의 그 밖의 비용 등",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "연구재료비 또는 연구활동비 용도. 외부 전문기술 활용비 제외",
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "MULTI_LIMIT",
+        "summary": "재료비+활동비 합계 10%, 연차평균 5천만원",
+        "detail": "재료용도 건별 300만원, 활동용도 건별 50만원 이하이며 외부 전문기술 활용비는 제외합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제10조의2·제25조의2"
+      ],
+      "effective_from": "2026-06-11"
+    },
+    {
+      "profile_code": "LEGAL_DIRECT_INCENTIVE",
+      "category_code": "DIRECT_INCENTIVE",
+      "display_name": "연구수당",
+      "usage_summary": "연구수당으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 3,
+      "allowed_items": [
+        {
+          "item_code": "RESEARCH_INCENTIVE_PI",
+          "item_name": "연구책임자 연구수당",
+          "description": "연구책임자에게 지급하는 장려금",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "수정인건비 20% 한도와 기여도 평가·개인별 지급한도 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "RESEARCH_INCENTIVE_RESEARCHER",
+          "item_name": "참여연구자 연구수당",
+          "description": "참여연구자에게 지급하는 장려금",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "수정인건비 20% 한도와 기여도 평가·개인별 지급한도 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "RESEARCH_INCENTIVE_STUDENT",
+          "item_name": "학생연구자 연구수당",
+          "description": "학생연구자에게 지급하는 장려금",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "수정인건비 20% 한도와 기여도 평가·개인별 지급한도 적용",
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "FORMULA",
+        "summary": "수정인건비의 20% 이내",
+        "detail": "참여연구자 2명 이상이면 1인 지급액은 전체 연구수당의 70% 이내입니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제11조·제26조"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_DIRECT_SECURITY",
+      "category_code": "DIRECT_SECURITY",
+      "display_name": "보안수당",
+      "usage_summary": "보안수당으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 4,
+      "allowed_items": [
+        {
+          "item_code": "SECURITY_INCENTIVE_PI",
+          "item_name": "보안과제 연구책임자 보안수당",
+          "description": "보안과제 연구책임자 장려금",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "보안과제 참여인력에게만 지급하며 개인별 인건비 3% 범위",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "SECURITY_INCENTIVE_RESEARCHER",
+          "item_name": "보안과제 참여연구자 보안수당",
+          "description": "보안과제 참여연구자 장려금",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "보안과제 참여인력에게만 지급하며 개인별 인건비 3% 범위",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "SECURITY_INCENTIVE_STUDENT",
+          "item_name": "보안과제 학생연구자 보안수당",
+          "description": "보안과제 학생연구자 장려금",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "보안과제 참여인력에게만 지급하며 개인별 인건비 3% 범위",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "SECURITY_INCENTIVE_SUPPORT",
+          "item_name": "보안과제 연구근접지원인력 보안수당",
+          "description": "보안과제 연구근접지원인력 장려금",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "보안과제 참여인력에게만 지급하며 개인별 인건비 3% 범위",
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "FORMULA",
+        "summary": "개인별 인건비의 3% 이내",
+        "detail": "보안과제 참여자에게만 지급합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제11조의2·제26조의2"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_DIRECT_SUBCONTRACT",
+      "category_code": "DIRECT_SUBCONTRACT",
+      "display_name": "위탁연구개발비",
+      "usage_summary": "위탁연구개발비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 1,
+      "allowed_items": [
+        {
+          "item_code": "SUBCONTRACT_RND_PAYMENT",
+          "item_name": "위탁연구개발기관 지급 연구개발비",
+          "description": "주관기관이 과제 일부를 위탁할 때 위탁기관에 지급하는 비용",
+          "institution_scope": "ALL",
+          "availability_status": "ALLOWED",
+          "condition_summary": "조정 직접비 40% 원칙. 초과 시 인정, 원래계획 대비 20% 이상 증액 시 사전승인",
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "FORMULA",
+        "summary": "조정 직접비의 40% 이내",
+        "detail": "초과 시 인정이 필요하며 원래계획 대비 20% 이상 증액은 사전승인 대상입니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제12조·제27조"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_DIRECT_INTERNATIONAL",
+      "category_code": "DIRECT_INTERNATIONAL",
+      "display_name": "국제공동연구개발비",
+      "usage_summary": "국제공동연구개발비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 2,
+      "allowed_items": [
+        {
+          "item_code": "INTERNATIONAL_INSTITUTION_PAYMENT",
+          "item_name": "외국 소재 기관 공동연구비",
+          "description": "외국 소재 기관에 지급하는 공동연구개발비",
+          "institution_scope": "ALL",
+          "availability_status": "CONDITIONAL",
+          "condition_summary": "협약에서 정하고 중앙행정기관의 승인·인정 필요",
+          "requires_approval": true,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "INTERNATIONAL_RESEARCHER_PAYMENT",
+          "item_name": "외국인 공동연구비",
+          "description": "외국인에게 지급하는 공동연구개발비",
+          "institution_scope": "ALL",
+          "availability_status": "CONDITIONAL",
+          "condition_summary": "협약에서 정하고 중앙행정기관의 승인·인정 필요",
+          "requires_approval": true,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "APPROVAL_BASED",
+        "summary": "승인·인정 범위",
+        "detail": "협약과 중앙행정기관 승인에 따라 외국기관 또는 외국인에게 지급합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제13조·제28조"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_DIRECT_RND_CONTRIBUTION",
+      "category_code": "DIRECT_RND_CONTRIBUTION",
+      "display_name": "연구개발부담비",
+      "usage_summary": "연구개발부담비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 2,
+      "allowed_items": [
+        {
+          "item_code": "BASIC_PROGRAM_CONTRIBUTION",
+          "item_name": "기본사업 연구개발비 부담금",
+          "description": "법률로 직접 설립된 기관이 기본사업 연구개발비에서 부담하는 비용",
+          "institution_scope": "GOV_FUNDED_OR_DIRECTLY_ESTABLISHED",
+          "availability_status": "INSTITUTION_SPECIFIC",
+          "condition_summary": "정부출연기관 등 고시상 적용 대상 기관에 한함",
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "OTHER_INSTITUTION_PAYMENT",
+          "item_name": "기본사업 수행 타 연구개발기관 지급비",
+          "description": "기본사업 수행을 위해 협약에 따라 다른 연구개발기관에 지급하는 비용",
+          "institution_scope": "GOV_FUNDED_OR_DIRECTLY_ESTABLISHED",
+          "availability_status": "INSTITUTION_SPECIFIC",
+          "condition_summary": "정부출연기관 등 고시상 적용 대상 기관에 한함",
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "INSTITUTION_BASED",
+        "summary": "대상 기관에 한해 계상",
+        "detail": "정부출연기관 등 고시상 적용 대상 기관에 한합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제14조·제29조"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_INDIRECT_HR_SUPPORT",
+      "category_code": "INDIRECT_HR_SUPPORT",
+      "display_name": "인력지원비",
+      "usage_summary": "인력지원비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 5,
+      "allowed_items": [
+        {
+          "item_code": "SUPPORT_STAFF_SALARY",
+          "item_name": "연구지원인력 인건비",
+          "description": "연구지원인력에게 지급하는 인건비",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "RND_PERFORMANCE_BONUS",
+          "item_name": "연구개발능률성과급",
+          "description": "우수 연구자·연구지원인력에게 지급하는 성과급",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "PARENTAL_LEAVE_INSURANCE",
+          "item_name": "육아휴직 기간 4대보험 기관부담금",
+          "description": "참여연구자·연구지원인력 육아휴직 기간 기관부담금",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "PARENTAL_LEAVE_RETIREMENT",
+          "item_name": "육아휴직 기간 퇴직급여충당금",
+          "description": "육아휴직 기간 퇴직급여충당금",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "NONPROFIT_HR_RELATED_COST",
+          "item_name": "비영리기관 연구자·연구지원인력 인건비 관련 비용",
+          "description": "제15조 각 호 및 유사한 인건비 관련 비용",
+          "institution_scope": "NON_PROFIT",
+          "availability_status": "INSTITUTION_SPECIFIC",
+          "condition_summary": "대학 교원·이미 인건비 지급 연구자 등의 중복 인건비 및 학생 장학금 제외",
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "INSTITUTION_BASED",
+        "summary": "기관 유형별 간접비 범위",
+        "detail": "인력지원비의 세부 사용용도와 제외항목을 적용합니다.",
+        "formula_expression": "project_indirect_cost * 0.10",
+        "over_limit_action": "NOT_ALLOWED"
+      },
+      "source_articles": [
+        "제15조·제15조의2"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_INDIRECT_RESEARCH_SUPPORT",
+      "category_code": "INDIRECT_RESEARCH_SUPPORT",
+      "display_name": "연구지원비",
+      "usage_summary": "연구지원비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 15,
+      "allowed_items": [
+        {
+          "item_code": "INSTITUTION_COMMON_COST",
+          "item_name": "기관 공통 비용",
+          "description": "연구개발 수행에 필요한 기관 공통 경비",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "PROJECT_GROUP_OPERATION",
+          "item_name": "사업단·연구단 운영비",
+          "description": "전문적 과제관리 조직의 운영 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "PROJECT_GROUP_EQUIPMENT",
+          "item_name": "사업단·연구단 비품 구입비",
+          "description": "사업단·연구단 운영에 필요한 비품 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "INFRA_CLOUD_COST",
+          "item_name": "기반시설·장비 운영 클라우드 비용",
+          "description": "기반시설·장비 운영에 필요한 클라우드 이용료",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "LAB_SAFETY_COST",
+          "item_name": "연구실안전관리비",
+          "description": "연구실 안전과 유지관리에 필요한 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "SECURITY_EQUIPMENT",
+          "item_name": "연구보안 장비 구입비",
+          "description": "연구보안을 위한 보안장비 구입 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "SECURITY_EDUCATION",
+          "item_name": "연구보안 교육비",
+          "description": "보안교육 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "SECURITY_VULNERABILITY",
+          "item_name": "보안취약점 진단비",
+          "description": "보안취약점 진단 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "SECURITY_INCIDENT_RESPONSE",
+          "item_name": "보안사고 대응 지원비",
+          "description": "보안사고 대응 지원 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "SECURITY_CONSULTING",
+          "item_name": "보안컨설팅비",
+          "description": "연구보안 컨설팅 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "TECH_ESCROW_COST",
+          "item_name": "기술자료 임치 비용",
+          "description": "기술자료 임치 관련 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "CORE_TECH_PROTECTION",
+          "item_name": "국가핵심기술 보호조치 비용",
+          "description": "국가핵심기술 보호조치 관련 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "OTHER_SECURITY_COST",
+          "item_name": "그 밖의 연구보안 비용",
+          "description": "과제 보안을 위해 직접 필요한 기타 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "RESEARCH_ETHICS_COST",
+          "item_name": "연구윤리활동비",
+          "description": "연구윤리규정·교육·인식확산 등 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "NONPROFIT_RESEARCH_ENVIRONMENT_COST",
+          "item_name": "비영리기관 연구시설·장비 구축·운영 및 연구환경 유지비",
+          "description": "제16조 각 호 및 이와 유사한 연구시설·장비·연구환경 관련 비용",
+          "institution_scope": "NON_PROFIT",
+          "availability_status": "INSTITUTION_SPECIFIC",
+          "condition_summary": "과제 수주 보상비와 건축물 신축·증축·개축·리모델링 제외",
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "INSTITUTION_BASED",
+        "summary": "기관 유형별 간접비 범위",
+        "detail": "연구시설·장비·연구환경 및 안전·보안·윤리 비용을 적용합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제16조·제16조의2"
+      ],
+      "effective_from": "2026-05-06"
+    },
+    {
+      "profile_code": "LEGAL_INDIRECT_OUTCOME_SUPPORT",
+      "category_code": "INDIRECT_OUTCOME_SUPPORT",
+      "display_name": "성과활용지원비",
+      "usage_summary": "성과활용지원비으로 사용할 수 있는 지침상 세부 항목입니다.",
+      "allowed_item_count": 14,
+      "allowed_items": [
+        {
+          "item_code": "SCIENCE_PROMOTION",
+          "item_name": "과학홍보물 제작비",
+          "description": "연구개발 관련 과학홍보물 제작 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "SCIENCE_EVENT",
+          "item_name": "과학문화 행사프로그램비",
+          "description": "과학기술문화 확산 행사 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "LECTURE_EXPERIENCE",
+          "item_name": "강연·체험활동비",
+          "description": "연구개발 관련 강연·체험활동 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "LAB_OPENING",
+          "item_name": "연구실 개방 비용",
+          "description": "연구실 개방 프로그램 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "PROMOTION_EXPERT_TRAINING",
+          "item_name": "홍보전문가 양성비",
+          "description": "과학기술 홍보전문가 양성 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "OTHER_SCIENCE_CULTURE",
+          "item_name": "그 밖의 과학기술문화 확산비",
+          "description": "과학기술문화 확산에 직접 필요한 기타 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "IP_APPLICATION",
+          "item_name": "지식재산권 출원비",
+          "description": "국가연구개발사업 관련 지식재산권 출원 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "IP_REGISTRATION",
+          "item_name": "지식재산권 등록비",
+          "description": "지식재산권 등록 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "IP_MAINTENANCE",
+          "item_name": "지식재산권 유지비",
+          "description": "지식재산권 유지 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "TECH_VALUATION",
+          "item_name": "기술가치평가비",
+          "description": "기술이전에 필요한 기술가치평가 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "TECH_TRANSFER",
+          "item_name": "기술이전 지원비",
+          "description": "기술이전에 필요한 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "STANDARD_ACTIVITY",
+          "item_name": "표준 활동비",
+          "description": "표준 활동에 필요한 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "RESEARCH_NOTE",
+          "item_name": "연구노트 제정·운영·교육비",
+          "description": "연구노트 규정·운영·교육·인식확산 비용",
+          "institution_scope": "FOR_PROFIT",
+          "availability_status": "ALLOWED",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        },
+        {
+          "item_code": "NONPROFIT_OUTCOME_SUPPORT",
+          "item_name": "비영리기관 과학기술문화·지식재산·성과활용 지원비",
+          "description": "과학기술문화 확산, 지식재산권 출원·등록, 연구성과 활용 지원 비용",
+          "institution_scope": "NON_PROFIT",
+          "availability_status": "INSTITUTION_SPECIFIC",
+          "condition_summary": null,
+          "requires_approval": false,
+          "requires_recognition": false
+        }
+      ],
+      "limit": {
+        "display_type": "INSTITUTION_BASED",
+        "summary": "기관 유형별 간접비 범위",
+        "detail": "과학문화·지식재산·연구성과 활용 지원 비용을 적용합니다.",
+        "formula_expression": null,
+        "over_limit_action": "CHECK_ALL_APPLICABLE_RULES"
+      },
+      "source_articles": [
+        "제17조·제17조의2"
+      ],
+      "effective_from": "2026-05-06"
+    }
+  ]
+}

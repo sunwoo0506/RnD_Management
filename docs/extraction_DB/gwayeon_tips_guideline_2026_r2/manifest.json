@@ -1,0 +1,51 @@
+{
+  "package_name": "gwayeon_tips_guideline_2026_r2",
+  "document_version": "TIPS_OPERATION_GUIDELINE_2026_R2",
+  "title": "팁스(TIPS) 총괄 운영지침",
+  "notice_number": "2026년 팁스(TIPS) 총괄 운영지침 2차 개정안",
+  "issuer": "중소벤처기업부",
+  "document_type": "GUIDELINE",
+  "revision_type": "2차 개정",
+  "effective_from": "2026-03-03",
+  "special_effective_dates": [
+    {
+      "articles": [
+        "18. 연구개발비 사용실적 보고 및 정산 (회의비 관련)"
+      ],
+      "effective_from": "2024-12-01",
+      "reason": "부칙 4. 단서 — 국가연구개발사업 연구개발비 사용기준 회의비 개정사항 시행일부터 적용"
+    }
+  ],
+  "base_document_version": "NRD_COST_STANDARD_2026_38",
+  "generated_at": "2026-07-22",
+  "source_files": [
+    "붙임1.+2026년+팁스TIPS+총괄+운영지침+2차+개정안+본문.hwp (규정 본문 — 11. 연구개발비 산정기준, 16. 관리 및 사용, 부칙)",
+    "붙임2.+2026년+팁스TIPS+총괄+운영지침+2차+개정안+별지서식.hwp (별지 제1-③호 부록2 연구개발비 비목별 총괄표 — 편성 양식의 비목 구조와 재원 구성 조건)"
+  ],
+  "source_file_sha256": "fd25264893b659894a5a1c4eff5d91577e4359a49ecdafdbf91c1994afe57b41",
+  "extraction_scope": "본문 11. 연구개발비 산정기준 및 조정 / 16. 연구개발비의 관리 및 사용 / 붙임 비목별 증빙자료 / 별지 제1-③호 부록2 연구개발비 사용계획",
+  "notes": "연구개발비 산정·사용 기준은 국가연구개발사업 연구개발비 사용 기준을 따르되(지침 11.가), 이 지침이 별도로 정한 사항을 우선 적용한다. 이 패키지는 지침이 별도로 정했거나 명시한 규칙만 추출했다. 인건비의 기존/신규(일반·청년의무)/외부 구분과 위탁 직접비·간접비 구분은 본문이 아니라 별지서식의 편성 양식에서 왔다.",
+  "counts": {
+    "categories": 26,
+    "budget_guides": 8,
+    "allowed_items": 36,
+    "limit_rules": 23,
+    "regulation_rules": 25,
+    "source_text": 15
+  },
+  "pack_meta": {
+    "guideline": "팁스(TIPS) 총괄 운영지침 (2026 · 2차 개정)",
+    "agency": "중소벤처기업부",
+    "reference_url": "https://www.jointips.or.kr",
+    "output": "tips2026.json",
+    "scopes": [
+      {
+        "scope": "FOR_PROFIT",
+        "id": "tips2026",
+        "name": "팁스(TIPS) R&D (2026 운영지침)",
+        "org_type": "영리기관(창업기업)"
+      }
+    ],
+    "program_name": "팁스(TIPS)"
+  }
+}

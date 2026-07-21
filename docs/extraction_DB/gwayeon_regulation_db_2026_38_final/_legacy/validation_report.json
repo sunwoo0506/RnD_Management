@@ -1,0 +1,14 @@
+{
+  "document_version": "NRD_COST_STANDARD_2026_38",
+  "checks": {
+    "direct_main_categories": true,
+    "activity_subcategories": true,
+    "indirect_main_categories": true,
+    "allowed_items_expanded": true,
+    "all_guides_have_source": true,
+    "all_items_have_source": true,
+    "all_items_have_category": true,
+    "innovation_effective_date": true
+  },
+  "all_passed": true
+}

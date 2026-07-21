@@ -1,0 +1,152 @@
+[
+  {
+    "evidence_code": "COM-013",
+    "category_code": "ALL",
+    "rule_name": "연구개발비 사용 증명자료 구비",
+    "condition": {
+      "field": "expense.has_supporting_evidence",
+      "operator": "eq",
+      "value": false
+    },
+    "required_documents": [],
+    "source_article": "제22조제2항",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  },
+  {
+    "evidence_code": "ACT-007",
+    "category_code": "ACTIVITY_MEETING",
+    "rule_name": "10만원 초과 회의비 기본 증빙",
+    "condition": {
+      "all": [
+        {
+          "field": "expense.amount",
+          "operator": "gt",
+          "value": 100000
+        },
+        {
+          "any": [
+            {
+              "field": "meeting.has_receipt",
+              "operator": "eq",
+              "value": false
+            },
+            {
+              "field": "meeting.has_internal_approval_or_minutes",
+              "operator": "eq",
+              "value": false
+            }
+          ]
+        }
+      ]
+    },
+    "required_documents": [
+      "RECEIPT",
+      "INTERNAL_APPROVAL_OR_MEETING_MINUTES"
+    ],
+    "source_article": "제25조제5항",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  },
+  {
+    "evidence_code": "ACT-008",
+    "category_code": "ACTIVITY_MEETING",
+    "rule_name": "10만원 이하 회의비 간소화 증빙",
+    "condition": {
+      "all": [
+        {
+          "field": "expense.amount",
+          "operator": "lte",
+          "value": 100000
+        },
+        {
+          "any": [
+            {
+              "field": "meeting.has_receipt",
+              "operator": "eq",
+              "value": false
+            },
+            {
+              "field": "meeting.has_simplified_record",
+              "operator": "eq",
+              "value": false
+            }
+          ]
+        }
+      ]
+    },
+    "required_documents": [
+      "RECEIPT",
+      "SIMPLIFIED_MEETING_RECORD"
+    ],
+    "source_article": "제25조제5항 단서",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  },
+  {
+    "evidence_code": "ACT-013",
+    "category_code": "ACTIVITY_TRAVEL",
+    "rule_name": "국외출장 집행 전 출장계획서 구비",
+    "condition": {
+      "all": [
+        {
+          "field": "travel.is_overseas",
+          "operator": "eq",
+          "value": true
+        },
+        {
+          "field": "travel.has_plan",
+          "operator": "eq",
+          "value": false
+        }
+      ]
+    },
+    "required_documents": [
+      "OVERSEAS_TRAVEL_PLAN"
+    ],
+    "source_article": "제25조제8항",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  },
+  {
+    "evidence_code": "ACT-014",
+    "category_code": "ACTIVITY_TRAVEL",
+    "rule_name": "국외출장 집행 후 출장결과보고서 구비",
+    "condition": {
+      "all": [
+        {
+          "field": "travel.is_overseas",
+          "operator": "eq",
+          "value": true
+        },
+        {
+          "field": "travel.has_result_report",
+          "operator": "eq",
+          "value": false
+        }
+      ]
+    },
+    "required_documents": [
+      "OVERSEAS_TRAVEL_RESULT_REPORT"
+    ],
+    "source_article": "제25조제8항",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  },
+  {
+    "evidence_code": "SUB-004",
+    "category_code": "DIRECT_SUBCONTRACT",
+    "rule_name": "위탁연구개발비 계좌이체 증명 구비",
+    "condition": {
+      "field": "subcontract.has_transfer_evidence",
+      "operator": "eq",
+      "value": false
+    },
+    "required_documents": [
+      "BANK_TRANSFER_EVIDENCE"
+    ],
+    "source_article": "제27조제5항",
+    "effective_from": "2026-05-06",
+    "is_active": true
+  }
+]

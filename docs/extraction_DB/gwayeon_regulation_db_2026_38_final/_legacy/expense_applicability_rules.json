@@ -1,0 +1,146 @@
+[
+  {
+    "applicability_code": "APP_STUDENT_ELIGIBLE_INSTITUTION",
+    "category_code": "DIRECT_STUDENT_LABOR",
+    "institution_scope": "ELIGIBLE_INSTITUTION",
+    "condition_summary": "대학 등 고시에서 정한 기관과 학생연구자에 한해 적용",
+    "result": "CONDITIONAL_AVAILABLE",
+    "source_article": "제7조",
+    "source_article_keys": [
+      "MAIN_ART_7"
+    ],
+    "effective_from": "2026-05-06",
+    "effective_to": null,
+    "is_active": true
+  },
+  {
+    "applicability_code": "APP_EXISTING_LABOR_CASH",
+    "category_code": "DIRECT_LABOR",
+    "institution_scope": "FOR_PROFIT",
+    "condition_summary": "기존 인력 현금 인건비는 인정 또는 별도 허용요건 필요",
+    "result": "RECOGNITION_REQUIRED",
+    "source_article": "제65조제4항",
+    "source_article_keys": [
+      "MAIN_ART_65"
+    ],
+    "effective_from": "2026-05-06",
+    "effective_to": null,
+    "is_active": true
+  },
+  {
+    "applicability_code": "APP_NEW_HIRE_LABOR_CASH",
+    "category_code": "DIRECT_LABOR",
+    "institution_scope": "SME_OR_MID_SIZED",
+    "condition_summary": "신규채용 참여연구자 현금 인건비 허용",
+    "result": "AVAILABLE_IF_CONDITIONS_MET",
+    "source_article": "제65조제4항제1호",
+    "source_article_keys": [
+      "MAIN_ART_65"
+    ],
+    "effective_from": "2026-05-06",
+    "effective_to": null,
+    "is_active": true
+  },
+  {
+    "applicability_code": "APP_LAB_OPERATION_FOR_PROFIT",
+    "category_code": "ACTIVITY_LAB_OPERATION",
+    "institution_scope": "FOR_PROFIT",
+    "condition_summary": "원래계획과 활용·관리계획 범위. 소모성 비용 제외",
+    "result": "PLAN_BASED",
+    "source_article": "제68조제4항·제5항",
+    "source_article_keys": [
+      "MAIN_ART_68"
+    ],
+    "effective_from": "2026-05-06",
+    "effective_to": null,
+    "is_active": true
+  },
+  {
+    "applicability_code": "APP_RND_CONTRIBUTION",
+    "category_code": "DIRECT_RND_CONTRIBUTION",
+    "institution_scope": "GOV_FUNDED_OR_DIRECTLY_ESTABLISHED",
+    "condition_summary": "정부출연기관 등 고시상 적용 대상 기관만 사용",
+    "result": "INSTITUTION_SPECIFIC",
+    "source_article": "제14조·제29조",
+    "source_article_keys": [
+      "MAIN_ART_14",
+      "MAIN_ART_29"
+    ],
+    "effective_from": "2026-05-06",
+    "effective_to": null,
+    "is_active": true
+  },
+  {
+    "applicability_code": "APP_INDIRECT_FOR_PROFIT",
+    "category_code": "INDIRECT",
+    "institution_scope": "FOR_PROFIT",
+    "condition_summary": "수정직접비의 10% 이내",
+    "result": "LIMIT_APPLIES",
+    "source_article": "제63조·제114조제4항",
+    "source_article_keys": [
+      "MAIN_ART_63",
+      "MAIN_ART_114"
+    ],
+    "effective_from": "2026-05-06",
+    "effective_to": null,
+    "is_active": true
+  },
+  {
+    "applicability_code": "APP_INDIRECT_NONPROFIT",
+    "category_code": "INDIRECT",
+    "institution_scope": "NON_PROFIT",
+    "condition_summary": "기관별 간접비고시비율 또는 해당 적용기준",
+    "result": "INSTITUTION_RATE_APPLIES",
+    "source_article": "제114조",
+    "source_article_keys": [
+      "MAIN_ART_114"
+    ],
+    "effective_from": "2026-05-06",
+    "effective_to": null,
+    "is_active": true
+  },
+  {
+    "applicability_code": "APP_INNOVATION_EFFECTIVE",
+    "category_code": "DIRECT_INNOVATION",
+    "institution_scope": "ALL",
+    "condition_summary": "2026년 6월 11일부터 시행",
+    "result": "DATE_CONDITIONAL",
+    "source_article": "제10조의2·제25조의2",
+    "source_article_keys": [
+      "MAIN_ART_10_2",
+      "MAIN_ART_25_2"
+    ],
+    "effective_from": "2026-06-11",
+    "effective_to": null,
+    "is_active": true
+  },
+  {
+    "applicability_code": "APP_FOREIGN_RESEARCHER",
+    "category_code": "ACTIVITY_FOREIGN_RESEARCHER",
+    "institution_scope": "ALL",
+    "condition_summary": "거주·참여·친족·자체절차 요건 및 인정 필요",
+    "result": "RECOGNITION_REQUIRED",
+    "source_article": "제25조제15항",
+    "source_article_keys": [
+      "MAIN_ART_25"
+    ],
+    "effective_from": "2026-05-06",
+    "effective_to": null,
+    "is_active": true
+  },
+  {
+    "applicability_code": "APP_INTERNATIONAL",
+    "category_code": "DIRECT_INTERNATIONAL",
+    "institution_scope": "ALL",
+    "condition_summary": "협약과 중앙행정기관 승인·인정 필요",
+    "result": "APPROVAL_REQUIRED",
+    "source_article": "제13조·제28조",
+    "source_article_keys": [
+      "MAIN_ART_13",
+      "MAIN_ART_28"
+    ],
+    "effective_from": "2026-05-06",
+    "effective_to": null,
+    "is_active": true
+  }
+]

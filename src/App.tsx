@@ -1,19 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle, ArrowDownRight, ArrowRight, ArrowUpRight, Banknote, Bell, BookOpenCheck,
   Building2, CalendarDays, Check, CheckCircle2, ChevronRight, CircleDollarSign, CloudUpload,
-  Download, Eye, FileCheck2, FileClock, FileSearch, FileText, HandCoins, Landmark, LayoutDashboard, LogOut, Mail, Package,
+  Download, Eye, FileCheck2, FileClock, FileSearch, FileText, HandCoins, Landmark, LayoutDashboard, Mail, Package,
   Pencil, Plus, RefreshCw, ScanLine, Settings as SettingsIcon, ShieldCheck, Sparkles, Trash2, Upload, UserPlus, Users, WalletCards,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
-import { capFor, categoryOf, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, rulesFor, transferLimitError, visibleCategories } from './rules';
-import { collectEvidenceIds, downloadBackup, loadProject, parseBackup, saveProject } from './storage';
-import { authErrorKo, deleteEvidence, deleteProjectDocuments, fetchCloudProject, getEvidence, getProjectDocument, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
+import { capFor, categoryOf, DEFAULT_INSURANCE_RATE, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
+import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
+import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, getEvidence, getProjectDocument, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
 import { isCloudEnabled, supabase } from './supabase';
-import { DOCUMENT_TYPE_LABEL, downloadRegistryDocument, getProgramById, guessDocumentType, matchDocToSource, myPendingSubmissions, projectRegistryId, registryEnabled, searchDocumentsByProgram, searchRegistry, submitRegistryShare, type DocumentEntry, type DocumentType, type RegistryEntry } from './registry';
+import { DOCUMENT_TYPE_LABEL, downloadRegistryDocument, getProgramById, guessDocumentType, matchDocToSource, myPendingSubmissions, projectRegistryId, registryEnabled, searchDocumentsByProgram, searchRegistry, submitRegistryShare, submitRegulationPackage, type DocumentEntry, type DocumentType, type RegistryEntry } from './registry';
 import { annotateVerification, buildCustomPack, fundingScheduleAmountWon, runExtraction, suggestedFundingRates, type Extraction } from './llmExtract';
+import { initRegulationPacks, type RegulationPackStatus } from './regulationDb';
+import { buildRegulationPackage } from './regulationPackage';
+import { diffExtraction, overlayRulesFrom, summarizeDiff, type PackDiff } from './packDiff';
 import SetupWizard from './SetupWizard';
-import type { BudgetCategoryId, BudgetItem, Evidence, Expense, Participant, PaymentMethod, Project, ProjectDocumentLink, Screen } from './types';
+import type { CategoryCap, CategoryMin, ReferenceStandard } from './rules';
+import type { BudgetCategoryId, BudgetItem, BudgetSubItem, Evidence, Expense, PackAllowedItem, PackArticle, PackCategory, PackRule, Participant, PaymentMethod, Project, ProjectDocumentLink, RulePack, SavedRulePack, Screen } from './types';
 
 // 문서 생성 라이브러리(docx·excel)는 무거워서 첫 화면 번들에서 제외하고 버튼 클릭 시에만 불러온다.
 const withExporters = async (run: (mod: typeof import('./exporters')) => Promise<void>) => {
@@ -30,21 +34,26 @@ const daysUntil = (date: string) => Math.ceil((new Date(`${date}T23:59:59`).getT
 
 const SYNC_LABEL = { local: '이 브라우저에만 저장', saving: '클라우드 저장 중…', synced: '클라우드 동기화됨', error: '동기화 오류 — 재시도 예정' } as const;
 
-function Sidebar({ screen, setScreen, project, onReset, account, sync, onLogout }: { screen: Screen; setScreen: (s: Screen) => void; project: Project; onReset: () => void; account: string | null; sync: 'local' | 'saving' | 'synced' | 'error'; onLogout: () => void }) {
+function Sidebar({ screen, setScreen, project, projects, onSelect, onAdd, onReset, account, sync, onLogout }: { screen: Screen; setScreen: (s: Screen) => void; project: Project; projects: Project[]; onSelect: (id: string) => void; onAdd: () => void; onReset: () => void; account: string | null; sync: 'local' | 'saving' | 'synced' | 'error'; onLogout: () => void }) {
   const nav = [
     { id: 'overview' as Screen, label: '한눈에 보기', icon: LayoutDashboard },
     { id: 'budget' as Screen, label: '예산 편성', icon: WalletCards },
     { id: 'spending' as Screen, label: '집행 · 증빙', icon: FileCheck2 },
     { id: 'change' as Screen, label: '변경 관리', icon: RefreshCw },
-    { id: 'team' as Screen, label: '인력 · 담당자', icon: Users },
+    { id: 'team' as Screen, label: '담당자 · 알림', icon: Users },
     { id: 'settings' as Screen, label: '과제 설정', icon: SettingsIcon },
   ];
   const pack = packFor(project);
+  const [menuOpen, setMenuOpen] = useState(false);
   return <aside className="sidebar">
     <div className="logo"><div className="brand-mark"><Check /></div><span>과제온</span><b>beta</b></div>
-    <div className="project-chip"><Building2 /><div><small>현재 과제</small><strong>{project.name}</strong></div><ChevronRight /></div>
+    <button type="button" className="project-chip" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}><Building2 /><div><small>현재 과제 {projects.length > 1 ? `(${projects.length}개 중)` : ''}</small><strong>{project.name}</strong></div><ChevronRight style={{ transform: menuOpen ? 'rotate(90deg)' : undefined }} /></button>
+    {menuOpen && <div className="project-menu">
+      {projects.map((p) => <button type="button" key={p.id} className={p.id === project.id ? 'active' : ''} onClick={() => { onSelect(p.id); setMenuOpen(false); }}><strong>{p.name}</strong><small>{p.companyName}{p.programName ? ` · ${p.programName}` : ''}</small></button>)}
+      <button type="button" className="add" onClick={() => { setMenuOpen(false); onAdd(); }}><Plus /> 새 과제 등록</button>
+    </div>}
     <nav>{nav.map(({ id, label, icon: Icon }) => <button key={id} className={screen === id ? 'active' : ''} onClick={() => setScreen(id)}><Icon />{label}</button>)}</nav>
-    <div className="sidebar-bottom"><div className="policy"><BookOpenCheck /><div><strong>{pack.name} · 예시 기준 (검증 전)</strong><span>{RULES_EFFECTIVE_DATE} 업데이트</span></div></div>{isCloudEnabled && <div className="cloud-chip"><span className={`sync-dot ${sync}`} /><div>{account ? <small>{account}</small> : null}<span>{SYNC_LABEL[sync]}</span></div>{account && <button onClick={onLogout}>로그아웃</button>}</div>}<button className="reset-button" onClick={onReset}><LogOut /> 과제 나가기</button></div>
+    <div className="sidebar-bottom"><div className="policy"><BookOpenCheck /><div><strong>{pack.name} · 예시 기준 (검증 전)</strong><span>{RULES_EFFECTIVE_DATE} 업데이트</span></div></div>{isCloudEnabled && <div className="cloud-chip"><span className={`sync-dot ${sync}`} /><div>{account ? <small>{account}</small> : null}<span>{SYNC_LABEL[sync]}</span></div>{account && <button onClick={onLogout}>로그아웃</button>}</div>}<button className="reset-button" onClick={onReset}><Trash2 /> 과제 삭제</button></div>
   </aside>;
 }
 
@@ -94,7 +103,7 @@ function Overview({ project, setScreen }: { project: Project; setScreen: (s: Scr
       </section>
       <section className="panel next-actions"><div className="panel-head"><div><span className="section-kicker">NEXT ACTION</span><h3>지금 확인할 일</h3></div></div>
         {incomplete > 0 ? <button onClick={() => setScreen('spending')} className="action-item warning"><AlertCircle /><div><strong>증빙 {incomplete}개가 비어 있어요</strong><span>파일을 올리면 자동으로 완료 처리돼요</span></div><ChevronRight /></button> : <div className="empty-action"><CheckCircle2 /><strong>증빙이 모두 준비됐어요</strong><span>새 집행건을 등록하면 필요한 서류를 안내해드려요.</span></div>}
-        {alerts > 0 && <button onClick={() => setScreen('team')} className="action-item danger"><AlertCircle /><div><strong>참여율 100% 초과</strong><span>참여 인력의 비율을 조정해주세요</span></div><ChevronRight /></button>}
+        {alerts > 0 && <button onClick={() => setScreen('budget')} className="action-item danger"><AlertCircle /><div><strong>참여율 100% 초과</strong><span>예산 편성의 인건비 산정에서 비율을 조정해주세요</span></div><ChevronRight /></button>}
         <button onClick={() => setScreen('spending')} className="quick-add"><Plus /> 새 집행건 등록</button>
       </section>
     </div>
@@ -103,17 +112,21 @@ function Overview({ project, setScreen }: { project: Project; setScreen: (s: Scr
 }
 
 // 공유 DB에 저장된 이 사업의 원본 문서(공고문·지침·매뉴얼)를 조회·업로드·미리보기하는 공용 훅.
-interface DocViewer { doc: DocumentEntry; kind: 'loading' | 'pdf' | 'image' | 'text'; url?: string; text?: string; highlights?: string[] }
+interface DocViewer { doc: DocumentEntry; kind: 'loading' | 'pdf' | 'image' | 'text'; url?: string; text?: string; highlights?: string[]; fallbacks?: string[] }
 
-// 근거 문구에서 팝업 하이라이트용 위치 패턴(제65조, 사업비 3번, 별표 1...)을 뽑는다.
+// 근거 문구에서 팝업 하이라이트용 위치 패턴(제65조, 사업비 3번, 별표 1...)을 전부 뽑는다.
+// "제8조·제23조"처럼 출처가 여러 조문이면 각각을 하이라이트 대상으로 삼는다 (DB화된 규정의 출처 컬럼 대응).
 const refPatternTerms = (ref: string): string[] => {
   const terms: string[] = [];
-  for (const pattern of [/제\s*\d+\s*조/, /사업비\s*\d+/, /별표\s*\d+/, /붙임\s*\d+/, /별지\s*제?\s*\d+호?/, /QnA|질의응답/i]) {
-    const match = pattern.exec(ref);
-    if (match) terms.push(match[0]);
+  for (const pattern of [/제\s*\d+\s*조(?:의\s*\d+)?/g, /사업비\s*\d+/g, /별표\s*\d+/g, /붙임\s*\d+/g, /별지\s*제?\s*\d+호?/g, /QnA|질의응답/gi]) {
+    for (const match of ref.matchAll(pattern)) terms.push(match[0]);
   }
-  return terms;
+  return [...new Set(terms)];
 };
+
+// 규정 문구의 핵심 수치("3천만원", "20%", "6개월", "2명")는 원문에 그대로 있을 확률이 가장 높은 하이라이트 대상이다.
+const numberTokens = (text: string): string[] =>
+  [...new Set((text.match(/\d[\d,.]*\s*(?:억|천만|백만|십만|만)?\s*원|\d[\d,.]*\s*(?:%|퍼센트)|\d+\s*(?:개월|개년|년|일|명|회|건|시간|인)/g) ?? []).map((token) => token.trim()))].slice(0, 5);
 
 // 흔해서 문서 전체에 칠해질 단어들 — 하이라이트 키워드에서 제외
 const COMMON_WORDS = new Set(['사업비', '사업', '지원', '창업', '기업', '경우', '집행', '비용', '금액', '대상', '신청', '이내', '불가', '가능', '있다', '한다', '해당', '관련']);
@@ -123,22 +136,84 @@ const keywordTokens = (text: string): string[] =>
     .sort((a, b) => b.length - a.length)
     .slice(0, 5);
 
-// 규칙 전체의 하이라이트 검색어: 원문 인용(있으면) + 근거 위치 패턴 + 특징 단어.
-const highlightTerms = (rule: { quote?: string; message?: string; source: { ref: string } }): string[] => [
-  ...(rule.quote ? [rule.quote.slice(0, 40)] : []),
-  ...refPatternTerms(rule.source.ref),
-  ...keywordTokens(rule.quote ?? rule.message ?? ''),
-];
+// 원문 인용(quote)을 길이가 다른 여러 검색어로 쪼갠다. 인용 전체가 문서와 한 글자도 안 틀리는
+// 경우는 드물어서(추출 과정에서 표·머리글이 끼어들거나 줄이 갈린다) 긴 조각부터 짧은 조각까지
+// 후보로 넣고, 실제로 문서에 있는 것만 하이라이트된다. 12자 미만 조각은 흔한 표현이라 넣지 않는다.
+const MIN_QUOTE_TERM = 12;
+export const quoteTerms = (quote?: string): string[] => {
+  const clean = (quote ?? '').trim();
+  if (clean.length < MIN_QUOTE_TERM) return [];
+  const terms = [clean.slice(0, 60)];
+  // 문장·절 단위로 끊어 각각을 후보로 (한 절만 원문과 일치해도 위치를 찾을 수 있다)
+  for (const piece of clean.split(/[.。;·]|(?<=다)\s|,\s/)) {
+    const trimmed = piece.trim();
+    if (trimmed.length >= MIN_QUOTE_TERM) terms.push(trimmed.slice(0, 40));
+  }
+  terms.push(clean.slice(0, 30), clean.slice(0, MIN_QUOTE_TERM + 6));
+  return [...new Set(terms)].sort((a, b) => b.length - a.length);
+};
+
+// 규칙의 하이라이트 검색어 2단계. primary는 확실한 근거(원문 인용·출처 조문·수치),
+// fallback은 primary가 문서에서 하나도 안 잡힐 때 대신 쓰는 비목·항목명 + 특징 단어 —
+// "연구개발계획서에" 같은 엉뚱한 단어가 1순위로 칠해지는 문제를 막으면서도, 문구가 다르게
+// 표기된 문서에서 빈손으로 끝나지 않게 한다. refOverride는 복수 근거를 링크별로 나눠 열 때 사용.
+export const highlightTermSets = (rule: { quote?: string; message?: string; item?: string; source: { ref: string } }, refOverride?: string): { primary: string[]; fallback: string[] } => ({
+  primary: [
+    ...quoteTerms(rule.quote),
+    ...refPatternTerms(refOverride ?? rule.source.ref),
+    ...numberTokens(`${rule.quote ?? ''} ${rule.message ?? ''}`),
+  ],
+  fallback: [...(rule.item ? [rule.item] : []), ...keywordTokens(rule.message ?? '')],
+});
 
 const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-// 텍스트 미리보기에서 검색어를 <mark>로 감싼다 (공백 차이 허용).
+// 근거 표시는 조·항·호 번호가 있으면 그 번호만 보여준다. AI 추출 팩의 ref는 "붙임2-5 1. 세부
+// 지원내용 - 주요 연구개발비 산정기준"처럼 목차 경로 전체가 오는 경우가 있어 링크가 본문을 덮는다.
+// (추출 프롬프트는 번호 우선으로 고쳤지만, 이미 저장된 팩에도 같은 축약이 적용돼야 한다.)
+// 구체적인 것부터 시도한다 — "붙임2-5 … 제65조 제7항"에서 붙임 번호가 아니라 조문 번호를 남겨야 한다.
+const REF_NUMBER_PATTERNS = [
+  /제\s*\d+\s*조(?:의\s*\d+)?(?:\s*제?\s*\d+\s*[항호목])*/,
+  /지침\s*[\d]+[.가-힣\d)(]*/,
+  /별표\s*\d+|별지\s*제?\s*\d+호?/,
+  /QnA\s*[^\s,]*\s*\d+번?/i,
+  /붙임\s*[\d-]+/,
+];
+export const shortRef = (ref: string): string => {
+  const trimmed = ref.trim();
+  if (trimmed.length <= 24) return trimmed;
+  for (const pattern of REF_NUMBER_PATTERNS) {
+    const found = pattern.exec(trimmed)?.[0];
+    if (found) return found.replace(/\s+/g, ' ').trim();
+  }
+  return `${trimmed.slice(0, 22)}…`;
+};
+
+// 같은 글자가 문서마다 다른 코드로 쓰인다 (가운뎃점·물결·괄호·따옴표). 인용문이 한 글자 차이로
+// 통째로 안 잡히는 걸 막으려고 흔한 변형을 한 묶음으로 취급한다.
+const CHAR_VARIANTS: Record<string, string> = {
+  '·': '[·‧ㆍ•・]', '~': '[~∼〜～]', '(': '[(（]', ')': '[)）]', '-': '[-–—―]',
+  "'": "['’‘]", '"': '["“”]', ',': '[,，]', '%': '[%％]',
+};
+
+// 검색어를 "글자 사이에 공백·줄바꿈이 끼어도 잡히는" 정규식 조각으로 바꾼다 —
+// HWP·PDF에서 뽑은 본문은 원문과 줄바꿈 위치가 달라서 공백을 그대로 요구하면 대부분 실패한다.
+const flexiblePattern = (term: string): string =>
+  [...term.replace(/\s+/g, '')].map((ch) => CHAR_VARIANTS[ch] ?? escapeRegex(ch)).join('\\s*');
+
+const buildTermRegex = (terms: string[] | undefined, flags: string): RegExp | null => {
+  const usable = (terms ?? []).map((term) => term.trim()).filter((term) => term.replace(/\s+/g, '').length >= 2);
+  if (!usable.length) return null;
+  try { return new RegExp(usable.map(flexiblePattern).join('|'), flags); } catch { return null; }
+};
+
+// 하이라이트 검색어들이 문서 텍스트에 실제로 존재하는지 검사한다 (renderHighlighted와 같은 매칭 방식).
+export const anyTermMatches = (text: string, terms?: string[]): boolean => buildTermRegex(terms, '')?.test(text) ?? false;
+
+// 텍스트 미리보기에서 검색어를 <mark>로 감싼다 (공백·줄바꿈·구두점 변형 허용).
 const renderHighlighted = (text: string, terms?: string[]) => {
-  const usable = (terms ?? []).map((term) => term.trim()).filter((term) => term.length >= 2);
-  if (!usable.length) return text;
-  const pattern = usable.map((term) => term.split(/\s+/).map(escapeRegex).join('\\s*')).join('|');
-  let re: RegExp;
-  try { re = new RegExp(pattern, 'g'); } catch { return text; }
+  const re = buildTermRegex(terms, 'g');
+  if (!re) return text;
   const parts: (string | React.ReactElement)[] = [];
   let last = 0;
   let key = 0;
@@ -204,19 +279,19 @@ function useSourceDocs(project: Project, update: (p: Project) => void) {
     } catch (error) { alert(`다운로드에 실패했습니다: ${error instanceof Error ? error.message : ''}`); }
   };
   // 팝업 미리보기: PDF·이미지·텍스트는 그대로, HWP/HWPX는 본문 텍스트를 추출해 보여준다.
-  // highlights가 있으면 텍스트 미리보기에서 해당 부분을 빨간색으로 강조한다.
-  const viewDoc = async (doc: DocumentEntry, highlights?: string[]) => {
-    setViewer({ doc, kind: 'loading', highlights });
+  // highlights(확실한 근거)가 문서에서 안 잡히면 fallbacks(비목명·특징 단어)로 2차 표시한다.
+  const viewDoc = async (doc: DocumentEntry, highlights?: string[], fallbacks?: string[]) => {
+    setViewer({ doc, kind: 'loading', highlights, fallbacks });
     try {
       const blob = await downloadRegistryDocument(doc.storagePath);
       const name = doc.fileName.toLowerCase();
-      if (name.endsWith('.pdf')) { setViewer({ doc, kind: 'pdf', url: URL.createObjectURL(new Blob([blob], { type: 'application/pdf' })), highlights }); return; }
-      if (/\.(png|jpe?g|gif|webp|bmp)$/.test(name)) { setViewer({ doc, kind: 'image', url: URL.createObjectURL(blob), highlights }); return; }
-      if (/\.(txt|md)$/.test(name)) { setViewer({ doc, kind: 'text', text: await blob.text(), highlights }); return; }
+      if (name.endsWith('.pdf')) { setViewer({ doc, kind: 'pdf', url: URL.createObjectURL(new Blob([blob], { type: 'application/pdf' })), highlights, fallbacks }); return; }
+      if (/\.(png|jpe?g|gif|webp|bmp)$/.test(name)) { setViewer({ doc, kind: 'image', url: URL.createObjectURL(blob), highlights, fallbacks }); return; }
+      if (/\.(txt|md)$/.test(name)) { setViewer({ doc, kind: 'text', text: await blob.text(), highlights, fallbacks }); return; }
       if (/\.hwpx?$/.test(name)) {
         const { extractDocumentText } = await import('./extract');
         const { text } = await extractDocumentText(new File([blob], doc.fileName));
-        setViewer({ doc, kind: 'text', text, highlights });
+        setViewer({ doc, kind: 'text', text, highlights, fallbacks });
         return;
       }
       // 미리보기 불가 형식은 다운로드로 폴백
@@ -322,18 +397,40 @@ function useSourceDocs(project: Project, update: (p: Project) => void) {
 function DocViewerModal({ source }: { source: ReturnType<typeof useSourceDocs> }) {
   const { viewer, closeViewer, downloadDoc } = source;
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [markPos, setMarkPos] = useState({ index: 0, total: 0 });
+  // n번째(1부터) 하이라이트로 이동하고 현재 위치를 진하게 표시한다. 끝에서 다음을 누르면 처음으로 순환.
+  const gotoMark = (next: number) => {
+    const marks = scrollRef.current?.querySelectorAll('mark');
+    if (!marks?.length) return;
+    const index = ((next - 1 + marks.length) % marks.length) + 1;
+    marks.forEach((mark, i) => mark.classList.toggle('current', i === index - 1));
+    marks[index - 1].scrollIntoView({ block: 'center' });
+    setMarkPos({ index, total: marks.length });
+  };
   useEffect(() => {
     if (!viewer) return;
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') closeViewer(); };
     window.addEventListener('keydown', onKey);
-    // 하이라이트된 첫 근거 위치로 자동 스크롤
-    if (viewer.kind === 'text') setTimeout(() => scrollRef.current?.querySelector('mark')?.scrollIntoView({ block: 'center' }), 60);
+    // 렌더 후 하이라이트 개수를 세고 첫 근거 위치로 자동 스크롤
+    setMarkPos({ index: 0, total: 0 });
+    if (viewer.kind === 'text') {
+      const timer = setTimeout(() => {
+        const total = scrollRef.current?.querySelectorAll('mark').length ?? 0;
+        if (total) gotoMark(1); else setMarkPos({ index: 0, total: 0 });
+      }, 60);
+      return () => { clearTimeout(timer); window.removeEventListener('keydown', onKey); };
+    }
     return () => window.removeEventListener('keydown', onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewer]);
   if (!viewer) return null;
   const isHwp = /\.hwpx?$/.test(viewer.doc.fileName.toLowerCase());
-  const highlighted = viewer.kind === 'text' && !!viewer.highlights?.length;
+  // 확실한 근거(조문·수치·인용)가 문서에 있으면 그것만, 없으면 비목명·특징 단어로 2차 표시한다.
+  const text = viewer.text ?? '';
+  const primaryHit = viewer.kind === 'text' && anyTermMatches(text, viewer.highlights);
+  const fallbackHit = viewer.kind === 'text' && !primaryHit && anyTermMatches(text, viewer.fallbacks);
+  const activeTerms = primaryHit ? viewer.highlights : fallbackHit ? viewer.fallbacks : viewer.highlights;
+  const highlighted = viewer.kind === 'text' && (!!viewer.highlights?.length || !!viewer.fallbacks?.length);
   return <div className="doc-viewer-overlay" onClick={closeViewer}>
     <div className="doc-viewer" role="dialog" aria-label={viewer.doc.fileName} onClick={(event) => event.stopPropagation()}>
       <header><div><strong>{DOCUMENT_TYPE_LABEL[viewer.doc.documentType]}</strong><span>{viewer.doc.fileName}</span></div>
@@ -341,7 +438,149 @@ function DocViewerModal({ source }: { source: ReturnType<typeof useSourceDocs> }
       {viewer.kind === 'loading' && <div className="viewer-scroll"><p className="viewer-note">문서를 불러오는 중…</p></div>}
       {viewer.kind === 'pdf' && <iframe title={viewer.doc.fileName} src={viewer.url} />}
       {viewer.kind === 'image' && <div className="viewer-scroll"><img src={viewer.url} alt={viewer.doc.fileName} /></div>}
-      {viewer.kind === 'text' && <div className="viewer-scroll" ref={scrollRef}><p className="viewer-note">텍스트 미리보기입니다{isHwp ? ' — 한글(HWP) 문서는 서식 없이 본문만 표시됩니다' : ''}.{highlighted ? ' 근거 부분이 빨간색으로 표시됩니다.' : ''} 원본 서식은 "원본 다운로드"로 확인하세요.</p><pre>{renderHighlighted(viewer.text ?? '', viewer.highlights)}</pre></div>}
+      {viewer.kind === 'text' && <div className="viewer-scroll" ref={scrollRef}>
+        {highlighted && markPos.total > 0 && <div className="mark-nav">
+          <span>근거 위치 <b>{markPos.index}</b> / {markPos.total}</span>
+          <button type="button" className="secondary" onClick={() => gotoMark(markPos.index - 1)}>◀ 이전</button>
+          <button type="button" className="secondary" onClick={() => gotoMark(markPos.index + 1)}>다음 ▶</button>
+        </div>}
+        <p className="viewer-note">텍스트 미리보기입니다{isHwp ? ' — 한글(HWP) 문서는 서식 없이 본문만 표시됩니다' : ''}.{highlighted ? (primaryHit ? ' 근거 부분이 빨간색으로 표시됩니다 — 위 이동 버튼으로 위치를 오갈 수 있어요.' : fallbackHit ? ' 정확한 근거 문구는 찾지 못해 규정의 항목명·특징 단어가 나오는 위치를 대신 표시했어요.' : ' 근거 문구를 이 문서에서 찾지 못했어요 — 다른 근거 문서일 수 있습니다.') : ''} 원본 서식은 "원본 다운로드"로 확인하세요.</p>
+        <pre>{renderHighlighted(text, activeTerms)}</pre>
+      </div>}
+    </div>
+  </div>;
+}
+
+type RefLink = (rule: { quote?: string; message?: string; item?: string; source: { doc: string; ref: string; matchLevel: string } }) => React.ReactNode;
+
+// 인정 항목은 비목에 따라 70건이 넘어(연구활동비) 패널을 덮는다 — 처음에는 6건만 보이고 나머지는 펼쳐서 본다.
+const ALLOWED_ITEM_PREVIEW = 6;
+function AllowedItemList({ items, refLink }: { items: PackAllowedItem[]; refLink: RefLink }) {
+  const [expanded, setExpanded] = useState(false);
+  const shown = expanded ? items : items.slice(0, ALLOWED_ITEM_PREVIEW);
+  return <>
+    {shown.map((item, index) => <p key={index} className={`allowed-item ${item.status ? 'conditional' : ''}`}>
+      {item.status ? <AlertCircle /> : <Check />}
+      <span><b>{item.name}</b>{item.status === 'CONDITIONAL' ? <em className="tag">조건부</em> : item.status === 'INSTITUTION_SPECIFIC' ? <em className="tag">기관 한정</em> : null}{item.requiresApproval && <em className="tag warn">사전승인</em>}
+        {item.description ? ` ${item.description}` : ''}
+        {' '}{refLink({ item: item.name, message: item.description ?? item.name, source: item.source })}</span>
+    </p>)}
+    {items.length > ALLOWED_ITEM_PREVIEW && <button type="button" className="text-button more-items" onClick={() => setExpanded(!expanded)}>
+      {expanded ? '접기' : `${items.length - ALLOWED_ITEM_PREVIEW}건 더 보기`}
+    </button>}
+  </>;
+}
+
+// 비목 기준 사이드 패널 — 편성표 행의 "기준" 버튼으로 연다.
+// 편성 화면에 규정을 길게 나열하지 않고, 궁금한 비목의 기준만 그 자리에서 펼쳐 본다.
+// 블록은 네 가지로 고정: 상한(계산식) / 계상 가능 세목 / 인정 항목 / 주의 · 절차.
+interface StandardPanelProps {
+  category: PackCategory;
+  reference: PackCategory | null;   // 공고 팩에 기준이 없을 때 이름으로 찾은 공통 규정 비목
+  referenceDoc?: string;
+  cap: CategoryCap | null;
+  amount: number;
+  min: CategoryMin | null;
+  rules: PackRule[];
+  refLink: RefLink;
+  onAddSub: (name: string) => void;
+  canAddSub: boolean;
+  onClose: () => void;
+}
+
+function StandardPanel({ category, reference, referenceDoc, cap, amount, min, rules, refLink, onAddSub, canAddSub, onClose }: StandardPanelProps) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  // 공고 팩에 기준이 없으면 공통 규정 비목의 것을 대신 보여준다 (출처는 헤더에 표시).
+  const std = reference ?? category;
+  const subOptions = category.subItemOptions ?? std.subItemOptions ?? std.allowedItems?.map((item) => item.name) ?? [];
+  const limitText = category.limitText ?? std.limitText;
+  const limitDetail = category.limitDetailText ?? std.limitDetailText;
+  const warnings = rules.filter((rule) => rule.kind === 'warning');
+  const approvals = category.approvals ?? std.approvals ?? [];
+  const evidenceRules = category.evidenceRules ?? std.evidenceRules ?? [];
+  const applicability = category.applicability ?? std.applicability ?? [];
+  const allowedItems = category.allowedItems ?? std.allowedItems ?? [];
+  const cautions = warnings.length + approvals.length + evidenceRules.length;
+  return <aside className="standard-panel" role="dialog" aria-label={`${category.name} 기준`}>
+    <header>
+      <div><strong>{category.name}</strong><span>{reference ? `${referenceDoc} 기준 참고` : '이 사업 공고 기준'}</span></div>
+      <button type="button" className="close" aria-label="기준 닫기" onClick={onClose}>×</button>
+    </header>
+    <div className="panel-body">
+      {reference && <p className="panel-note"><BookOpenCheck /><span>이 사업 공고에 세부 기준이 없어 <b>{referenceDoc}</b>의 「{reference.name}」 기준을 보여드려요. 공고·협약이 따로 정한 내용이 있으면 그쪽이 우선합니다.</span></p>}
+
+      <section className="panel-block">
+        <h4>상한</h4>
+        {cap?.basisAmount != null
+          ? <div className="panel-cap">
+              <strong>{formatWon(cap.amount!)}</strong>
+              <small>{cap.basisLabel} {formatWon(cap.basisAmount)} × {cap.limitPct}%</small>
+              <small className={amount > cap.amount! ? 'over' : 'ok'}>현재 {formatWon(amount)} — {amount > cap.amount! ? `${formatWon(amount - cap.amount!)} 초과` : `여유 ${formatWon(cap.amount! - amount)}`}</small>
+            </div>
+          : cap
+          ? <p className="panel-line">{cap.label}<em>{cap.partial ? '비목 전체가 아니라 세부항목 기준이라 자동 계산하지 않아요' : '편성표 밖 기준(구입가 등)이라 금액은 직접 확인하세요'}</em></p>
+          : limitText
+          ? <p className="panel-line">{limitText}{limitDetail ? <em>{limitDetail}</em> : null}</p>
+          : <p className="panel-line muted">별도 상한 없음</p>}
+        {min && <p className="panel-line ok-line"><Check /> {min.label}</p>}
+        {(limitText || limitDetail) && cap?.basisAmount != null && <p className="panel-line muted">{limitText}{limitDetail ? ` — ${limitDetail}` : ''}</p>}
+        <p className="panel-ref">근거 {refLink({ item: category.name, message: limitDetail ?? limitText ?? category.name, source: category.limitSource ?? std.limitSource ?? category.source })}</p>
+      </section>
+
+      {subOptions.length > 0 && <section className="panel-block">
+        <h4>계상 가능 세목 <b>{subOptions.length}</b></h4>
+        <div className="panel-chips">{subOptions.map((name) => <button type="button" key={name} disabled={!canAddSub} onClick={() => onAddSub(name)}><Plus />{name}</button>)}</div>
+      </section>}
+
+      {allowedItems.length > 0 && <section className="panel-block">
+        <h4>인정 항목 <b>{allowedItems.length}</b></h4>
+        <AllowedItemList items={allowedItems} refLink={refLink} />
+      </section>}
+
+      {cautions > 0 && <section className="panel-block caution">
+        <h4>주의 · 절차 <b>{cautions}</b></h4>
+        {approvals.map((item, index) => <p key={`av${index}`} className="allowed-item conditional"><ShieldCheck /><span><b>{item.name}</b><em className="tag warn">{item.status}</em> {refLink({ item: category.name, message: item.name, source: item.source })}</span></p>)}
+        {evidenceRules.map((item, index) => <p key={`ev${index}`} className="allowed-item"><FileCheck2 /><span><b>{item.name}</b> {item.documents.join(' · ')} {refLink({ item: category.name, message: item.name, source: item.source })}</span></p>)}
+        {warnings.map((rule) => <p key={rule.id} className="allowed-item conditional"><AlertCircle /><span>{rule.message} {refLink(rule)}</span></p>)}
+      </section>}
+
+      {applicability.length > 0 && <section className="panel-block">
+        <h4>기관 적용 조건</h4>
+        {applicability.map((rule, index) => <p key={`ap${index}`} className={`allowed-item ${rule.applies ? '' : 'other-scope'}`}>
+          <Building2 /><span><b>{rule.scopeKo}</b>{rule.applies ? '' : ' (이 과제 유형은 해당 없음)'} {rule.condition} — <b>{rule.result}</b> {refLink({ item: category.name, message: rule.condition, source: rule.source })}</span>
+        </p>)}
+      </section>}
+    </div>
+  </aside>;
+}
+
+// 규정 DB의 조문 원문 팝업. 근거 링크를 누르면 원본 파일을 열지 않고도 그 조문을 바로 볼 수 있다
+// (HWP 본문에는 자동 매긴 조문 번호가 빠져 있어 원본 검색이 자주 실패한다).
+// 원본 문서가 연결돼 있으면 여기서 "원본 문서에서 보기"로 이어간다.
+function ArticleModal({ articles, ref: refText, doc, onClose, onOpenDoc }: { articles: PackArticle[]; ref: string; doc: string; onClose: () => void; onOpenDoc?: () => void }) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  return <div className="doc-viewer-overlay" onClick={onClose}>
+    <div className="doc-viewer" role="dialog" aria-label={`근거 조문 ${refText}`} onClick={(event) => event.stopPropagation()}>
+      <header><div><strong>근거 조문 원문 · {refText}</strong><span>{doc}</span></div>
+        <div className="viewer-actions">
+          {onOpenDoc && <button type="button" className="secondary" onClick={onOpenDoc}><FileText /> 원본 문서에서 보기</button>}
+          <button type="button" className="close" aria-label="닫기" onClick={onClose}>×</button>
+        </div></header>
+      <div className="viewer-scroll article-view">
+        <p className="viewer-note">규정 DB에 보관된 조문 원문입니다. 개정 시점에 따라 최신 원문과 다를 수 있으니 중요한 판단은 원본 문서로 확인하세요.</p>
+        {articles.map((article) => <article key={article.key}>
+          <h4>{article.ref}{article.title ? ` (${article.title})` : ''}</h4>
+          <pre>{article.text}</pre>
+        </article>)}
+      </div>
     </div>
   </div>;
 }
@@ -414,27 +653,233 @@ function SourceDocsPanel({ source }: { source: ReturnType<typeof useSourceDocs> 
   </section>;
 }
 
+// ---- 예산 구성 도넛 ----
+// 색은 비목의 "팩 내 순서"에 고정 배정한다(금액 순위가 아니라) — 금액이 바뀌어도 비목 색이 따라 바뀌지 않는다.
+// 색 슬롯은 8개까지: 9번째 이후 비목은 회색 "기타"로 묶는다 (색을 더 만들면 색약 구분이 깨진다).
+// 팔레트는 색약 시뮬레이션 검증을 통과한 순서 그대로다 — 순서를 바꾸면 인접 조각 구분이 깨진다.
+const CAT_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
+const COMP_SLOTS = CAT_COLORS.length;
+const ETC_COLOR = '#8f98a9';
+const FREE_COLOR = '#e4e9f1';
+
+function BudgetComposition({ pack, project, cats }: { pack: RulePack; project: Project; cats: PackCategory[] }) {
+  const slotOf = new Map(pack.categories.filter((c) => c.allowed).map((c, i) => [c.id, i]));
+  const entries = cats
+    .map((cat) => ({ cat, amount: project.budgets.find((b) => b.categoryId === cat.id)?.amount ?? 0, slot: slotOf.get(cat.id) ?? COMP_SLOTS }))
+    .filter((e) => e.amount > 0);
+  const planned = entries.reduce((sum, e) => sum + e.amount, 0);
+  if (!project.totalBudget || planned === 0) return null;
+  const folded = entries.filter((e) => e.slot >= COMP_SLOTS);
+  const foldedSum = folded.reduce((sum, e) => sum + e.amount, 0);
+  const free = Math.max(0, project.totalBudget - planned);
+  const share = (value: number) => (value / project.totalBudget * 100).toFixed(1);
+  const slices = [
+    ...entries.filter((e) => e.slot < COMP_SLOTS).map((e) => ({ key: e.cat.id, name: e.cat.name, amount: e.amount, color: CAT_COLORS[e.slot] })),
+    ...(foldedSum > 0 ? [{ key: '__etc', name: `기타 ${folded.length}개 비목`, amount: foldedSum, color: ETC_COLOR }] : []),
+    ...(free > 0 ? [{ key: '__free', name: '미편성 잔액', amount: free, color: FREE_COLOR }] : []),
+  ];
+  // 편성이 총사업비를 넘으면 눈금을 편성 합계로 키워 넘친 만큼이 원에 그대로 보이게 한다.
+  const scale = Math.max(project.totalBudget, planned);
+  // 도넛은 원둘레를 stroke-dasharray로 잘라 그린다. 조각 사이 2px 틈을 둬 인접 색이 붙지 않게 한다.
+  const R = 46;
+  const CIRC = 2 * Math.PI * R;
+  let offset = 0;
+  const arcs = slices.map((s) => {
+    const len = s.amount / scale * CIRC;
+    const draw = Math.max(len - 2, 0.6);
+    const arc = { ...s, draw, offset };
+    offset += len;
+    return arc;
+  });
+  return <div className="budget-comp">
+    <figure className="donut-figure">
+      <svg viewBox="0 0 120 120" role="img" aria-label={`비목별 편성 구성 — 편성 합계 ${formatWon(planned)} / 총사업비 ${formatWon(project.totalBudget)}`}>
+        <g transform="rotate(-90 60 60)">
+          {arcs.map((a) => <circle key={a.key} cx="60" cy="60" r={R} fill="none" stroke={a.color} strokeWidth="17"
+            strokeDasharray={`${a.draw} ${CIRC - a.draw}`} strokeDashoffset={-a.offset}>
+            <title>{`${a.name} ${formatWon(a.amount)} (총사업비의 ${share(a.amount)}%)`}</title>
+          </circle>)}
+        </g>
+        <text x="60" y="55" textAnchor="middle" className="donut-label">편성 합계</text>
+        <text x="60" y="70" textAnchor="middle" className="donut-value">{(planned / 100_000_000).toFixed(planned >= 1_000_000_000 ? 0 : 1)}억</text>
+      </svg>
+      <figcaption>총사업비 {formatWon(project.totalBudget)} 기준</figcaption>
+    </figure>
+    <div className="comp-legend">
+      {slices.map((s) => <span className="comp-chip" key={s.key}><i className="dot" style={{ background: s.color }} /><b>{s.name}</b><span>{formatWon(s.amount)} · {share(s.amount)}%</span></span>)}
+      {planned > project.totalBudget && <span className="comp-chip over"><AlertCircle /><b>총사업비 초과</b><span>{formatWon(planned - project.totalBudget)}</span></span>}
+    </div>
+  </div>;
+}
+
+// ---- 참여인력 · 인건비 산정 패널 (예산 편성 화면) ----
+// 참여율 점검과 인건비(4대보험·퇴직금) 자동 계산을 한 뒤 "예산 편성에 반영"으로 인건비 비목을 채운다.
+function ParticipantsPanel({ project, update }: { project: Project; update: (p: Project) => void }) {
+  const pack = packFor(project);
+  const [person, setPerson] = useState('');
+  const addPerson = (e: React.FormEvent) => { e.preventDefault(); if (!person.trim()) return; update({ ...project, participants: [...project.participants, { id: uid(), name: person.trim(), projectRate: 0, externalRate: 0 }] }); setPerson(''); };
+  const setRate = (id: string, key: 'projectRate' | 'externalRate', value: number) => update({ ...project, participants: project.participants.map((p) => p.id === id ? { ...p, [key]: Math.max(0, value) } : p) });
+  const removePerson = (p: Participant) => {
+    if (!confirm(`참여 인력 "${p.name}"을(를) 삭제할까요?`)) return;
+    update({ ...project, participants: project.participants.filter((x) => x.id !== p.id) });
+  };
+  const insRate = project.insuranceRate ?? DEFAULT_INSURANCE_RATE;
+  const includeInsurance = project.laborIncludeInsurance ?? true;
+  const includeSeverance = project.laborIncludeSeverance ?? true;
+  const laborOpts = { startDate: project.startDate, endDate: project.endDate, insuranceRate: insRate, includeInsurance, includeSeverance };
+  const setP = (id: string, patch: Partial<Participant>) => update({ ...project, participants: project.participants.map((p) => p.id === id ? { ...p, ...patch } : p) });
+  const laborSum = (type: 'existing' | 'new') => project.participants
+    .filter((p) => (p.laborType ?? 'existing') === type)
+    .reduce((acc, p) => { const c = laborCostFor(p, laborOpts); return { total: acc.total + c.total, cash: acc.cash + c.cash, inKind: acc.inKind + c.inKind }; }, { total: 0, cash: 0, inKind: 0 });
+  const sumExisting = laborSum('existing');
+  const sumNew = laborSum('new');
+  const [reflected, setReflected] = useState(false);
+  // 기존/신규 인건비 합계를 예산 편성의 해당 비목에 반영한다. 비목 이름으로 찾는다:
+  // "기존인력 인건비"/"신규인력 인건비"가 있으면 각각, 없으면 일반 "인건비" 비목에 합산.
+  const reflectToBudget = () => {
+    const norm = (text: string) => text.replace(/\s/g, '');
+    const existingCat = pack.categories.find((c) => /기존/.test(norm(c.name)) && /인건비|인력/.test(norm(c.name)));
+    const newCat = pack.categories.find((c) => /신규/.test(norm(c.name)) && /인건비|인력/.test(norm(c.name)));
+    const genericCat = pack.categories.find((c) => /인건비/.test(norm(c.name)) && c.id !== existingCat?.id && c.id !== newCat?.id);
+    const totals = new Map<string, { name: string; amount: number; inKind: number; parts: string[] }>();
+    const assign = (cat: PackCategory | undefined, sum: { total: number; inKind: number }, label: string): boolean => {
+      if (!cat) return false;
+      const entry = totals.get(cat.id) ?? { name: cat.name, amount: 0, inKind: 0, parts: [] };
+      entry.amount += sum.total; entry.inKind += sum.inKind; entry.parts.push(label);
+      totals.set(cat.id, entry);
+      return true;
+    };
+    const okExisting = sumExisting.total === 0 || assign(existingCat ?? genericCat, sumExisting, '기존인력');
+    const okNew = sumNew.total === 0 || assign(newCat ?? genericCat, sumNew, '신규인력');
+    if (totals.size === 0) { alert('반영할 인건비가 없거나 이 규정 팩에서 인건비 비목을 찾지 못했어요. 월급여·참여기간 입력과 비목 구성을 확인해주세요.'); return; }
+    const missed = [!okExisting && '기존인력', !okNew && '신규인력'].filter(Boolean).join(', ');
+    const lines = [...totals.values()].map((t) => `· ${t.name} ← ${t.parts.join(' + ')} 합계 ${formatWon(t.amount)} (현금 ${formatWon(t.amount - t.inKind)} · 현물 ${formatWon(t.inKind)})`).join('\n');
+    if (!confirm(`예산 편성에 반영할까요? 아래 비목의 기존 편성 금액(현금·현물 포함)은 대체됩니다.\n${lines}${missed ? `\n(${missed} 인건비는 맞는 비목이 없어 반영하지 않았어요.)` : ''}`)) return;
+    const budgets = [...project.budgets];
+    for (const [id, t] of totals) {
+      const idx = budgets.findIndex((b) => b.categoryId === id);
+      if (idx >= 0) budgets[idx] = { ...budgets[idx], amount: t.amount, inKindAmount: t.inKind || undefined };
+      else budgets.push({ categoryId: id, amount: t.amount, inKindAmount: t.inKind || undefined });
+    }
+    update({ ...project, budgets });
+    setReflected(true); setTimeout(() => setReflected(false), 3000);
+  };
+  // 계상 구분(현물 → 혼합 → 현금)별로 묶어 보여준다. 같은 구분 안에서는 등록 순서를 유지한다.
+  const fundingKindOf = (p: Participant): 'inkind' | 'mixed' | 'cash' => p.laborFunding ?? (p.laborInKind != null ? 'mixed' : 'cash');
+  const KIND_ORDER = { inkind: 0, mixed: 1, cash: 2 } as const;
+  const KIND_LABEL = { inkind: '현물 계상', mixed: '혼합 계상 (현금+현물)', cash: '현금 계상' } as const;
+  const sortedParticipants = [...project.participants].sort((a, b) => KIND_ORDER[fundingKindOf(a)] - KIND_ORDER[fundingKindOf(b)]);
+  return <section className="panel participants-panel">
+    <div className="panel-head"><div><span className="section-kicker">STEP 1 · 인건비 산정</span><h3>참여인력 · 참여율 · 인건비</h3><p>인력을 등록하고 인건비(4대보험·퇴직금 자동 계산)를 산출한 뒤, 아래 비목별 편성에 바로 반영하세요. 계상 구분(현물/현금)별로 묶어 보여드려요.</p></div></div>
+    <div className="participant-list">{sortedParticipants.map((p, index) => { const total = p.projectRate + p.externalRate; const over = total > 100; const cost = laborCostFor(p, laborOpts); const kind = fundingKindOf(p); const hasSeverance = severanceApplies(p, includeSeverance); const showGroup = index === 0 || fundingKindOf(sortedParticipants[index - 1]) !== kind; return <Fragment key={p.id}>{showGroup && <div className="labor-group"><b>{KIND_LABEL[kind]}</b><span>{sortedParticipants.filter((x) => fundingKindOf(x) === kind).length}명</span></div>}<div className={over ? 'participant over' : 'participant'}><div className="participant-name"><div className="avatar">{p.name[0]}</div><strong>{p.name}</strong><button type="button" className="person-remove" aria-label={`${p.name} 삭제`} onClick={() => removePerson(p)}><Trash2 /></button></div><label>현재 과제<input aria-label={`${p.name} 현재 과제 참여율`} type="number" min="0" value={p.projectRate} onChange={(e) => setRate(p.id, 'projectRate', Number(e.target.value))} /><b>%</b></label><label>타 과제 합계<input aria-label={`${p.name} 타 과제 참여율`} type="number" min="0" value={p.externalRate} onChange={(e) => setRate(p.id, 'externalRate', Number(e.target.value))} /><b>%</b></label><div className="rate-total"><span>합산</span><strong>{total}%</strong></div>
+      <div className="labor-editor">
+        <label>구분<select aria-label={`${p.name} 기존/신규 구분`} value={p.laborType ?? 'existing'} onChange={(e) => setP(p.id, { laborType: e.target.value as 'existing' | 'new' })}><option value="existing">기존인력</option><option value="new">신규인력</option></select></label>
+        <label>참여 시작<input type="date" aria-label={`${p.name} 참여 시작일`} value={p.laborStart ?? project.startDate} onChange={(e) => setP(p.id, { laborStart: e.target.value })} /></label>
+        <label>참여 종료<input type="date" aria-label={`${p.name} 참여 종료일`} value={p.laborEnd ?? project.endDate} onChange={(e) => setP(p.id, { laborEnd: e.target.value })} /></label>
+        <label>월급여(원)<input inputMode="numeric" aria-label={`${p.name} 월급여`} value={withCommas(String(p.monthlyPay ?? ''))} placeholder="0" onChange={(e) => setP(p.id, { monthlyPay: Number(digitsOnly(e.target.value)) || undefined })} /></label>
+        <label>계상 구분<select aria-label={`${p.name} 인건비 계상 구분`} value={kind} onChange={(e) => setP(p.id, { laborFunding: e.target.value as Participant['laborFunding'] })}><option value="cash">현금 (전액)</option><option value="inkind">현물 (전액)</option><option value="mixed">혼합</option></select></label>
+        {kind === 'mixed' && <label>합계 중 현물(원)<input inputMode="numeric" aria-label={`${p.name} 현물 계상액`} value={withCommas(String(p.laborInKind ?? ''))} placeholder="0" onChange={(e) => setP(p.id, { laborInKind: Number(digitsOnly(e.target.value)) || undefined })} /></label>}
+        <label className="labor-sev"><strong>퇴직금 포함</strong><input type="checkbox" aria-label={`${p.name} 퇴직금 포함`} checked={hasSeverance} onChange={(e) => setP(p.id, { includeSeverance: e.target.checked })} /><span>: 1년 이상 근무자만 퇴직금을 포함할 수 있어요 (월급여의 1/12)</span></label>
+        <p className="labor-calc">월급여 {formatWon(cost.pay)}{includeInsurance ? ` + 4대보험 ${formatWon(cost.insurance)}` : ''}{hasSeverance ? ` + 퇴직금 ${formatWon(cost.severance)}` : ' (퇴직금 미계상)'} → 월 {formatWon(cost.monthly)} <em>(참여율 {p.projectRate}% 적용)</em> × {cost.months}개월 = <strong>합계 {formatWon(cost.total)}</strong> · 현금 {formatWon(cost.cash)} / 현물 {formatWon(cost.inKind)}</p>
+      </div>
+    {over && <p><AlertCircle /> 참여율 합산이 100%를 초과했습니다. 100% 이하로 조정해주세요.</p>}</div></Fragment>; })}</div>
+    <form className="person-add" onSubmit={addPerson}><input value={person} onChange={(e) => setPerson(e.target.value)} placeholder="새 참여 인력 이름" /><button className="secondary" type="submit"><Plus /> 인력 추가</button></form>
+    {project.participants.length === 0 && <div className="inline-warning"><AlertCircle /> 참여율 데이터가 없어 초과 경고가 작동하지 않습니다. 참여 인력을 추가해주세요.</div>}
+    {project.participants.length > 0 && <div className="labor-summary">
+      <div className="labor-toggles">
+        <label className="share-toggle"><input type="checkbox" checked={includeInsurance} onChange={(e) => update({ ...project, laborIncludeInsurance: e.target.checked })} /><span><strong>4대보험 포함</strong> — 사업별 계상 기준에 따라</span></label>
+        {includeInsurance && <label className="labor-rate">요율(%)<input inputMode="decimal" value={String(insRate)} onChange={(e) => { const v = e.target.value.replace(/[^\d.]/g, ''); update({ ...project, insuranceRate: Math.min(30, Number(v) || 0) }); }} /></label>}
+        <label className="share-toggle"><input type="checkbox" checked={includeSeverance} onChange={(e) => update({ ...project, laborIncludeSeverance: e.target.checked })} /><span><strong>퇴직금 기본값</strong> — 새로 추가하는 인력의 기본 설정 (1년 이상 근무자만 계상 가능해 개인별로 조정하세요)</span></label>
+      </div>
+      {(() => {
+        const withSev = project.participants.filter((p) => severanceApplies(p, includeSeverance)).length;
+        return <p className="field-hint">퇴직금 계상 인력 {withSev}명 / 전체 {project.participants.length}명 — 계속근로 1년 미만인 인력은 개인 카드에서 "퇴직금 포함"을 해제하세요.</p>;
+      })()}
+      <div><span>기존인력 인건비 합계</span><strong>{formatWon(sumExisting.total)}</strong><small>현금 {formatWon(sumExisting.cash)} · 현물 {formatWon(sumExisting.inKind)}</small></div>
+      <div><span>신규인력 인건비 합계</span><strong>{formatWon(sumNew.total)}</strong><small>현금 {formatWon(sumNew.cash)} · 현물 {formatWon(sumNew.inKind)}</small></div>
+      {(() => {
+        // 인건비 현물이 재원 구성의 민간부담 현물 한도를 넘으면 반영 전에 미리 경고한다.
+        const laborFunding = fundingBreakdown(project);
+        const laborInKindTotal = sumExisting.inKind + sumNew.inKind;
+        if (laborInKindTotal === 0) return null;
+        if (!laborFunding.matchingCashRateKnown) return <p className="field-hint"><AlertCircle /> 현물 {formatWon(laborInKindTotal)} 계상됨 — 한도 검증을 하려면 과제 설정에서 "민간부담금 중 현금 비율"을 입력하세요.</p>;
+        if (laborInKindTotal > laborFunding.matchingInKind) return <p className="field-error"><AlertCircle /> 인건비 현물 합계({formatWon(laborInKindTotal)})가 재원 구성의 현물 한도({formatWon(laborFunding.matchingInKind)})를 {formatWon(laborInKindTotal - laborFunding.matchingInKind)} 초과했어요. 계상 구분(현금/현물)이나 지원비율·현금 비율을 확인하세요.</p>;
+        return null;
+      })()}
+      <div className="settings-save"><button type="button" className="primary" onClick={reflectToBudget}><WalletCards /> 예산 편성에 반영</button>{reflected && <span className="save-ok"><CheckCircle2 /> 반영됐어요 — 아래 편성표에서 확인하세요</span>}</div>
+    </div>}
+  </section>;
+}
+
 function Budget({ project, update }: { project: Project; update: (p: Project) => void }) {
   const pack = packFor(project);
   const cats = visibleCategories(pack, project);
   const confirmed = !!project.budgetConfirmed;
   const sourceDocs = useSourceDocs(project, update);
   const { viewDoc, docForSource } = sourceDocs;
+  // 근거 링크를 누르면 규정 DB의 조문 원문을 먼저 띄운다 — 원본 파일이 없어도, HWP처럼 조문
+  // 번호가 유실된 문서여도 항상 정확한 조문이 열린다. 원본 문서가 연결돼 있으면 팝업 안에서 이어간다.
+  const [openArticles, setOpenArticles] = useState<{ ref: string; articles: PackArticle[]; doc: string; openDoc?: () => void } | null>(null);
   // 근거가 "공고 비목 정의 + QnA 사업비 7번"처럼 복수면 각각을 해당 문서로 여는 개별 링크로 나눈다.
-  const refLink = (rule: { quote?: string; message?: string; source: { doc: string; ref: string; matchLevel: string } }) => {
+  const refLink = (rule: { quote?: string; message?: string; item?: string; source: { doc: string; ref: string; matchLevel: string } }) => {
     const parts = rule.source.ref.split(/\s*\+\s*/).filter(Boolean);
     const composite = parts.length > 1;
     return <>{parts.map((part, index) => {
       // 복수 근거일 때는 부분 문구만으로 문서를 매칭한다 (합쳐진 문서명이 매칭을 흐리지 않게)
       const doc = docForSource(composite ? { ref: part, matchLevel: rule.source.matchLevel } : rule.source);
-      const terms = [...(rule.quote ? [rule.quote.slice(0, 40)] : []), ...refPatternTerms(part), ...keywordTokens(rule.quote ?? rule.message ?? '')];
-      return <span key={index}>{index > 0 && ' '}{doc
-        ? <button type="button" className="ref-link" onClick={() => viewDoc(doc, terms)}>({part} · 원문 보기)</button>
-        : <em>({part})</em>}</span>;
+      const sets = highlightTermSets(rule, part);
+      const openDoc = doc ? () => { setOpenArticles(null); viewDoc(doc, sets.primary, sets.fallback); } : undefined;
+      const found = findArticles(pack, part);
+      if (found) return <span key={index}>{index > 0 && ' '}
+        <button type="button" className="ref-link" title={`${part} — ${found.pack.guideline} 조문 원문 보기`} onClick={() => setOpenArticles({ ref: part, articles: found.articles, doc: found.pack.guideline, openDoc })}>{shortRef(part)} <BookOpenCheck /></button>
+      </span>;
+      return <span key={index}>{index > 0 && ' '}{openDoc
+        ? <button type="button" className="ref-link" title={`${part} — ${doc!.fileName}에서 이 근거 위치 열기`} onClick={openDoc}>{shortRef(part)} <FileSearch /></button>
+        : <em title={part}>({shortRef(part)})</em>}</span>;
     })}</>;
   };
   const total = project.budgets.reduce((sum, item) => sum + item.amount, 0);
-  const changeAmount = (id: BudgetCategoryId, amount: number) => update({ ...project, budgets: project.budgets.map((b) => b.categoryId === id ? { ...b, amount: Math.max(0, amount) } : b) });
+  const funding = fundingBreakdown(project);
+  // "직접비(현물 제외)" 같은 상한 기준에 쓰는 민간부담 현물 금액
+  const inKind = funding.matchingInKind;
+  // 비목별 현물 계상 합계 (편성 금액을 넘는 부분은 세지 않는다)
+  const totalInKind = project.budgets.reduce((sum, b) => sum + Math.min(b.inKindAmount ?? 0, b.amount), 0);
+  const changeAmount = (id: BudgetCategoryId, amount: number) => update({ ...project, budgets: project.budgets.map((b) => b.categoryId === id ? { ...b, amount: Math.max(0, amount), inKindAmount: b.inKindAmount != null ? Math.min(b.inKindAmount, Math.max(0, amount)) || undefined : undefined } : b) });
+  const setInKindAmount = (id: BudgetCategoryId, value: number) => update({ ...project, budgets: project.budgets.map((b) => b.categoryId === id ? { ...b, inKindAmount: Math.max(0, Math.min(value, b.amount)) || undefined } : b) });
+  // ---- 비목 기준 사이드 패널 ----
+  const [standardId, setStandardId] = useState<BudgetCategoryId | null>(null);
+  // 이 팩에 규정 DB 기준이 없는 비목(공고문 AI 추출 팩·내장 예시 팩)은 이름으로 공통 규정 기준을 찾아둔다.
+  // 편성표의 상한 칸과 기준 패널이 같은 결과를 쓴다.
+  const referenceByCategory = useMemo(() => {
+    const map = new Map<string, ReferenceStandard | null>();
+    for (const category of cats) {
+      const hasOwn = !!(category.allowedItems?.length || category.limitText || category.approvals?.length || category.evidenceRules?.length);
+      map.set(category.id, hasOwn ? null : referenceStandardFor(category.name, pack.id));
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pack.id, cats.map((c) => c.id).join('|')]);
+  // ---- 세목(비목 내 하위 항목) 편집 ----
+  const [subOpen, setSubOpen] = useState<Set<string>>(new Set());
+  const toggleSub = (id: string) => setSubOpen((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  // 세목이 있으면 비목 금액은 항상 세목 합계로 맞춘다. 세목을 모두 지우면 직접 입력으로 돌아간다.
+  const setSubItems = (id: BudgetCategoryId, subs: BudgetSubItem[]) => {
+    const sum = subs.reduce((s, x) => s + x.amount, 0);
+    const exists = project.budgets.some((b) => b.categoryId === id);
+    const budgets = exists
+      ? project.budgets.map((b) => b.categoryId === id ? { ...b, subItems: subs.length ? subs : undefined, amount: subs.length ? sum : b.amount } : b)
+      : [...project.budgets, { categoryId: id, amount: sum, subItems: subs.length ? subs : undefined }];
+    update({ ...project, budgets });
+  };
+  // 세목을 처음 만들 때는 이미 편성해둔 비목 금액을 첫 세목에 그대로 옮긴다 —
+  // 안 그러면 세목 합계(0원)로 덮여 편성 합계가 조용히 깨진다.
+  const addSubItem = (id: BudgetCategoryId, name = '') => {
+    const item = project.budgets.find((b) => b.categoryId === id);
+    const subs = item?.subItems ?? [];
+    const amount = subs.length === 0 ? item?.amount ?? 0 : 0;
+    setSubItems(id, [...subs, { id: uid(), name, amount }]);
+    setSubOpen((prev) => new Set(prev).add(id));
+  };
   const toggleConfirm = () => {
     if (confirmed) { update({ ...project, budgetConfirmed: false }); return; }
     const zero = pack.categories.filter((c) => c.allowed && !(project.budgets.find((b) => b.categoryId === c.id)?.amount)).length;
@@ -445,23 +890,95 @@ function Budget({ project, update }: { project: Project; update: (p: Project) =>
   return <div className="page-content"><div className="page-title"><div><span className="eyebrow">모듈 1</span><h2>예산 편성 도우미</h2><p>{pack.name} 규정 체계 기준 초안입니다. 협약서의 개별 조건이 항상 우선합니다.</p></div><div className="title-actions"><button className="secondary" onClick={() => withExporters((m) => m.exportBudgetXlsx(project))}><Download /> 엑셀 내보내기</button><button className={confirmed ? 'secondary' : 'primary'} onClick={toggleConfirm}>{confirmed ? <><Pencil /> 편성 수정</> : <><Check /> 편성 확정</>}</button></div></div>
     <div className="notice"><BookOpenCheck /><div><strong>예시 기준 (검증 전) · {pack.guideline}</strong><span>{pack.agency} 기준으로 정리한 데이터입니다 ({RULES_EFFECTIVE_DATE} 업데이트). 실제 협약 및 최신 공고 원문이 항상 우선합니다. {(() => { const doc = docForSource({ doc: pack.guideline, matchLevel: 'guideline' }); return doc ? <button type="button" className="ref-link" onClick={() => viewDoc(doc)}>저장된 원문 보기 ({doc.fileName}) →</button> : pack.referenceUrl ? <a href={pack.referenceUrl} target="_blank" rel="noreferrer">공식 사이트에서 원문 확인 →</a> : null; })()}</span></div></div>
     {!pack.hasRatioLimits && packInfos.length > 0 && <div className="notice soft"><ShieldCheck /><div><strong>이 사업은 비목 간 비율 제한이 없습니다</strong><span>{packInfos.map((rule, index) => <span key={rule.id}>{index > 0 && ' · '}{rule.message} {refLink(rule)}</span>)}</span></div></div>}
-    <section className="panel budget-editor"><div className="editor-head"><div><span>전체 사용 가능 예산</span><strong>{formatWon(project.totalBudget)}</strong></div><div className={total === project.totalBudget ? 'sum-ok' : 'sum-bad'}>{total === project.totalBudget ? <CheckCircle2 /> : <AlertCircle />} 편성 합계 {formatWon(total)} {total !== project.totalBudget && `(차이 ${formatWon(total - project.totalBudget)})`}{confirmed && ' · 편성 확정됨'}</div></div>
-      <div className="budget-table"><div className="table-head"><span>비목 · 사용 예시</span><span>허용 상한</span><span>편성 금액</span><span>비율</span><span>상태</span></div>{cats.map((category) => {
-        const amount = project.budgets.find((b) => b.categoryId === category.id)?.amount ?? 0;
+    <ParticipantsPanel project={project} update={update} />
+    <section className="panel budget-editor"><div className="editor-head"><div><span className="section-kicker">STEP 2 · 비목별 편성</span><span>전체 사용 가능 예산</span><strong>{formatWon(project.totalBudget)}</strong>{funding.matching > 0 && funding.matchingCashRateKnown && <small className="funding-split-note">현금 {formatWon(funding.subsidy + funding.matchingCash)} (지원금+민간 현금) · 현물 {formatWon(funding.matchingInKind)}</small>}</div><div className="editor-head-sums">{funding.matching > 0 && funding.matchingCashRateKnown
+        ? (() => {
+            // 현금·현물을 각각 검증한다 — 둘 다 맞으면 편성 합계도 자동으로 맞는다.
+            const gap = (planned: number, target: number) => planned === target ? '' : ` — ${planned > target ? '초과' : '부족'} ${formatWon(Math.abs(planned - target))}`;
+            const cashTarget = funding.subsidy + funding.matchingCash;
+            const cashTotal = total - totalInKind;
+            return <>
+              <div className={cashTotal === cashTarget ? 'sum-ok' : 'sum-bad'}>{cashTotal === cashTarget ? <CheckCircle2 /> : <AlertCircle />} 현금 편성 {formatWon(cashTotal)} / 재원 현금 {formatWon(cashTarget)}{gap(cashTotal, cashTarget)}{confirmed && ' · 편성 확정됨'}</div>
+              <div className={totalInKind === funding.matchingInKind ? 'sum-ok' : 'sum-bad'}>{totalInKind === funding.matchingInKind ? <CheckCircle2 /> : <AlertCircle />} 현물 편성 {formatWon(totalInKind)} / 재원 현물 {formatWon(funding.matchingInKind)}{gap(totalInKind, funding.matchingInKind)}</div>
+            </>;
+          })()
+        : <>
+          <div className={total === project.totalBudget ? 'sum-ok' : 'sum-bad'}>{total === project.totalBudget ? <CheckCircle2 /> : <AlertCircle />} 편성 합계 {formatWon(total)} {total !== project.totalBudget && `(차이 ${formatWon(total - project.totalBudget)})`}{confirmed && ' · 편성 확정됨'}</div>
+          {funding.matching > 0 && totalInKind > 0 && <div className="sum-bad"><AlertCircle /> 현물 {formatWon(totalInKind)} 편성됨 — 한도 검증을 하려면 과제 설정에서 "민간부담금 중 현금 비율"을 입력하세요</div>}
+        </>}</div></div>
+      <BudgetComposition pack={pack} project={project} cats={cats} />
+      <div className="budget-table"><div className="table-head"><span>비목 · 사용 예시</span><span>허용 상한</span><span>편성 금액</span><span>비율</span><span>상태</span><span>기준</span></div>{cats.map((category) => {
+        const item = project.budgets.find((b) => b.categoryId === category.id);
+        const amount = item?.amount ?? 0;
+        const itemInKind = Math.min(item?.inKindAmount ?? 0, amount);
+        const subs = item?.subItems ?? [];
+        const hasSubs = subs.length > 0;
+        const open = subOpen.has(category.id);
         const rate = project.totalBudget ? amount / project.totalBudget * 100 : 0;
-        const cap = capFor(pack, project.budgets, project.totalBudget, category.id);
+        const cap = capFor(pack, project.budgets, project.totalBudget, category.id, inKind);
         const min = minFor(pack, category.id);
         const over = cap?.amount != null && amount > cap.amount;
         const under = min != null && amount < min.amount;
-        return <div className={`table-row ${over || under ? 'row-danger' : ''}`} key={category.id}><div><strong>{category.name}</strong><small>{category.definition ?? `초안 ${category.draftRate}%`}</small></div><div className="cap-cell">{cap
-          ? <>{cap.amount != null && <strong>{formatWon(cap.amount)}</strong>}<small>{cap.label}</small>{cap.rule.note && <small className="cap-note">{cap.rule.note}</small>}</>
-          : '제한 없음'}{min && <small className="cap-min">{min.label}</small>}</div><label className="money-input"><input aria-label={`${category.name} 편성 금액`} inputMode="numeric" value={withCommas(String(amount))} disabled={confirmed} onChange={(e) => changeAmount(category.id, Number(digitsOnly(e.target.value)) || 0)} /><b>원</b></label><div className="rate-cell"><div className="mini-progress"><i style={{ width: `${cap?.amount ? Math.min(amount / cap.amount * 100, 100) : Math.min(rate, 100)}%` }} /></div><b>{rate.toFixed(1)}%</b></div><span className={`status ${over || under ? 'bad' : 'good'}`}>{over ? <><AlertCircle /> 상한 초과</> : under ? <><AlertCircle /> 필수 금액 미달</> : <><Check /> 정상</>}</span></div>;
+        return <div key={category.id}><div className={`table-row ${over || under ? 'row-danger' : ''}`}><div><strong>{category.name}</strong>
+          <small>{category.definition ?? `초안 ${category.draftRate}%`}</small>
+          <button type="button" className="text-button sub-toggle" onClick={() => toggleSub(category.id)}>{hasSubs ? `세목 ${subs.length}개 ${open ? '접기' : '보기'}` : open ? '세목 입력 닫기' : '+ 세목 나누기'}</button></div>
+        {/* 상한의 근거·조건은 "기준" 패널에 있으므로, 여기서는 금액이 어떻게 나왔는지 계산식만 보여준다. */}
+        <div className="cap-cell">{cap
+          ? cap.basisAmount != null
+            ? <><strong>{formatWon(cap.amount!)}</strong><small className="cap-formula">{cap.basisLabel} {formatWon(cap.basisAmount)} × {cap.limitPct}%</small>{amount > 0 && cap.amount! > 0 && <small className={over ? 'cap-used over' : 'cap-used'}>{over ? `상한 ${formatWon(amount - cap.amount!)} 초과` : `여유 ${formatWon(cap.amount! - amount)}`}</small>}</>
+            : <small className="cap-db">{cap.label}<br /><em>{cap.partial ? '비목 전체가 아니라 세부항목 기준이라 자동 계산하지 않아요' : '편성표 밖 기준(구입가 등)이라 금액은 직접 확인하세요'}</em></small>
+          : (category.limitText ?? referenceByCategory.get(category.id)?.category.limitText)
+          ? <small className="cap-db">{category.limitText ?? referenceByCategory.get(category.id)?.category.limitText}{!category.limitText && <em> · 공통 규정 기준</em>}</small>
+          : <small className="cap-db muted">규정 상한 없음</small>}{min && <small className="cap-min">{min.label}</small>}</div><div className="amount-cell"><label className="money-input"><input aria-label={`${category.name} 편성 금액`} inputMode="numeric" value={withCommas(String(amount))} disabled={confirmed || hasSubs} onChange={(e) => changeAmount(category.id, Number(digitsOnly(e.target.value)) || 0)} /><b>원</b></label>{funding.matching > 0 && <div className="inkind-row"><span>현물</span><label className="money-input"><input aria-label={`${category.name} 현물 계상액`} inputMode="numeric" disabled={confirmed} placeholder="0" value={withCommas(String(itemInKind || ''))} onChange={(e) => setInKindAmount(category.id, Number(digitsOnly(e.target.value)) || 0)} /><b>원</b></label><small>현금 {formatWon(amount - itemInKind)}</small></div>}{hasSubs && <div className="amount-slider"><small>세목 {subs.length}개 합계 자동</small></div>}{!confirmed && !hasSubs && (() => {
+          // 막대바 눈금은 총사업비로 고정한다(썸 위치 = 총사업비 대비 비율). 눈금을 "현재 금액+잔액"으로
+          // 잡으면 한 비목을 움직일 때마다 잔액이 변해 다른 슬라이더 썸까지 시각적으로 따라 움직인다.
+          // 잔액·허용 상한 제한은 드래그된 값에만 적용 — 상한 초과 편성이 필요하면 직접 입력으로 한다.
+          const free = Math.max(0, project.totalBudget - total);
+          const dragLimit = Math.max(amount, Math.min(amount + free, cap?.amount ?? Infinity));
+          const step = Math.max(10000, Math.round(project.totalBudget / 200 / 10000) * 10000);
+          return <div className="amount-slider"><input type="range" aria-label={`${category.name} 편성 금액 조절`} min={0} max={project.totalBudget} step={step} value={Math.min(amount, project.totalBudget)} onChange={(e) => changeAmount(category.id, Math.min(Number(e.target.value), dragLimit))} /><small>{free > 0 ? `미편성 잔액 ${formatWon(free)}` : total > project.totalBudget ? '예산 초과 — 줄여주세요' : '남은 잔액 없음'}</small></div>;
+        })()}</div><div className="rate-cell"><div className="mini-progress"><i className={over || under ? 'danger' : ''} style={{ width: `${cap?.amount ? Math.min(amount / cap.amount * 100, 100) : Math.min(rate, 100)}%` }} /></div><b>{rate.toFixed(1)}%</b></div><span className={`status ${over || under ? 'bad' : 'good'}`}>{over ? <><AlertCircle /> 상한 초과</> : under ? <><AlertCircle /> 필수 금액 미달</> : <><Check /> 정상</>}</span>
+        <button type="button" className={`standard-open ${standardId === category.id ? 'active' : ''}`} aria-label={`${category.name} 기준 보기`} title={`${category.name} 기준 보기`} onClick={() => setStandardId(standardId === category.id ? null : category.id)}><BookOpenCheck /></button></div>
+        {open && <div className="sub-items">
+          {subs.map((sub) => <div className="sub-item-row" key={sub.id}>
+            <input aria-label={`${category.name} 세목 이름`} placeholder="세목 이름 (예: 기술도입비)" value={sub.name} disabled={confirmed} onChange={(e) => setSubItems(category.id, subs.map((x) => x.id === sub.id ? { ...x, name: e.target.value } : x))} />
+            <label className="money-input"><input aria-label={`${sub.name || '세목'} 금액`} inputMode="numeric" disabled={confirmed} value={withCommas(String(sub.amount))} onChange={(e) => setSubItems(category.id, subs.map((x) => x.id === sub.id ? { ...x, amount: Number(digitsOnly(e.target.value)) || 0 } : x))} /><b>원</b></label>
+            {!confirmed && <button type="button" className="danger-button" aria-label={`${sub.name || '세목'} 삭제`} onClick={() => setSubItems(category.id, subs.filter((x) => x.id !== sub.id))}><Trash2 /></button>}
+          </div>)}
+          {!confirmed && <button type="button" className="secondary sub-add" onClick={() => addSubItem(category.id)}><Plus /> 세목 추가</button>}
+          <p className="sub-hint">{hasSubs ? `비목 금액은 세목 합계 ${formatWon(amount)}(으)로 자동 계산됩니다. 세목을 모두 지우면 직접 입력으로 돌아가요.` : '세목을 추가하면 비목 금액이 세목 합계로 자동 계산됩니다. 첫 세목에는 지금 편성 금액이 그대로 옮겨져요.'}</p>
+        </div>}</div>;
       })}</div>
     </section>
-    <section><div className="section-title"><h3>항목별 기준 · 주의사항</h3><p>모든 기준에 원문 근거(조문·QnA 위치)가 표시됩니다.</p></div><div className="criteria-grid">{cats.map((category) => { const rules = rulesFor(pack, category.id); return <details key={category.id}><summary><div className="category-dot" />{category.name}<ChevronRight /></summary><div>{category.definition && <p><CheckCircle2 />{category.definition}</p>}{rules.map((rule) => <div key={rule.id}><p className={rule.kind === 'warning' ? 'rule-warn' : ''}>{rule.kind === 'warning' ? <AlertCircle /> : <CheckCircle2 />}{rule.message} {refLink(rule)}</p>{rule.note && <p className="rule-note">{rule.note}</p>}</div>)}{!category.definition && rules.length === 0 && <p><CheckCircle2 />등록된 세부 기준이 없습니다. 공고·협약 원문을 확인하세요.</p>}</div></details>; })}</div></section>
+    {/* 비목 기준은 화면에 길게 나열하지 않고 편성표의 "기준" 버튼으로 그때그때 연다. */}
+    {(() => {
+      if (!standardId) return null;
+      const category = cats.find((c) => c.id === standardId);
+      if (!category) return null;
+      const reference = referenceByCategory.get(category.id) ?? null;
+      return <StandardPanel
+        category={category}
+        reference={reference?.category ?? null}
+        referenceDoc={reference?.pack.guideline}
+        cap={capFor(pack, project.budgets, project.totalBudget, category.id, inKind)}
+        amount={project.budgets.find((b) => b.categoryId === category.id)?.amount ?? 0}
+        min={minFor(pack, category.id)}
+        rules={rulesFor(pack, category.id)}
+        refLink={refLink}
+        canAddSub={!confirmed}
+        onAddSub={(name) => addSubItem(category.id, name)}
+        onClose={() => setStandardId(null)}
+      />;
+    })()}
+    {pack.reviewIssues?.length ? <section><div className="section-title"><h3>규정 DB 검토 메모</h3><p>규정을 DB로 옮기면서 원문 확인이 필요하다고 표시해둔 지점입니다.</p></div>
+      <div className="global-warnings">{pack.reviewIssues.map((issue) => <div key={issue.code} className={`warn-item ${issue.severity === 'warning' ? 'medium' : 'low'}`}>
+        <AlertCircle /><div><strong>{issue.description}</strong><span>{issue.handling} {issue.ref && refLink({ message: issue.description, source: { doc: pack.guideline, ref: issue.ref, matchLevel: 'guideline' } })}</span></div>
+      </div>)}</div>
+    </section> : null}
     {globalRules(pack, 'warning').length > 0 && <section><div className="section-title"><h3>과제 공통 주의사항</h3><p>비목과 무관하게 적용되는 금지·주의 규정입니다.</p></div><div className="global-warnings">{globalRules(pack, 'warning').map((rule) => <div key={rule.id} className={`warn-item ${rule.severity ?? 'medium'}`}><AlertCircle /><div><strong>{rule.trigger ?? rule.item}</strong><span>{rule.message} {refLink(rule)}</span></div></div>)}</div></section>}
     {/* 근거 원본 문서 관리는 과제 설정 화면에서만 — 여기서는 "원문 보기" 팝업만 뜬다. */}
     <DocViewerModal source={sourceDocs} />
+    {openArticles && <ArticleModal articles={openArticles.articles} ref={openArticles.ref} doc={openArticles.doc} onOpenDoc={openArticles.openDoc} onClose={() => setOpenArticles(null)} />}
   </div>;
 }
 
@@ -580,7 +1097,7 @@ function ChangeManagement({ project, update }: { project: Project; update: (p: P
   const [form, setForm] = useState({ from: cats[1]?.id ?? cats[0]?.id ?? '', to: cats[0]?.id ?? '', amount: '', reasonKey: REASON_TEMPLATES[0].key, reason: REASON_TEMPLATES[0].text });
   const source = project.budgets.find((b) => b.categoryId === form.from)?.amount ?? 0;
   const amount = Number(form.amount) || 0;
-  const limitError = form.from !== form.to ? transferLimitError(pack, project.budgets, project.totalBudget, form.to, amount) : null;
+  const limitError = form.from !== form.to ? transferLimitError(pack, project.budgets, project.totalBudget, form.to, amount, fundingBreakdown(project).matchingInKind) : null;
   const valid = form.from !== form.to && amount > 0 && amount <= source && !limitError && form.reason.trim();
   const save = (event: React.FormEvent) => { event.preventDefault(); if (!valid) return; const before = project.budgets.map((b) => ({ ...b })); const after: BudgetItem[] = before.map((b) => b.categoryId === form.from ? { ...b, amount: b.amount - amount } : b.categoryId === form.to ? { ...b, amount: b.amount + amount } : b); update({ ...project, budgets: after, changes: [{ id: uid(), fromCategoryId: form.from, toCategoryId: form.to, amount, reasonKey: form.reasonKey, reason: form.reason, before, after, createdAt: new Date().toISOString() }, ...project.changes] }); };
   const change = project.changes[0];
@@ -594,12 +1111,9 @@ function ChangeManagement({ project, update }: { project: Project; update: (p: P
   </div>;
 }
 
-function Team({ project, update }: { project: Project; update: (p: Project) => void }) {
+function Team({ project, update, setScreen }: { project: Project; update: (p: Project) => void; setScreen: (s: Screen) => void }) {
   const [member, setMember] = useState({ name: '', email: '' });
-  const [person, setPerson] = useState('');
   const addMember = (e: React.FormEvent) => { e.preventDefault(); if (project.members.length >= 2 || !member.name || !member.email) return; update({ ...project, members: [...project.members, { id: uid(), name: member.name, email: member.email, role: '담당자' }] }); setMember({ name: '', email: '' }); };
-  const addPerson = (e: React.FormEvent) => { e.preventDefault(); if (!person.trim()) return; update({ ...project, participants: [...project.participants, { id: uid(), name: person.trim(), projectRate: 0, externalRate: 0 }] }); setPerson(''); };
-  const setRate = (id: string, key: 'projectRate' | 'externalRate', value: number) => update({ ...project, participants: project.participants.map((p) => p.id === id ? { ...p, [key]: Math.max(0, value) } : p) });
   const refreshReminders = () => {
     const milestone = daysUntil(project.settlementDeadline);
     if (![30, 14, 7].includes(milestone)) { alert(`현재 정산 마감은 D-${milestone}입니다. 알림은 D-30, D-14, D-7에 생성됩니다.`); return; }
@@ -608,9 +1122,9 @@ function Team({ project, update }: { project: Project; update: (p: Project) => v
     if (project.emailLogs.some((l) => l.milestone === milestone)) { alert('해당 마감 알림 로그가 이미 있습니다.'); return; }
     update({ ...project, emailLogs: [...project.emailLogs, ...project.members.map((m) => ({ id: uid(), sentAt: new Date().toISOString(), recipient: m.email, milestone: milestone as 30 | 14 | 7, status: '제품 내 알림' as const, incompleteCount: incomplete }))] });
   };
-  return <div className="page-content"><div className="page-title"><div><span className="eyebrow">운영 설정</span><h2>인력 · 담당자 관리</h2><p>참여율을 점검하고 담당자 정보를 기록합니다. 데이터는 이 브라우저에만 저장되며 계정·초대·동기화 기능은 서버 버전에서 제공될 예정입니다.</p></div></div>
-    <div className="team-grid"><section className="panel"><div className="panel-head"><div><h3>담당자 정보</h3><p>{project.members.length} / 2명 입력됨 · 알림 수신 대상</p></div></div><div className="member-list">{project.members.map((m) => <div key={m.id}><div className="avatar">{m.name[0]}</div><span><strong>{m.name} <b>{m.role}</b></strong><small>{m.email}</small></span><CheckCircle2 /></div>)}</div>{project.members.length < 2 ? <form className="inline-add" onSubmit={addMember}><h4><UserPlus /> 담당자 추가</h4><div className="field-grid"><label>이름<input required value={member.name} onChange={(e) => setMember({ ...member, name: e.target.value })} /></label><label>이메일<input required type="email" value={member.email} onChange={(e) => setMember({ ...member, email: e.target.value })} /></label></div><button className="secondary" type="submit"><Plus /> 두 번째 담당자 추가</button></form> : <div className="limit-note"><ShieldCheck /> 담당자는 최대 2명까지 기록할 수 있습니다. 실제 공동 사용은 서버 버전에서 지원됩니다.</div>}</section>
-      <section className="panel"><div className="panel-head"><div><h3>참여 인력과 참여율</h3><p>과제 참여율 + 타 과제 참여율을 합산합니다.</p></div></div><div className="participant-list">{project.participants.map((p) => { const total = p.projectRate + p.externalRate; const over = total > 100; return <div className={over ? 'participant over' : 'participant'} key={p.id}><div className="participant-name"><div className="avatar">{p.name[0]}</div><strong>{p.name}</strong></div><label>현재 과제<input aria-label={`${p.name} 현재 과제 참여율`} type="number" min="0" value={p.projectRate} onChange={(e) => setRate(p.id, 'projectRate', Number(e.target.value))} /><b>%</b></label><label>타 과제 합계<input aria-label={`${p.name} 타 과제 참여율`} type="number" min="0" value={p.externalRate} onChange={(e) => setRate(p.id, 'externalRate', Number(e.target.value))} /><b>%</b></label><div className="rate-total"><span>합산</span><strong>{total}%</strong></div>{over && <p><AlertCircle /> 참여율 합산이 100%를 초과했습니다. 100% 이하로 조정해주세요.</p>}</div>; })}</div><form className="person-add" onSubmit={addPerson}><input value={person} onChange={(e) => setPerson(e.target.value)} placeholder="새 참여 인력 이름" /><button className="secondary" type="submit"><Plus /> 인력 추가</button></form>{project.participants.length === 0 && <div className="inline-warning"><AlertCircle /> 참여율 데이터가 없어 초과 경고가 작동하지 않습니다. 참여 인력을 추가해주세요.</div>}</section>
+  return <div className="page-content"><div className="page-title"><div><span className="eyebrow">운영 설정</span><h2>담당자 · 알림 관리</h2><p>담당자 정보를 기록하고 증빙 누락 알림을 확인합니다.</p></div></div>
+    <div className="notice"><Users /><div><strong>참여 인력 · 인건비 관리는 예산 편성 화면으로 이동했어요</strong><span>참여율 점검과 인건비 계산은 이제 예산 편성의 "STEP 1 · 인건비 산정"에서 합니다. <button type="button" className="ref-link" onClick={() => setScreen('budget')}>예산 편성으로 이동 →</button></span></div></div>
+    <div className="team-grid single"><section className="panel"><div className="panel-head"><div><h3>담당자 정보</h3><p>{project.members.length} / 2명 입력됨 · 알림 수신 대상</p></div></div><div className="member-list">{project.members.map((m) => <div key={m.id}><div className="avatar">{m.name[0]}</div><span><strong>{m.name} <b>{m.role}</b></strong><small>{m.email}</small></span><CheckCircle2 /></div>)}</div>{project.members.length < 2 ? <form className="inline-add" onSubmit={addMember}><h4><UserPlus /> 담당자 추가</h4><div className="field-grid"><label>이름<input required value={member.name} onChange={(e) => setMember({ ...member, name: e.target.value })} /></label><label>이메일<input required type="email" value={member.email} onChange={(e) => setMember({ ...member, email: e.target.value })} /></label></div><button className="secondary" type="submit"><Plus /> 두 번째 담당자 추가</button></form> : <div className="limit-note"><ShieldCheck /> 담당자는 최대 2명까지 기록할 수 있습니다. 실제 공동 사용은 서버 버전에서 지원됩니다.</div>}</section>
     </div>
     <section className="panel reminder-panel"><div className="panel-head"><div><h3><Mail /> 증빙 누락 알림 로그</h3><p>정산 마감 D-30 / D-14 / D-7에 미완료 증빙을 확인합니다.</p></div><button className="secondary" onClick={refreshReminders}><RefreshCw /> 오늘 기준 확인</button></div>{project.emailLogs.length ? <div className="log-table"><div><strong>발송 시각</strong><strong>수신자</strong><strong>시점</strong><strong>미완료</strong><strong>상태</strong></div>{project.emailLogs.map((log) => <div key={log.id}><span>{new Date(log.sentAt).toLocaleString('ko-KR')}</span><span>{log.recipient}</span><b>D-{log.milestone}</b><span>{log.incompleteCount}개</span><span className="log-status">{log.status}</span></div>)}</div> : <div className="empty-state compact"><Mail /><h3>아직 알림 로그가 없어요</h3><p>마감 기준일에 미완료 증빙이 있으면 제품 내 알림 로그가 생성됩니다.</p></div>}</section>
   </div>;
@@ -618,10 +1132,17 @@ function Team({ project, update }: { project: Project; update: (p: Project) => v
 
 const RULE_KIND_LABEL = { ratio: '상한', warning: '금지·주의', funding: '재원', info: '참고' } as const;
 
+const DIFF_STATUS_LABEL: Record<PackDiff['status'], string> = {
+  changed: '달라짐', added: '새로 나옴', missing: '확인 필요', unchanged: '동일',
+};
+const DIFF_TARGET_LABEL: Record<PackDiff['target'], string> = {
+  limit: '상한', minimum: '필수계상', category: '비목', rule: '규칙',
+};
+
 // "근거 원본 문서"에 이미 있는 문서 중 골라서 AI로 규정(비목·상한·금지)을 추출·반영한다.
 // 파일 업로드는 여기서 하지 않는다 — 문서 확보는 "근거 원본 문서" 패널의 역할이고, 여긴 그중
 // 무엇을 분석에 쓸지 고르기만 한다.
-function DocUpdatePanel({ project, update }: { project: Project; update: (p: Project) => void }) {
+function DocUpdatePanel({ project, update, source }: { project: Project; update: (p: Project) => void; source: ReturnType<typeof useSourceDocs> }) {
   const docs = project.documents ?? [];
   // 과제가 이미 사업명에 연결돼 있으면(공유 팩을 쓰거나 "근거 원본 문서"에서 수동 연결) 그
   // 사업명을 그대로 쓴다 — 사용자가 직접 타이핑하지 않게 해서 표기 차이로 인한 중복을 막는다.
@@ -632,16 +1153,38 @@ function DocUpdatePanel({ project, update }: { project: Project; update: (p: Pro
     getProgramById(linkedProgramId).then((p) => setLinkedProgramName(p?.programName ?? null)).catch(() => setLinkedProgramName(null));
   }, [linkedProgramId]);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
-  const [ai, setAi] = useState<{ status: 'idle' | 'working' | 'done' | 'error'; extraction?: Extraction; cached?: boolean; message?: string }>({ status: 'idle' });
+  const [ai, setAi] = useState<{ status: 'idle' | 'working' | 'done' | 'error'; extraction?: Extraction; cached?: boolean; message?: string; progress?: { done: number; total: number } }>({ status: 'idle' });
   const [acceptedRules, setAcceptedRules] = useState<Set<number>>(new Set());
+  // 인정 항목은 규칙과 별개로 승인한다 — 원문 확인된 것만 기본 선택.
+  const [acceptedItems, setAcceptedItems] = useState<Set<number>>(new Set());
   const [useDocCats, setUseDocCats] = useState(false);
   const [applied, setApplied] = useState(false);
   const [rateSuggestion, setRateSuggestion] = useState<ReturnType<typeof suggestedFundingRates> | null>(null);
   const [rateForm, setRateForm] = useState<{ subsidyRate: string; matchingCashRate: string } | null>(null);
   const [rateApplied, setRateApplied] = useState(false);
-  const [share, setShare] = useState(false);
   const [shareYear, setShareYear] = useState('');
   const [applying, setApplying] = useState(false);
+  const [openPack, setOpenPack] = useState<SavedRulePack | null>(null);
+  // 규정DB가 이미 있는 사업이면 추출 결과를 그대로 적용하지 않고 "무엇이 달라졌는지"만 보여준다.
+  const [acceptedDiffs, setAcceptedDiffs] = useState<Set<number>>(new Set());
+  const [showUnchanged, setShowUnchanged] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  const basePack = packFor(project);
+  const onRegulationDb = isRegulationDbPack(basePack);
+  // 변경사항 비교. 규정DB 팩이 아닐 때는 비교 기준이 없으므로 예전처럼 규칙을 직접 승인한다.
+  const diffs = useMemo(
+    () => (ai.status === 'done' && ai.extraction && onRegulationDb ? diffExtraction(basePack, ai.extraction) : []),
+    [ai.status, ai.extraction, onRegulationDb, basePack],
+  );
+  const diffCounts = useMemo(() => summarizeDiff(diffs), [diffs]);
+  // 승인 대상 — 값이 맞부딪히는 변경과 이 공고 고유로 새로 나온 것. 비목 신설은 규정DB 갱신
+  // 사안이라 여기서 승인할 수 없고, missing 은 추출 누락일 수 있어 자동 반영하지 않는다.
+  const actionableDiffs = useMemo(
+    () => diffs.map((diff, index) => ({ diff, index }))
+      .filter(({ diff }) => !!diff.extracted && (diff.status === 'changed' || diff.status === 'added') && diff.target !== 'category'),
+    [diffs],
+  );
 
   const toggleChecked = (id: string) => setCheckedIds((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
 
@@ -658,10 +1201,14 @@ function DocUpdatePanel({ project, update }: { project: Project; update: (p: Pro
         return text;
       }));
       const combined = texts.join('\n');
-      const { extraction, cached } = await runExtraction(combined, project.packId);
+      // 긴 지침은 조각으로 나눠 순차 호출된다 — 진행 상황을 보여준다.
+      const { extraction, cached } = await runExtraction(combined, project.packId,
+        (done, total) => setAi((prev) => prev.status === 'working' ? { ...prev, progress: { done, total } } : prev));
       const verified = annotateVerification(extraction, combined);
       setAi({ status: 'done', extraction: verified, cached });
+      // DB에 연결 안 된(미등록) 사업이면 공유 신청을 기본으로 켠다 — 승인되면 DB에 등록돼 재사용된다.
       setAcceptedRules(new Set(verified.rules.map((rule, index) => rule.verified ? index : -1).filter((index) => index >= 0)));
+      setAcceptedItems(new Set((verified.allowedItems ?? []).map((item, index) => item.verified ? index : -1).filter((index) => index >= 0)));
       setUseDocCats(false);
       const suggestion = suggestedFundingRates(verified);
       if (suggestion.subsidyRate || suggestion.matchingCashRate) {
@@ -677,24 +1224,77 @@ function DocUpdatePanel({ project, update }: { project: Project; update: (p: Pro
     }
   };
 
+  // 추출 결과를 규정DB 패키지(manifest + 6개 JSON)로 만든다 — 사람이 만든 패키지와 같은 구성이라
+  // 그대로 검토·변환·적재 스크립트를 태울 수 있고, 승인되면 예산편성 화면의 비목이 된다.
+  const regulationPackage = useMemo(() => {
+    if (ai.status !== 'done' || !ai.extraction) return null;
+    return buildRegulationPackage(ai.extraction, {
+      programName: linkedProgramName ?? ai.extraction.programName ?? project.programName,
+      year: Number(shareYear) || ai.extraction.year,
+      sourceFiles: docs.filter((link) => checkedIds.has(link.id)).map((link) => link.fileName),
+    });
+  }, [ai.status, ai.extraction, linkedProgramName, project.programName, shareYear, docs, checkedIds]);
+
+  // 규정DB 등록 신청 — 공유 데이터에 직접 쓰지 않고 대기열에 넣는다. 관리자가 근거를 검토해
+  // 승인해야 origin='regulation_db'가 되어 비목으로 쓰인다.
+  const submitPackage = async () => {
+    if (!regulationPackage || ai.status !== 'done' || !ai.extraction) return;
+    setApplying(true);
+    try {
+      const items = (ai.extraction.allowedItems ?? []).filter((_, index) => acceptedItems.has(index));
+      const accepted = ai.extraction.rules.filter((_, index) => acceptedRules.has(index));
+      await submitRegulationPackage({
+        programName: linkedProgramName || ai.extraction.programName || project.programName || basePack.name,
+        year: Number(shareYear) || ai.extraction.year,
+        pack: buildCustomPack(null, ai.extraction, accepted.length ? accepted : ai.extraction.rules, true, items),
+        regulationPackage,
+        ...(onRegulationDb ? { diff: diffs, basePackId: basePack.id } : {}),
+        programRegistryId: linkedProgramId,
+      });
+      setSubmitted(true); setTimeout(() => setSubmitted(false), 3000);
+    } catch (error) {
+      alert(`규정DB 등록 신청에 실패했습니다 (${error instanceof Error ? error.message : ''}).`);
+    } finally { setApplying(false); }
+  };
+
+  // 규정DB가 있는 사업 — 승인한 변경사항만 오버레이로 얹는다. 비목은 규정DB 것을 그대로 쓴다.
+  const applyOverlayChanges = () => {
+    if (ai.status !== 'done' || !ai.extraction) return;
+    const approved = actionableDiffs.filter(({ index }) => acceptedDiffs.has(index)).map(({ diff }) => diff);
+    const { rules, supersededRuleIds } = overlayRulesFrom(basePack, approved);
+    update({
+      ...project,
+      packOverlay: {
+        basePackId: basePack.id,
+        appliedAt: new Date().toISOString(),
+        sourceDocTitles: docs.filter((link) => checkedIds.has(link.id)).map((link) => link.title),
+        rules,
+        ...(supersededRuleIds.length ? { supersededRuleIds } : {}),
+      },
+    });
+    setApplied(true); setTimeout(() => setApplied(false), 2500);
+  };
+
+  const clearOverlay = () => {
+    if (!confirm('최신 공고에서 반영한 변경사항을 걷어내고 규정DB 기준으로 되돌릴까요?')) return;
+    const next = { ...project }; delete next.packOverlay; update(next);
+  };
+
   const apply = async () => {
     if (ai.status !== 'done' || !ai.extraction) return;
     const base = useDocCats ? null : packFor(project);
     const accepted = ai.extraction.rules.filter((_, index) => acceptedRules.has(index));
-    const pack = buildCustomPack(base, ai.extraction, accepted, useDocCats);
-    update({ ...project, customPack: pack, packId: pack.id });
-    if (share && registryEnabled()) {
-      setApplying(true);
-      try {
-        const name = linkedProgramName || ai.extraction.programName || project.programName || packFor(project).name;
-        const year = Number(shareYear) || null;
-        // 원본 파일은 이미 "근거 원본 문서"가 관리하므로 여기선 추출된 규정 팩만 신청한다.
-        // 과제가 이미 사업명에 연결돼 있으면 그 id를 같이 보내 관리자가 정확히 매칭하게 한다.
-        await submitRegistryShare({ programName: name, year, pack, origin: 'extracted', programRegistryId: linkedProgramId });
-      } catch (error) {
-        alert(`공유 신청에 실패했습니다 (${error instanceof Error ? error.message : ''}). 이 과제에는 정상 반영됐습니다.`);
-      } finally { setApplying(false); }
-    }
+    const items = (ai.extraction.allowedItems ?? []).filter((_, index) => acceptedItems.has(index));
+    const pack = buildCustomPack(base, ai.extraction, accepted, useDocCats, items);
+    // 적용한 팩은 보관함(extractedPacks)에도 쌓아 언제든 다시 열람·재적용할 수 있게 한다.
+    const saved: SavedRulePack = {
+      id: crypto.randomUUID(), savedAt: new Date().toISOString(),
+      sourceDocTitles: docs.filter((link) => checkedIds.has(link.id)).map((link) => link.title),
+      pack,
+    };
+    // 규정DB가 없는 사업이라 추출 팩이 비목의 출처가 된다 — 화면에는 "미검증"으로 표시된다.
+    // 공유는 여기서 하지 않는다. 규정DB 등록은 위의 "규정DB 등록 신청"이 패키지째로 처리한다.
+    update({ ...project, customPack: pack, packId: pack.id, extractedPacks: [saved, ...(project.extractedPacks ?? [])].slice(0, 20) });
     setApplied(true); setTimeout(() => setApplied(false), 2500);
   };
 
@@ -709,7 +1309,7 @@ function DocUpdatePanel({ project, update }: { project: Project; update: (p: Pro
   };
 
   return <section className="panel docupdate-panel">
-    <div className="panel-head"><div><h3><FileSearch /> AI 규정 추출</h3><p>"근거 원본 문서"에 등록된 문서 중 골라서 비목·상한·금지 규정을 추출·반영해요.</p></div></div>
+    <div className="panel-head"><div><h3><FileSearch /> AI 규정 추출 — DB에 없는 사업의 DB화 도구</h3><p>공유 DB에 규정이 없는 사업일 때 "근거 원본 문서"의 문서에서 규정을 추출해요. 이 과제에 바로 적용되고, 공유 신청하면 관리자 승인 후 DB에 등록돼 다음부터는 사업명 검색으로 바로 쓸 수 있어요.</p></div></div>
     <div className="docupdate-body">
       {docs.length === 0 ? <p className="doc-empty">아직 근거 원본 문서가 없어요. 아래 "근거 원본 문서"에서 먼저 업로드하거나 불러와주세요.</p> : <div className="source-doc-list">
         {docs.map((link) => <label key={link.id} className="share-toggle">
@@ -719,7 +1319,9 @@ function DocUpdatePanel({ project, update }: { project: Project; update: (p: Pro
       </div>}
       {docs.length > 0 && <>
         {ai.status === 'idle' && <button type="button" className="secondary" disabled={checkedIds.size === 0} onClick={runAi}><Sparkles /> 선택한 문서에서 규정 추출하기 ({checkedIds.size})</button>}
-        {ai.status === 'working' && <p className="wiz-hint">문서를 분석하는 중… (문서 크기에 따라 최대 1~2분 걸릴 수 있어요)</p>}
+        {ai.status === 'working' && <p className="wiz-hint">{ai.progress && ai.progress.total > 1
+          ? `문서가 길어 ${ai.progress.total}조각으로 나눠 분석하는 중… (${ai.progress.done}/${ai.progress.total} 완료) 조각당 1분 내외 걸립니다.`
+          : '문서를 분석하는 중… (문서 크기에 따라 최대 1~2분 걸릴 수 있어요)'}</p>}
         {ai.status === 'error' && <><p className="field-error"><AlertCircle /> {ai.message}</p><button type="button" className="secondary" onClick={runAi}>다시 시도</button></>}
         {ai.status === 'done' && ai.extraction && <div className="ai-review">
           {ai.cached && <p className="wiz-hint">이 문서는 이전에 분석된 적이 있어 캐시된 결과를 불러왔어요.</p>}
@@ -750,19 +1352,105 @@ function DocUpdatePanel({ project, update }: { project: Project; update: (p: Pro
               {totalWon != null && currentSubsidy > totalWon && <p className="field-error"><AlertCircle /> 현재 입력된 지원금({formatWon(currentSubsidy)})이 공고 한도({formatWon(totalWon)})를 초과했어요.</p>}
             </div>;
           })()}
+          {onRegulationDb && <div className="diff-block">
+            <h4><ShieldCheck /> 규정DB와 비교한 변경사항</h4>
+            <p className="wiz-hint">이 과제는 근거가 검증된 규정DB(<b>{basePack.name}</b>)를 쓰고 있어요. 그래서 추출 결과를 그대로 덮어쓰지 않고, <b>규정DB와 무엇이 달라졌는지</b>만 비교해 보여줍니다. 예산 화면의 비목은 규정DB 것이 그대로 유지됩니다.</p>
+            <div className="diff-counts">
+              <span className="diff-chip changed">달라짐 <b>{diffCounts.changed}</b></span>
+              <span className="diff-chip added">새로 나옴 <b>{diffCounts.added}</b></span>
+              <span className="diff-chip missing">확인 필요 <b>{diffCounts.missing}</b></span>
+              <span className="diff-chip unchanged">동일 <b>{diffCounts.unchanged}</b></span>
+            </div>
+            {diffCounts.changed === 0 && diffCounts.added === 0
+              ? <p className="wiz-hint">규정DB와 달라진 기준을 찾지 못했어요 — 최신 공고가 기존 규정과 같습니다.</p>
+              : <div className="diff-list">{diffs.map((diff, index) => {
+                if (diff.status === 'unchanged' && !showUnchanged) return null;
+                const selectable = !!diff.extracted && (diff.status === 'changed' || diff.status === 'added') && diff.target !== 'category';
+                const body = <>
+                  <strong><span className={`diff-tag ${diff.status}`}>{DIFF_STATUS_LABEL[diff.status]}</span> <span className="diff-target">{DIFF_TARGET_LABEL[diff.target]}</span> {diff.label}</strong>
+                  {(diff.before || diff.after) && <em className="diff-values">
+                    {diff.before && <span className="diff-before">{diff.before}</span>}
+                    {diff.before && diff.after && <ArrowRight />}
+                    {diff.after && <span className="diff-after">{diff.after}</span>}
+                  </em>}
+                  {diff.note && <em>{diff.note}</em>}
+                  {diff.extracted?.quote && <em>"{diff.extracted.quote.slice(0, 90)}{diff.extracted.quote.length > 90 ? '…' : ''}" ({diff.extracted.ref}){diff.extracted.verified ? ' · 원문 확인됨' : ' · ⚠ 원문에서 찾지 못한 인용'}</em>}
+                </>;
+                return selectable
+                  ? <label key={index} className={`ai-rule ${diff.extracted?.verified ? '' : 'unverified'}`}>
+                    <input type="checkbox" checked={acceptedDiffs.has(index)} onChange={(e) => setAcceptedDiffs((prev) => { const next = new Set(prev); if (e.target.checked) next.add(index); else next.delete(index); return next; })} />
+                    <span>{body}</span>
+                  </label>
+                  : <div key={index} className="ai-rule static"><span>{body}</span></div>;
+              })}</div>}
+            {diffCounts.unchanged > 0 && <button type="button" className="link-btn" onClick={() => setShowUnchanged((v) => !v)}>{showUnchanged ? '동일한 항목 접기' : `동일한 항목 ${diffCounts.unchanged}건 보기`}</button>}
+            <div className="settings-save">
+              <button type="button" className="primary" disabled={acceptedDiffs.size === 0} onClick={applyOverlayChanges}><Check /> 선택한 변경사항 반영 ({acceptedDiffs.size}건)</button>
+              {project.packOverlay && <button type="button" className="secondary" onClick={clearOverlay}><RefreshCw /> 규정DB 기준으로 되돌리기</button>}
+              {applied && <span className="save-ok"><CheckCircle2 /> 반영됐어요</span>}
+            </div>
+          </div>}
+          {!onRegulationDb && <>
           {ai.extraction.categories.length > 0 && <label className="share-toggle"><input type="checkbox" checked={useDocCats} onChange={(e) => setUseDocCats(e.target.checked)} /><span><strong>문서의 비목 구성 사용</strong> ({ai.extraction.categories.length}개: {ai.extraction.categories.map((c) => c.name).join(', ').slice(0, 60)})</span></label>}
           <div className="ai-rules">{ai.extraction.rules.map((rule, index) => <label key={index} className={`ai-rule ${rule.verified ? '' : 'unverified'}`}>
             <input type="checkbox" checked={acceptedRules.has(index)} onChange={(e) => setAcceptedRules((prev) => { const next = new Set(prev); if (e.target.checked) next.add(index); else next.delete(index); return next; })} />
             <span><strong>[{rule.minAmount != null ? '필수계상' : RULE_KIND_LABEL[rule.kind]}] {rule.message}{rule.minAmount != null && ` (${formatWon(rule.minAmount)})`}</strong><em>"{rule.quote.slice(0, 90)}{rule.quote.length > 90 ? '…' : ''}" ({rule.ref}) {rule.verified ? '· 원문 확인됨' : '· ⚠ 원문에서 찾지 못한 인용 — 직접 확인 후 선택하세요'}</em></span>
           </label>)}</div>
-          {ai.extraction.uncertain.length > 0 && <p className="wiz-hint">AI가 판단을 보류한 항목: {ai.extraction.uncertain.join(' / ')}</p>}
-          {registryEnabled() && <div className="wiz-block share-block">
-            <label className="share-toggle"><input type="checkbox" checked={share} onChange={(e) => setShare(e.target.checked)} /><span><CloudUpload /> <strong>추출한 규정 팩 공유 신청</strong> — 관리자 검토 후 다른 사용자도 이 사업명 검색으로 쓸 수 있게 합니다</span></label>
-            {share && (linkedProgramId
-              ? <p className="wiz-hint">"{linkedProgramName ?? '연결된 사업'}" 사업으로 신청됩니다 — 사업명은 관리자가 근거 문서 승인 때 이미 정리해뒀어요, 직접 입력할 필요 없습니다.</p>
-              : <label>연도<input inputMode="numeric" value={shareYear} onChange={(e) => setShareYear(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="2026" /></label>)}
+          {/* 인정 항목 — 기준 패널의 "인정 항목"이 된다. 규칙과 따로 승인한다. */}
+          {(ai.extraction.allowedItems?.length ?? 0) > 0 && <div className="extract-block">
+            <h4><Package /> 인정 항목 <b>{ai.extraction.allowedItems!.length}</b> <em>비목별로 무엇을 쓸 수 있는지</em></h4>
+            <div className="ai-rules">{ai.extraction.allowedItems!.map((item, index) => <label key={index} className={`ai-rule ${item.verified ? '' : 'unverified'}`}>
+              <input type="checkbox" checked={acceptedItems.has(index)} onChange={(e) => setAcceptedItems((prev) => { const next = new Set(prev); if (e.target.checked) next.add(index); else next.delete(index); return next; })} />
+              <span><strong>[{item.categoryName}] {item.name}{item.status === 'CONDITIONAL' ? ' (조건부)' : item.status === 'NOT_ALLOWED' ? ' (계상 불가)' : ''}</strong>
+                <em>{item.description ?? ''}{item.condition ? ` · 조건: ${item.condition}` : ''}{item.restriction ? ` · 제한: ${item.restriction}` : ''}</em>
+                <em>"{item.quote.slice(0, 80)}{item.quote.length > 80 ? '…' : ''}" ({item.ref}) {item.verified ? '· 원문 확인됨' : '· ⚠ 원문에서 찾지 못한 인용 — 직접 확인 후 선택하세요'}</em></span>
+            </label>)}</div>
           </div>}
-          <div className="settings-save"><button type="button" className="primary" onClick={apply} disabled={(acceptedRules.size === 0 && !useDocCats) || applying}><Check /> {applying ? '반영 중…' : `선택한 규정 적용 (${acceptedRules.size}건${useDocCats ? ' + 비목 구성' : ''})`}</button>{applied && <span className="save-ok"><CheckCircle2 /> 반영됐어요{share ? ' · 공유 신청도 접수됐어요' : ''}</span>}</div>
+          </>}
+          {/* 조문 원문 — 근거 링크를 눌렀을 때 원본 파일 없이 바로 열리게 한다. 개별 승인 대상이 아니다. */}
+          {(ai.extraction.articles?.length ?? 0) > 0 && <p className="wiz-hint">
+            <BookOpenCheck /> 근거 조문 원문 <b>{ai.extraction.articles!.length}건</b>을 함께 저장합니다 — 적용 후 근거 링크를 누르면 원본 파일 없이도 조문이 그대로 열립니다.
+            {ai.extraction.articles!.some((a) => !a.verified) && ' (일부 조문은 원문 대조에 실패했어요 — 문서에서 직접 확인하세요)'}
+          </p>}
+          {ai.extraction.uncertain.length > 0 && <p className="wiz-hint">AI가 판단을 보류한 항목: {ai.extraction.uncertain.join(' / ')}</p>}
+          {/* 규정DB 등록 — 추출 결과를 사람이 만든 패키지와 같은 구성으로 묶어 신청한다. */}
+          {regulationPackage && <div className="wiz-block share-block">
+            <h4><Package /> 규정DB로 등록</h4>
+            <p className="wiz-hint">
+              추출 결과를 <b>규정DB 패키지</b>(manifest + 6개 JSON)로 만들었어요 — 기존 규정DB와 똑같은 구성입니다.
+              {onRegulationDb
+                ? ' 이 사업은 이미 규정DB가 있으니, 위 변경사항까지 함께 실어 개정본으로 신청합니다.'
+                : ' 관리자가 근거를 검토해 승인하면 이 사업의 비목·상한이 규정DB가 되어, 다음부터는 사업명 검색만으로 바로 쓸 수 있어요.'}
+            </p>
+            <div className="pkg-counts">
+              <span>비목 <b>{regulationPackage.expense_categories.length}</b></span>
+              <span>인정항목 <b>{regulationPackage.expense_allowed_items.length}</b></span>
+              <span>상한 <b>{regulationPackage.expense_limit_rules.length}</b></span>
+              <span>규칙 <b>{regulationPackage.regulation_rules.length}</b></span>
+              <span>조문 <b>{regulationPackage.source_text.length}</b></span>
+            </div>
+            {(() => {
+              const v = (regulationPackage.manifest as { validation: { unverified_rules: number; unverified_items: number; unverified_articles: number } }).validation;
+              const unverified = v.unverified_rules + v.unverified_items + v.unverified_articles;
+              return unverified > 0
+                ? <p className="field-error"><AlertCircle /> 원문 대조에 실패한 항목이 {unverified}건 있어요 — 승인 전에 검토자가 원문을 직접 확인해야 합니다.</p>
+                : <p className="wiz-hint">추출된 항목의 인용이 모두 원문에서 확인됐어요.</p>;
+            })()}
+            {!linkedProgramId && <label>연도<input inputMode="numeric" value={shareYear} onChange={(e) => setShareYear(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="2026" /></label>}
+            {linkedProgramId && <p className="wiz-hint">"{linkedProgramName ?? '연결된 사업'}" 사업으로 신청됩니다 — 사업명은 관리자가 근거 문서 승인 때 이미 정리해뒀어요.</p>}
+            <div className="settings-save">
+              {registryEnabled() && <button type="button" className="secondary" onClick={submitPackage} disabled={applying}><CloudUpload /> {applying ? '신청 중…' : '규정DB 등록 신청'}</button>}
+              <button type="button" className="secondary" onClick={() => withExporters((m) => m.exportRegulationPackage(regulationPackage))}><Download /> 패키지 ZIP</button>
+              {submitted && <span className="save-ok"><CheckCircle2 /> 신청됐어요 — 관리자 검토 후 반영됩니다</span>}
+            </div>
+          </div>}
+          <div className="settings-save">
+            {!onRegulationDb && <button type="button" className="primary" onClick={apply} disabled={(acceptedRules.size === 0 && acceptedItems.size === 0 && !useDocCats) || applying}><Check /> {applying ? '반영 중…' : `선택한 규정 적용 (규칙 ${acceptedRules.size}건${acceptedItems.size ? ` · 인정항목 ${acceptedItems.size}건` : ''}${useDocCats ? ' + 비목 구성' : ''})`}</button>}
+            {/* 엑셀로 받아 사람이 검토·보강한 뒤 관리자가 공유 DB에 올리는 흐름 */}
+            <button type="button" className="secondary" onClick={() => withExporters((m) => m.exportExtractionReview(ai.extraction!, {
+              documentTitle: ai.extraction!.programName || undefined,
+              sourceFiles: docs.filter((link) => checkedIds.has(link.id)).map((link) => link.fileName),
+            }))}><Download /> 검토본 엑셀</button>{applied && !onRegulationDb && <span className="save-ok"><CheckCircle2 /> 반영됐어요</span>}</div>
           {ai.extraction.referencedRegulations && ai.extraction.referencedRegulations.length > 0 && <div className="ref-regs">
             <h4>이 공고가 참고하라고 명시한 규정</h4>
             <p className="wiz-hint">예산 편성 기준은 대개 공고문·사업계획서에 있지만, 증빙 서류는 아래 규정도 함께 확인해야 할 수 있어요. 정부 사이트에 원문이 흩어져 있어 자동으로 가져오지는 못하니, 직접 찾아 "공유 규정 DB"에 올려두면 다음부터 검색으로 바로 쓸 수 있어요.</p>
@@ -770,8 +1458,75 @@ function DocUpdatePanel({ project, update }: { project: Project; update: (p: Pro
           </div>}
         </div>}
       </>}
+      {(project.extractedPacks?.length ?? 0) > 0 && <div className="saved-packs">
+        <h4><Package /> 완료된 규정팩 <b>{project.extractedPacks!.length}</b></h4>
+        <p className="wiz-hint">추출해서 적용까지 마친 규정팩이 여기 보관됩니다. 클릭하면 비목·규칙을 근거 원문과 함께 언제든 다시 볼 수 있어요.</p>
+        <div className="source-doc-list">{project.extractedPacks!.map((entry) => <div className="source-doc-row" key={entry.id}>
+          <button type="button" onClick={() => setOpenPack(entry)}>
+            <Package /><span><strong>{entry.pack.name}</strong><small>{new Date(entry.savedAt).toLocaleString('ko-KR')} · 비목 {entry.pack.categories.length}개 · 규칙 {entry.pack.rules.length}건{project.packId === entry.pack.id ? ' · 현재 적용 중' : ''}</small></span><Eye />
+          </button>
+        </div>)}</div>
+      </div>}
     </div>
+    {openPack && <SavedPackModal entry={openPack} project={project} update={update} source={source} onClose={() => setOpenPack(null)} />}
   </section>;
+}
+
+const PACK_RULE_KIND_LABEL: Record<string, string> = { ratio: '상한', warning: '금지·주의', info: '참고', evidence: '증빙', minimum: '필수계상' };
+
+// 보관된 규정팩 열람 팝업 — 비목·규칙을 근거 인용과 함께 보여주고, 근거는 기존 원문 미리보기 창으로 연다.
+// 재적용·삭제도 여기서 처리한다. 원문 미리보기(DocViewerModal)는 같은 source를 쓰는 SourceDocsPanel이 띄운다.
+function SavedPackModal({ entry, project, update, source, onClose }: { entry: SavedRulePack; project: Project; update: (p: Project) => void; source: ReturnType<typeof useSourceDocs>; onClose: () => void }) {
+  const { viewer, viewDoc, docForSource } = source;
+  // 원문 미리보기가 위에 떠 있을 때 Escape는 미리보기만 닫혀야 한다 (이 팝업까지 닫히지 않게).
+  const viewerOpen = useRef(false);
+  viewerOpen.current = !!viewer;
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !viewerOpen.current) onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  const current = project.packId === entry.pack.id;
+  const applyPack = () => {
+    if (!confirm(`"${entry.pack.name}" 규정팩을 이 과제에 다시 적용할까요? 현재 적용 중인 규정을 대체합니다.`)) return;
+    update({ ...project, customPack: entry.pack, packId: entry.pack.id });
+  };
+  const removePack = () => {
+    if (!confirm(`"${entry.pack.name}" 보관 기록을 삭제할까요?${current ? ' 현재 적용 중인 규정은 그대로 유지되고 보관 목록에서만 사라집니다.' : ''}`)) return;
+    update({ ...project, extractedPacks: (project.extractedPacks ?? []).filter((p) => p.id !== entry.id) });
+    onClose();
+  };
+  const ruleRef = (rule: PackRule) => {
+    const doc = docForSource(rule.source);
+    if (!doc) return <>({rule.source.ref})</>;
+    const sets = highlightTermSets(rule);
+    return <button type="button" className="ref-link" onClick={() => viewDoc(doc, sets.primary, sets.fallback)}>({rule.source.ref} · 원문 보기)</button>;
+  };
+  return <div className="doc-viewer-overlay" onClick={onClose}>
+    <div className="doc-viewer" role="dialog" aria-label={`규정팩 ${entry.pack.name}`} onClick={(event) => event.stopPropagation()}>
+      <header><div><strong>{entry.pack.name}</strong><span>{new Date(entry.savedAt).toLocaleString('ko-KR')} 적용 · {entry.pack.guideline}</span></div>
+        <div className="viewer-actions">
+          {current
+            ? <span className="save-ok"><CheckCircle2 /> 현재 적용 중</span>
+            : <button type="button" className="secondary" onClick={applyPack}><Check /> 이 규정팩 적용</button>}
+          <button type="button" className="secondary" onClick={removePack}><Trash2 /> 삭제</button>
+          <button type="button" className="close" aria-label="닫기" onClick={onClose}>×</button>
+        </div></header>
+      <div className="viewer-scroll pack-view">
+        <p className="viewer-note">기관: {entry.pack.agency}{entry.sourceDocTitles.length ? ` · 추출에 쓴 문서: ${entry.sourceDocTitles.join(', ')}` : ''} · 근거 표시가 파란 링크면 저장된 원문 미리보기로 바로 열 수 있어요.</p>
+        <h4>비목 구성 <b>{entry.pack.categories.length}개</b></h4>
+        <ul className="ref-reg-list">{entry.pack.categories.map((category) => <li key={category.id}>
+          <strong>{category.name}{category.allowed ? '' : ' · 사용 불가'}</strong>
+          {category.definition && <em>{category.definition}</em>}
+        </li>)}</ul>
+        <h4>규칙 <b>{entry.pack.rules.length}건</b></h4>
+        <div className="ai-rules pack-rules">{entry.pack.rules.map((rule) => <div key={rule.id} className="ai-rule">
+          <span><strong>[{PACK_RULE_KIND_LABEL[rule.kind] ?? rule.kind}] {rule.message}{rule.minAmount != null && ` (${formatWon(rule.minAmount)})`}</strong>
+            <em>{rule.quote && `"${rule.quote.slice(0, 90)}${rule.quote.length > 90 ? '…' : ''}" `}{ruleRef(rule)}</em></span>
+        </div>)}</div>
+      </div>
+    </div>
+  </div>;
 }
 
 function Settings({ project, update, onReset }: { project: Project; update: (p: Project) => void; onReset: () => void }) {
@@ -833,7 +1588,7 @@ function Settings({ project, update, onReset }: { project: Project; update: (p: 
         <div className="settings-save"><button className="primary" type="submit">과제 정보 저장</button>{saved && <span className="save-ok"><CheckCircle2 /> 저장됐어요</span>}</div>
       </form>
     </section>
-    <DocUpdatePanel project={project} update={update} />
+    <DocUpdatePanel project={project} update={update} source={sourceDocs} />
     <SourceDocsPanel source={sourceDocs} />
     <section className="panel backup-panel"><div className="panel-head"><div><h3>백업 · 복원</h3><p>브라우저 데이터 삭제나 기기 변경에 대비해 주기적으로 백업 파일을 보관하세요. 증빙 파일 원본은 포함되지 않습니다.</p></div></div><div className="backup-actions"><button className="secondary" onClick={() => downloadBackup(project)}><Download /> 백업 JSON 내보내기</button><label className="upload-button"><Upload /> 백업으로 복원<input type="file" accept="application/json,.json" onChange={importBackup} /></label></div></section>
     <section className="panel danger-panel"><div className="panel-head"><div><h3>초기화 · 삭제</h3><p>아래 작업은 되돌릴 수 없습니다. 실행 전에 백업을 권장합니다.</p></div></div>
@@ -891,15 +1646,33 @@ function AuthScreen({ onLocal }: { onLocal: () => void }) {
 type SyncState = 'local' | 'saving' | 'synced' | 'error';
 
 export default function App() {
-  const [project, setProject] = useState<Project | null>(() => loadProject());
+  const [projects, setProjects] = useState<Project[]>(() => loadProjects());
+  const [activeId, setActiveId] = useState<string | null>(() => loadActiveProjectId());
+  const [adding, setAdding] = useState(false); // 기존 과제가 있어도 "새 과제 등록" 마법사를 띄운다
   const [screen, setScreen] = useState<Screen>('overview');
   const [session, setSession] = useState<Session | null>(null);
   const [authChecked, setAuthChecked] = useState(!isCloudEnabled);
   const [localMode, setLocalMode] = useState(false);
   const [syncState, setSyncState] = useState<SyncState>('local');
   const saveWarned = useRef(false);
+  const project = projects.find((p) => p.id === activeId) ?? projects[0] ?? null;
+  const projectsRef = useRef(projects);
+  projectsRef.current = projects;
   const projectRef = useRef(project);
   projectRef.current = project;
+
+  useEffect(() => { saveActiveProjectId(project?.id ?? null); }, [project?.id]);
+
+  // 규정DB(검증된 비목·상한·규칙)를 서버에서 받아 등록한다. 예산편성 화면의 비목이 여기서 온다.
+  // 읽기에 로그인이 필요하므로 세션이 바뀔 때마다 다시 시도한다. 실패해도 번들 팩으로 동작한다.
+  // packFor는 모듈 상태를 읽는 동기 함수라 React가 갱신을 감지하지 못한다 — 버전을 올려 다시 그린다.
+  const [packStatus, setPackStatus] = useState<RegulationPackStatus | null>(null);
+  const [, setPackVersion] = useState(0);
+  useEffect(() => {
+    let live = true;
+    initRegulationPacks().then((status) => { if (!live) return; setPackStatus(status); setPackVersion((v) => v + 1); });
+    return () => { live = false; };
+  }, [session?.user.id]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -907,48 +1680,77 @@ export default function App() {
       setCloudUser(next?.user.id ?? null);
       setSession(next);
       if (next) {
-        // 클라우드에 데이터가 있으면 내려받고, 없으면 이 브라우저의 로컬 데이터를 올려 이전한다.
-        const cloudProject = await fetchCloudProject();
-        if (cloudProject) { setProject(cloudProject); setSyncState('synced'); }
-        else if (projectRef.current) setSyncState(await saveCloudProject(projectRef.current) ? 'synced' : 'error');
-        else setSyncState('synced');
+        // 클라우드에 데이터가 있으면 내려받는다. 없을 때는 "로그인 없이 만든(owner='local')" 로컬
+        // 데이터만 이 계정으로 이전한다 — 다른 계정이 이 브라우저에 남긴 사본을 새 계정으로
+        // 복사하면 안 되기 때문 (그 데이터는 원래 계정 클라우드에 이미 있다).
+        const cloudProjects = await fetchCloudProjects();
+        if (cloudProjects.length) {
+          setProjects(cloudProjects);
+          setActiveId((prev) => cloudProjects.some((p) => p.id === prev) ? prev : cloudProjects[0].id);
+          setSyncState('synced');
+        } else if (projectsRef.current.length && (loadProjectOwner() ?? 'local') === 'local') {
+          let ok = true;
+          for (const p of projectsRef.current) ok = (await saveCloudProject(p)) && ok;
+          setSyncState(ok ? 'synced' : 'error');
+        } else {
+          if (projectsRef.current.length) setProjects([]); // 이전 계정의 잔재는 치우고 새 과제 등록부터 시작
+          setSyncState('synced');
+        }
       } else setSyncState('local');
       if (initial) setAuthChecked(true);
     };
     supabase.auth.getSession().then(({ data }) => apply(data.session, true));
     const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
+      // 로그아웃하면 이 브라우저의 과제 사본도 치운다 — 데이터는 그 계정 클라우드에 남아 있고,
+      // 남겨두면 다음에 로그인하는 다른 계정에 이전 계정 과제가 노출·복사될 수 있다.
+      if (event === 'SIGNED_OUT') setProjects([]);
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') apply(next);
     });
     return () => sub.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
-    const saved = saveProject(project);
+    const saved = saveProjectsLocal(projects);
+    saveProjectOwner(projects.length ? (session?.user.id ?? 'local') : null);
     if (!saved && !saveWarned.current) {
       saveWarned.current = true;
-      alert('브라우저 저장 공간이 부족해 변경 내용을 저장하지 못했습니다. 인력 · 담당자 화면에서 백업 JSON을 내보내 데이터를 보관해주세요.');
+      alert('브라우저 저장 공간이 부족해 변경 내용을 저장하지 못했습니다. 과제 설정 화면에서 백업 JSON을 내보내 데이터를 보관해주세요.');
     }
     if (saved) saveWarned.current = false;
     // 클라우드 저장은 입력이 잦아도 부담이 없도록 0.8초 디바운스로 미룬다.
-    if (session) {
+    // 변경은 항상 "현재 열려 있는 과제"에서만 일어나므로 그 과제만 저장한다 (삭제는 reset에서 별도 처리).
+    const current = projectRef.current;
+    if (session && current) {
       setSyncState('saving');
-      const timer = setTimeout(async () => setSyncState(await saveCloudProject(project) ? 'synced' : 'error'), 800);
+      const timer = setTimeout(async () => setSyncState(await saveCloudProject(current) ? 'synced' : 'error'), 800);
       return () => clearTimeout(timer);
     }
-  }, [project, session]);
+  }, [projects, session]);
 
   const logout = async () => { await signOutCloud(); setLocalMode(false); };
   if (!authChecked) return <div className="auth-splash"><div className="brand-mark"><Check /></div> 계정 확인 중…</div>;
   if (isCloudEnabled && !session && !localMode) return <AuthScreen onLocal={() => setLocalMode(true)} />;
-  if (!project) return <SetupWizard onCreate={setProject} />;
-  const update = (next: Project) => setProject(next);
+  const handleCreate = (created: Project) => {
+    setProjects((list) => [...list, created]);
+    setActiveId(created.id);
+    setAdding(false);
+    setScreen('overview');
+  };
+  if (!project || adding) return <SetupWizard onCreate={handleCreate} onCancel={project && adding ? () => setAdding(false) : undefined} />;
+  const update = (next: Project) => {
+    const currentId = project.id;
+    setProjects((list) => list.map((p) => p.id === currentId ? next : p));
+    if (next.id !== currentId) setActiveId(next.id); // 백업 복원처럼 과제 id가 바뀌는 경우
+  };
   const reset = async () => {
-    if (!confirm(session ? '현재 과제를 계정에서 제거할까요? 클라우드와 이 브라우저의 데이터가 삭제됩니다.' : '현재 과제를 브라우저에서 제거할까요? 입력한 데이터가 삭제됩니다.')) return;
+    if (!confirm(`"${project.name}" 과제를 삭제할까요? ${session ? '클라우드와 이 브라우저에서' : '이 브라우저에서'} 이 과제만 삭제되고 다른 과제는 유지됩니다.${session ? '\n(계정을 바꾸려는 거라면 삭제 대신 "로그아웃"을 사용하세요.)' : ''}`)) return;
     const evidenceIds = collectEvidenceIds(project);
     if (evidenceIds.length && confirm(`업로드한 증빙 파일 ${evidenceIds.length}개도 함께 삭제할까요?\n[확인] 파일까지 완전 삭제  [취소] 파일은 남겨두기`)) {
       try { await deleteEvidence(evidenceIds); } catch { alert('증빙 파일 삭제에 실패했습니다. 저장 공간에 파일이 남아 있을 수 있습니다.'); }
     }
-    setProject(null);
+    if (session) await deleteCloudProject(project.id);
+    setProjects((list) => list.filter((p) => p.id !== project.id));
+    setActiveId(null);
   };
-  return <div className="app-shell"><Sidebar screen={screen} setScreen={setScreen} project={project} onReset={reset} account={session?.user.email ?? null} sync={syncState} onLogout={logout} /><main className="main"><Header project={project} />{screen === 'overview' && <Overview project={project} setScreen={setScreen} />}{screen === 'budget' && <Budget project={project} update={update} />}{screen === 'spending' && <Spending project={project} update={update} />}{screen === 'change' && <ChangeManagement project={project} update={update} />}{screen === 'team' && <Team project={project} update={update} />}{screen === 'settings' && <Settings project={project} update={update} onReset={reset} />}</main></div>;
+  return <div className="app-shell"><Sidebar screen={screen} setScreen={setScreen} project={project} projects={projects} onSelect={(id) => { setActiveId(id); setScreen('overview'); }} onAdd={() => setAdding(true)} onReset={reset} account={session?.user.email ?? null} sync={syncState} onLogout={logout} /><main className="main"><Header project={project} />{screen === 'overview' && <Overview project={project} setScreen={setScreen} />}{screen === 'budget' && <Budget project={project} update={update} />}{screen === 'spending' && <Spending project={project} update={update} />}{screen === 'change' && <ChangeManagement project={project} update={update} />}{screen === 'team' && <Team project={project} update={update} setScreen={setScreen} />}{screen === 'settings' && <Settings project={project} update={update} onReset={reset} />}</main></div>;
 }

@@ -1,0 +1,49 @@
+{
+  "package_name": "gwayeon_startup_growth_2026_214",
+  "document_version": "STARTUP_GROWTH_DIDIMDOL_2026_214",
+  "title": "2026년도 창업성장기술개발사업(디딤돌) 제3차 시행계획 공고 — 도약(전략기술 R&D)",
+  "notice_number": "중소벤처기업부 공고 제2026-214호",
+  "issuer": "중소벤처기업부",
+  "document_type": "PROGRAM_ANNOUNCEMENT",
+  "revision_type": "제3차 시행계획",
+  "effective_from": "2026-06-01",
+  "special_effective_dates": [],
+  "base_document_version": "NRD_COST_STANDARD_2026_38",
+  "generated_at": "2026-07-22",
+  "source_files": [
+    "(공고_제2026-214호)_2026년도 창업성장기술개발사업(디딤돌) 제3차 시행계획 공고.hwpx (공고 본문 — 지원규모·기존인력 현금계상)",
+    "[붙임 2-5] 디딤돌(도약_전략기술 R&D) 세부 지원내용.hwp (주요 연구개발비 산정기준 — 비목별 상한의 핵심)",
+    "2026년+제1차+창업성장기술개발사업(디딤돌)+관리지침.hwp (연구활동비 산정기준·연구개발비 관리 및 사용)",
+    "[붙임 1-1] 신청방법 및 신청 또는 지원 제외사항 등 유의사항.hwp (신청 단계 — 집행 규칙 아님)",
+    "[참고] 창업성장기술개발사업(첫걸음) FAQ.pdf (첫걸음 과제 FAQ — 도약 과제와 트랙이 달라 참고용)"
+  ],
+  "source_file_sha256": {
+    "공고": "3e3dfe4342a2b56129f09f9175203cff6f0f3f3cca31f684baa6fdd98ba413d4",
+    "관리지침": "a8168ef2b198d2654a2749593d709ea8cc13c30bc1c3dfbf99d60680603e76e4"
+  },
+  "extraction_scope": "붙임2-5 주요 연구개발비 산정기준 / 관리지침 바. 연구개발비 산정기준·아. 연구개발비의 관리 및 사용 / 공고 지원내용",
+  "notes": "연구개발비 산정·사용의 일반 기준은 「국가연구개발사업 연구개발비 사용 기준」과 중소기업기술개발 지원사업 공통 운영요령·관리지침을 따르고, 이 패키지는 디딤돌(도약) 사업이 별도로 정하거나 명시한 규칙만 담았다. 규정 계층: 공고(2026-214호) > 디딤돌 관리지침 > 공통지침·운영요령 > 국가연구개발비 사용 기준. 비목 체계는 국가연구개발사업 비목을 그대로 쓰므로 코드도 NRD 패키지와 동일하게 맞췄다.",
+  "counts": {
+    "categories": 12,
+    "budget_guides": 8,
+    "allowed_items": 11,
+    "limit_rules": 10,
+    "regulation_rules": 12,
+    "source_text": 6
+  },
+  "pack_meta": {
+    "guideline": "창업성장기술개발사업(디딤돌) 도약 R&D (2026 공고 제2026-214호)",
+    "agency": "중소벤처기업부 · 중소기업기술정보진흥원",
+    "reference_url": "https://www.smtech.go.kr",
+    "output": "didimdol2026.json",
+    "scopes": [
+      {
+        "scope": "FOR_PROFIT",
+        "id": "didimdol2026",
+        "name": "창업성장기술개발사업 디딤돌 도약 (2026)",
+        "org_type": "영리기관(창업기업)"
+      }
+    ],
+    "program_name": "창업성장기술개발사업(디딤돌) 도약"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "document_id": "DOC-EXAMPLE",
+  "title": "OO부 창업지원사업 사업비 집행지침",
+  "document_type": "GUIDELINE",
+  "issuer": "OO부",
+  "notice_number": null,
+  "promulgated_at": "2026-01-10",
+  "effective_from": "2026-01-10",
+  "effective_to": null,
+  "version_code": "OO_STARTUP_2026_01",
+  "publication_status": "ACTIVE",
+  "scope": {
+    "ministries": [
+      "OO부"
+    ],
+    "agencies": [
+      "OO진흥원"
+    ],
+    "programs": [
+      "2026 창업지원사업"
+    ],
+    "institution_types": [
+      "FOR_PROFIT"
+    ]
+  },
+  "supersedes": [],
+  "source_file_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+  "source_filename": "2026_창업지원사업_사업비집행지침.pdf",
+  "source_url": null,
+  "special_effective_dates": [],
+  "confidence": 0.94
+}

@@ -1,0 +1,30 @@
+{
+  "document_code": "NRD_COST_STANDARD",
+  "title": "국가연구개발사업 연구개발비 사용 기준",
+  "document_type": "ADMINISTRATIVE_RULE",
+  "scope": "NATIONAL_RND_COMMON",
+  "issuer": "과학기술정보통신부",
+  "notice_number": "과학기술정보통신부고시 제2026-38호",
+  "revision_type": "일부개정",
+  "promulgated_at": "2026-05-06",
+  "effective_from": "2026-05-06",
+  "effective_to": null,
+  "version_code": "NRD_COST_STANDARD_2026_38",
+  "version_label": "제2026-38호 시행본",
+  "publication_status": "ACTIVE",
+  "source_filename": "국가연구개발사업 연구개발비 사용 기준(고시)(제2026-38호)(20260506) (2).hwpx",
+  "source_file_sha256": "0687bc3e6351915b2a9d5f3c891e1bbbbddbe0bdd7d21022cca8d6908ca74ca5",
+  "source_system": "국가법령정보센터",
+  "special_effective_dates": [
+    {
+      "articles": [
+        "제5조",
+        "제10조의2",
+        "제25조의2"
+      ],
+      "effective_from": "2026-06-11",
+      "reason": "부칙 제1조 단서"
+    }
+  ],
+  "generated_at": "2026-07-21"
+}

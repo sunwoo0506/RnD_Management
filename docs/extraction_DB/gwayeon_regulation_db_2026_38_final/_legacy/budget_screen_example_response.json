@@ -1,0 +1,58 @@
+{
+  "document_version": "NRD_COST_STANDARD_2026_38",
+  "institution_type": "FOR_PROFIT",
+  "total_available_budget": 133334000,
+  "allocated_total": 133334000,
+  "rows": [
+    {
+      "profile_code": "FOR_PROFIT_EXISTING_LABOR",
+      "allocated_amount": 24120000,
+      "cap_amount": null,
+      "ratio": 18.1,
+      "status": "NORMAL"
+    },
+    {
+      "profile_code": "FOR_PROFIT_NEW_HIRE_LABOR",
+      "allocated_amount": 35860400,
+      "cap_amount": null,
+      "ratio": 26.9,
+      "status": "NORMAL"
+    },
+    {
+      "profile_code": "SUBCONTRACT",
+      "allocated_amount": 13400000,
+      "cap_amount": 33293600,
+      "ratio": 10.0,
+      "status": "NORMAL"
+    },
+    {
+      "profile_code": "RESEARCH_INCENTIVE",
+      "allocated_amount": 11996080,
+      "cap_amount": 11996080,
+      "ratio": 9.0,
+      "status": "NORMAL"
+    },
+    {
+      "profile_code": "EXTERNAL_TECH",
+      "allocated_amount": 27257520,
+      "cap_amount": 33293600,
+      "ratio": 20.4,
+      "status": "NORMAL"
+    },
+    {
+      "profile_code": "FOR_PROFIT_LAB_OPERATION",
+      "allocated_amount": 14000000,
+      "cap_amount": null,
+      "ratio": 10.5,
+      "status": "PLAN_CHECK_REQUIRED"
+    },
+    {
+      "profile_code": "FOR_PROFIT_INDIRECT",
+      "allocated_amount": 6700000,
+      "cap_amount": 8323400,
+      "ratio": 5.0,
+      "status": "NORMAL"
+    }
+  ],
+  "note": "화면 연동 예시입니다. cap_amount는 실제 과제 입력값으로 서버에서 재계산합니다."
+}

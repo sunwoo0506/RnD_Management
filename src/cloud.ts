@@ -21,20 +21,50 @@ export const authErrorKo = (message: string): string => {
   return message;
 };
 
-// 과제 데이터는 사용자당 1건, JSONB 통째로 저장한다 (last-write-wins).
-export const fetchCloudProject = async (): Promise<Project | null> => {
-  if (!cloudActive()) return null;
+// 과제 데이터는 과제당 1행(user_projects), JSONB 통째로 저장한다 (last-write-wins).
+// user_projects 테이블이 아직 없으면(supabase/user_projects.sql 실행 전) 구버전
+// projects(사용자당 1건) 방식으로 폴백한다 — 이때는 마지막으로 저장한 과제만 클라우드에 남는다.
+const fetchLegacyProject = async (): Promise<Project | null> => {
   const { data, error } = await supabase!.from('projects').select('data').eq('user_id', userId!).maybeSingle();
   if (error || !data) return null;
   return parseProject(JSON.stringify(data.data));
 };
 
-export const saveCloudProject = async (project: Project | null): Promise<boolean> => {
+export const fetchCloudProjects = async (): Promise<Project[]> => {
+  if (!cloudActive()) return [];
+  const { data, error } = await supabase!.from('user_projects').select('data').eq('user_id', userId!).order('updated_at', { ascending: false });
+  if (error) {
+    // 마이그레이션 전 — 구버전 단일 행으로 폴백
+    const legacy = await fetchLegacyProject();
+    return legacy ? [legacy] : [];
+  }
+  const projects = (data ?? []).map((row) => parseProject(JSON.stringify(row.data))).filter((p): p is Project => !!p);
+  if (projects.length) return projects;
+  // 새 테이블이 비어 있으면 구버전 행을 이전한다 (SQL 마이그레이션을 건너뛴 경우 대비).
+  const legacy = await fetchLegacyProject();
+  if (!legacy) return [];
+  await supabase!.from('user_projects').upsert({ id: legacy.id, user_id: userId!, data: legacy, updated_at: new Date().toISOString() });
+  await supabase!.from('projects').delete().eq('user_id', userId!);
+  return [legacy];
+};
+
+export const saveCloudProject = async (project: Project): Promise<boolean> => {
   if (!cloudActive()) return false;
-  const { error } = project
-    ? await supabase!.from('projects').upsert({ user_id: userId!, data: project, updated_at: new Date().toISOString() })
-    : await supabase!.from('projects').delete().eq('user_id', userId!);
-  return !error;
+  const { error } = await supabase!.from('user_projects').upsert({ id: project.id, user_id: userId!, data: project, updated_at: new Date().toISOString() });
+  if (!error) return true;
+  // 마이그레이션 전 폴백 — 단일 행 방식으로라도 현재 과제는 지킨다.
+  const { error: legacyError } = await supabase!.from('projects').upsert({ user_id: userId!, data: project, updated_at: new Date().toISOString() });
+  return !legacyError;
+};
+
+export const deleteCloudProject = async (projectId: string): Promise<boolean> => {
+  if (!cloudActive()) return false;
+  const { error } = await supabase!.from('user_projects').delete().eq('user_id', userId!).eq('id', projectId);
+  if (error) {
+    const { error: legacyError } = await supabase!.from('projects').delete().eq('user_id', userId!);
+    return !legacyError;
+  }
+  return true;
 };
 
 // 증빙 파일: 로그인 상태면 Storage(사용자별 폴더), 아니면 브라우저 IndexedDB.

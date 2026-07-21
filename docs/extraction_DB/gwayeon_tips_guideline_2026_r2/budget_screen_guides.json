@@ -1,0 +1,106 @@
+[
+ {
+  "profile_code": "TIPS_LABOR",
+  "category_code": "DIRECT_LABOR",
+  "display_name": "인건비",
+  "usage_summary": "참여연구자에게 지급하는 급여(4대보험 본인부담금 포함)와 4대보험 기관부담금·퇴직급여충당금.",
+  "limit_text": "별도 총액 상한 없음",
+  "limit_detail_text": "참여연구자는 각 사업별 인건비 계상률 100%를 초과할 수 없고, 신규 채용 인력(채용일부터 접수마감일까지 6개월 이내 포함, 연구개발 종료일 이내 채용)은 1인당 계상률 100%까지 계상 가능 — 참여율 기준이며 비목 금액 상한은 아니다. 지식서비스 분야 등 사용기준 제65조제4항제6호 해당 시 현금 계상 가능.",
+  "source_articles": [
+   "지침 11.다.1) 인건비"
+  ],
+  "effective_from": "2026-03-03",
+  "display_order": 10
+ },
+ {
+  "profile_code": "TIPS_EQUIPMENT",
+  "category_code": "DIRECT_EQUIPMENT",
+  "display_name": "연구시설·장비비",
+  "usage_summary": "연구시설·장비의 설치·구입·임차 경비와 부대경비, 지정 보육공간 임차료.",
+  "limit_text": "별도 총액 상한 없음",
+  "limit_detail_text": "부가세 포함 3천만원 이상 구입 시 구축·운영계획 승인 필요, 1억원 이상은 연구장비도입 심의요청서 제출. 보유 장비 사용료는 부가세 제외 구입가의 20% 이내 현물 계상(내용연수 5년 이내). 기 보유 장비·외부 장비 우선 활용이 원칙.",
+  "source_articles": [
+   "지침 11.다.1) 연구시설·장비비"
+  ],
+  "effective_from": "2026-03-03",
+  "display_order": 20
+ },
+ {
+  "profile_code": "TIPS_MATERIAL",
+  "category_code": "DIRECT_MATERIAL",
+  "display_name": "연구재료비",
+  "usage_summary": "시약·재료 구입비와 시험제품·설비 외주가공비.",
+  "limit_text": "별도 총액 상한 없음",
+  "limit_detail_text": "기 보유·생산판매 중인 재료 또는 과제 시작 후 자체재원으로 구입한 재료는 현물로 계상(구매 원가 또는 생산·판매가 기준). 직접 제작하는 경우의 소요비용은 재료비·인건비 등 해당 비목에 계상.",
+  "source_articles": [
+   "지침 11.다.1) 연구재료비"
+  ],
+  "effective_from": "2026-03-03",
+  "display_order": 30
+ },
+ {
+  "profile_code": "TIPS_ACTIVITY",
+  "category_code": "DIRECT_ACTIVITY",
+  "display_name": "연구활동비",
+  "usage_summary": "출장비, 외부 전문기술 활용비, 지식재산 창출 활동비, 연구실 운영비, 회의비, 소프트웨어 활용비, 연구인력 지원비, 해외 연구자 유치 지원비, 그 밖의 비용.",
+  "limit_text": "세부 항목별 한도 적용",
+  "limit_detail_text": "외부 전문기술 활용비는 직접비(현물 포함)의 40% 이내. 회의 다과·식비는 1인 1식 5만원 이내, 야근(특근) 식대는 1인 1일 1만원 이내. 영리기관은 연구실 소모성 비용 계상 불가.",
+  "source_articles": [
+   "지침 11.다.1) 연구활동비"
+  ],
+  "effective_from": "2026-03-03",
+  "display_order": 40
+ },
+ {
+  "profile_code": "TIPS_INCENTIVE",
+  "category_code": "DIRECT_INCENTIVE",
+  "display_name": "연구수당",
+  "usage_summary": "해당 연구개발기관 수정인건비 합을 기준으로 계상하는 수당.",
+  "limit_text": "수정인건비 합의 20% 이내",
+  "limit_detail_text": "수정인건비 합 = 현금·현물 인건비 + 학생인건비 + 미지급 인건비 (연구근접지원인력 인건비는 제외). 2차 최종평가에서 우수·보통·미흡 판정을 받은 과제의 집행금액만 인정. 연구수당 지급으로 발생하는 4대보험 기관부담금·퇴직급여충당금은 인건비로 계상 불가.",
+  "source_articles": [
+   "지침 11.다.1) 연구수당"
+  ],
+  "effective_from": "2026-03-03",
+  "display_order": 50
+ },
+ {
+  "profile_code": "TIPS_SUBCONTRACT",
+  "category_code": "DIRECT_SUBCONTRACT",
+  "display_name": "위탁연구개발비",
+  "usage_summary": "연구개발과제의 일부를 위탁할 때 위탁연구개발기관에 지급하는 비용.",
+  "limit_text": "직접비(현물 포함, 위탁 제외)의 40% 이내",
+  "limit_detail_text": "위탁연구개발비 자체도 이 지침의 직접비·간접비 산정기준을 따라야 한다.",
+  "source_articles": [
+   "지침 11.다.1) 위탁연구개발비"
+  ],
+  "effective_from": "2026-03-03",
+  "display_order": 60
+ },
+ {
+  "profile_code": "TIPS_INDIRECT",
+  "category_code": "INDIRECT",
+  "display_name": "간접비",
+  "usage_summary": "인력지원비·연구지원비·성과활용지원비 용도로 사용.",
+  "limit_text": "직접비(현물·위탁 제외)의 10% 이내 (영리기관)",
+  "limit_detail_text": "간접비고시비율을 산출하지 않은 대학은 5%, 대학이 아닌 비영리기관은 17%. 연구개발능률성과급은 영리기관의 경우 해당 과제 간접비 계상액의 10% 이내. 기술창업 출연·출자금은 해당 연도 간접비 총액의 10% 범위에서 설립 후 5년(최장 10년)까지.",
+  "source_articles": [
+   "지침 11.다.2)"
+  ],
+  "effective_from": "2026-03-03",
+  "display_order": 70
+ },
+ {
+  "profile_code": "TIPS_FUNDING",
+  "category_code": "ALL",
+  "display_name": "연구개발비 구성",
+  "usage_summary": "운영사 투자금, 정부지원연구개발비, 기관부담연구개발비(현금·현물)로 구성.",
+  "limit_text": "정부지원연구개발비는 연구개발비의 75% 이내",
+  "limit_detail_text": "기관부담연구개발비는 연구개발비의 25% 이상이며 그중 현금은 기관부담연구개발비의 10% 이상. 운영사 투자금 합계는 정부지원연구개발비의 25% 이상(의무투자금 기준 2억원, 글로벌트랙은 3억원).",
+  "source_articles": [
+   "지침 11.나"
+  ],
+  "effective_from": "2026-03-03",
+  "display_order": 5
+ }
+]

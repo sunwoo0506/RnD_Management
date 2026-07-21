@@ -1,7 +1,10 @@
 import { saveAs } from 'file-saver';
 import type { Project } from './types';
 
-const PROJECT_KEY = 'gwajeon.project.v1';
+const PROJECT_KEY = 'gwajeon.project.v1';           // 구버전 단일 과제 (마이그레이션 소스로만 사용)
+const PROJECTS_KEY = 'gwajeon.projects.v1';         // 다중 과제 배열
+const ACTIVE_KEY = 'gwajeon.active-project';        // 마지막으로 열어둔 과제 id
+const OWNER_KEY = 'gwajeon.project.owner';
 const CORRUPT_BACKUP_KEY = 'gwajeon.project.corrupt-backup';
 const FILE_DB = 'gwajeon-evidence';
 const FILE_STORE = 'files';
@@ -30,6 +33,8 @@ export const parseProject = (raw: string | null): Project | null => {
   if (typeof value.packId !== 'string') project.packId = 'legacy-rnd';
   // customPack이 깨진 형태면 내장 팩으로 되돌아가도록 제거한다.
   if (value.customPack !== undefined && (!isRecord(value.customPack) || !Array.isArray((value.customPack as Record<string, unknown>).categories))) delete (project as Partial<Project>).customPack;
+  // 규정팩 보관함이 깨진 형태면 통째로 제거한다 — 열람 이력만 잃고 과제는 정상 동작.
+  if (value.extractedPacks !== undefined && (!Array.isArray(value.extractedPacks) || value.extractedPacks.some((entry) => !isRecord(entry) || !isRecord(entry.pack)))) delete (project as Partial<Project>).extractedPacks;
   return project;
 };
 
@@ -55,6 +60,54 @@ export const saveProject = (project: Project | null): boolean => {
   } catch {
     return false;
   }
+};
+
+// ---- 다중 과제 저장 ----
+// 새 키(projects.v1)가 없으면 구버전 단일 과제(project.v1)를 배열로 이전해 읽는다.
+export const loadProjects = (): Project[] => {
+  try {
+    const raw = localStorage.getItem(PROJECTS_KEY);
+    if (raw) {
+      const value: unknown = JSON.parse(raw);
+      if (Array.isArray(value)) return value.map((item) => parseProject(JSON.stringify(item))).filter((p): p is Project => !!p);
+    }
+  } catch { /* 아래 구버전 폴백으로 */ }
+  const legacy = loadProject();
+  return legacy ? [legacy] : [];
+};
+
+export const saveProjectsLocal = (projects: Project[]): boolean => {
+  try {
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+    localStorage.removeItem(PROJECT_KEY); // 이전 완료 — 구버전 키가 다시 살아나지 않게 비운다
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const loadActiveProjectId = (): string | null => {
+  try { return localStorage.getItem(ACTIVE_KEY); } catch { return null; }
+};
+
+export const saveActiveProjectId = (id: string | null) => {
+  try {
+    if (id) localStorage.setItem(ACTIVE_KEY, id);
+    else localStorage.removeItem(ACTIVE_KEY);
+  } catch { /* 다음 방문에 첫 과제가 열릴 뿐 */ }
+};
+
+// 브라우저 사본이 누구 것인지 기록한다 — 'local'(로그인 없이 만든 데이터) 또는 계정 user_id.
+// 다른 계정으로 로그인할 때 이전 계정의 로컬 잔재를 새 계정 클라우드로 잘못 이전하는 것을 막는 기준.
+export const loadProjectOwner = (): string | null => {
+  try { return localStorage.getItem(OWNER_KEY); } catch { return null; }
+};
+
+export const saveProjectOwner = (owner: string | null) => {
+  try {
+    if (owner) localStorage.setItem(OWNER_KEY, owner);
+    else localStorage.removeItem(OWNER_KEY);
+  } catch { /* 기록 실패 시 다음 로그인 때 이전 여부만 보수적으로 판단된다 */ }
 };
 
 export const collectEvidenceIds = (project: Project): string[] =>

@@ -1,0 +1,19 @@
+[
+  {
+    "override_code": "EXAMPLE_PROGRAM_OVERRIDE",
+    "program_id": "REPLACE_WITH_PROGRAM_ID",
+    "target_type": "LIMIT_RULE",
+    "target_code": "EXTERNAL_TECH_40",
+    "override_type": "REPLACE",
+    "override_payload": {
+      "limit_value": 30,
+      "limit_unit": "PERCENT"
+    },
+    "priority": 1000,
+    "effective_from": null,
+    "effective_to": null,
+    "status": "EXAMPLE_DISABLED",
+    "is_active": false,
+    "note": "사업 공고·협약에서 공통 기준보다 별도 상한을 정한 경우 사용하는 예시"
+  }
+]

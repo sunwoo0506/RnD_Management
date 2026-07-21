@@ -1,0 +1,206 @@
+[
+  {
+    "rule_id": "RULE-MEETING-MEAL-INTERNAL",
+    "version_id": "VERSION-EXAMPLE",
+    "rule_type": "PROHIBITED_ITEM",
+    "rule_name": "내부 참여연구자만 참석한 회의 식비 제한",
+    "target": {
+      "category_code": "ACTIVITY_MEETING",
+      "item_code": "MEETING_MEAL",
+      "original_term": "회의비 중 식비",
+      "mapping_status": "EXACT_MATCH"
+    },
+    "scope": {
+      "institution_types": [
+        "ALL"
+      ],
+      "program_types": [
+        "NATIONAL_RND"
+      ],
+      "project_attributes": {}
+    },
+    "condition": {
+      "op": "AND",
+      "clauses": [
+        {
+          "field": "meeting.external_attendee_count",
+          "operator": "EQ",
+          "value": 0
+        },
+        {
+          "field": "meeting.all_attendees_are_project_participants",
+          "operator": "EQ",
+          "value": true
+        }
+      ]
+    },
+    "limit": null,
+    "result": {
+      "status": "NOT_ALLOWED",
+      "message": "참여연구자만 참석하는 회의의 식비는 계상할 수 없습니다.",
+      "approval_authority": null,
+      "recognition_authority": null,
+      "agreement_change_required": false,
+      "block_until_satisfied": true
+    },
+    "evidence": [],
+    "deadline": null,
+    "exceptions": [],
+    "overrides_rule_id": null,
+    "source_nodes": [
+      "NODE-ARTICLE-25-P4"
+    ],
+    "source_article": "제25조제4항",
+    "source_text": "해당 연구개발과제의 참여연구자만 참여하는 회의에 대하여는 회의비 중 식비를 계상하여서는 아니 된다.",
+    "cross_references": [],
+    "effective": {
+      "effective_from": "2026-05-06",
+      "effective_to": null,
+      "date_basis": "EXPENSE_DATE"
+    },
+    "confidence": 0.98,
+    "review_status": "AUTO_VALIDATED",
+    "validation_issues": []
+  },
+  {
+    "rule_id": "RULE-EXTERNAL-TECH-40",
+    "version_id": "VERSION-EXAMPLE",
+    "rule_type": "LIMIT",
+    "rule_name": "외부 전문기술 활용비 직접비 40% 한도",
+    "target": {
+      "category_code": "ACTIVITY_EXTERNAL_TECH",
+      "item_code": null,
+      "original_term": "외부 전문기술 활용비",
+      "mapping_status": "EXACT_MATCH"
+    },
+    "scope": {
+      "institution_types": [
+        "ALL"
+      ],
+      "program_types": [
+        "NATIONAL_RND"
+      ],
+      "project_attributes": {}
+    },
+    "condition": null,
+    "limit": {
+      "limit_type": "PERCENT",
+      "value": 40,
+      "unit": "PERCENT",
+      "basis_code": "DIRECT_COST",
+      "formula_expression": "direct_cost * 0.40",
+      "rounding_rule": null
+    },
+    "result": {
+      "status": "LIMIT_EXCEEDED",
+      "message": "기본 한도는 직접비의 40%입니다.",
+      "approval_authority": null,
+      "recognition_authority": null,
+      "agreement_change_required": false,
+      "block_until_satisfied": false
+    },
+    "evidence": [],
+    "deadline": null,
+    "exceptions": [
+      {
+        "condition": {
+          "field": "approval.central_recognition",
+          "operator": "EQ",
+          "value": true
+        },
+        "effect": {
+          "status": "ALLOWED"
+        },
+        "source_node_ids": [
+          "NODE-ARTICLE-25-P2-PROVISO"
+        ]
+      }
+    ],
+    "overrides_rule_id": null,
+    "source_nodes": [
+      "NODE-ARTICLE-25-P2"
+    ],
+    "source_article": "제25조제2항",
+    "source_text": "외부 전문기술 활용비를 직접비의 40퍼센트 범위에서 사용하여야 한다. 다만 중앙행정기관의 장이 인정하는 경우에는 초과하여 사용할 수 있다.",
+    "cross_references": [],
+    "effective": {
+      "effective_from": "2026-05-06",
+      "effective_to": null,
+      "date_basis": "EXPENSE_DATE"
+    },
+    "confidence": 0.96,
+    "review_status": "ADMIN_REVIEWED",
+    "validation_issues": []
+  },
+  {
+    "rule_id": "RULE-EQUIPMENT-30M-APPROVAL",
+    "version_id": "VERSION-EXAMPLE",
+    "rule_type": "APPROVAL_REQUIRED",
+    "rule_name": "계획 외 3천만원 이상 장비 사전승인",
+    "target": {
+      "category_code": "DIRECT_EQUIPMENT",
+      "item_code": "EQUIPMENT_PURCHASE",
+      "original_term": "연구시설·장비",
+      "mapping_status": "EXACT_MATCH"
+    },
+    "scope": {
+      "institution_types": [
+        "ALL"
+      ],
+      "program_types": [
+        "NATIONAL_RND"
+      ],
+      "project_attributes": {}
+    },
+    "condition": {
+      "op": "AND",
+      "clauses": [
+        {
+          "field": "equipment.total_acquisition_cost",
+          "operator": "GTE",
+          "value": 30000000,
+          "unit": "KRW"
+        },
+        {
+          "field": "equipment.in_original_plan",
+          "operator": "EQ",
+          "value": false
+        }
+      ]
+    },
+    "limit": {
+      "limit_type": "APPROVAL_THRESHOLD",
+      "value": 30000000,
+      "unit": "KRW",
+      "basis_code": "EQUIPMENT_TOTAL_ACQUISITION_COST",
+      "formula_expression": null,
+      "rounding_rule": null
+    },
+    "result": {
+      "status": "PRIOR_APPROVAL_REQUIRED",
+      "message": "사용 전에 중앙행정기관의 사전승인이 필요합니다.",
+      "approval_authority": "CENTRAL_ADMINISTRATIVE_AGENCY",
+      "recognition_authority": null,
+      "agreement_change_required": true,
+      "block_until_satisfied": true
+    },
+    "evidence": [],
+    "deadline": null,
+    "exceptions": [],
+    "overrides_rule_id": null,
+    "source_nodes": [
+      "NODE-ARTICLE-73-P1-I5-A"
+    ],
+    "source_article": "제73조제1항제5호가목",
+    "source_text": "원래계획에 반영되지 아니한 3천만원 이상이 소요되는 연구시설·장비를 새로 구입하거나 임차하려는 경우",
+    "cross_references": [],
+    "effective": {
+      "effective_from": "2026-05-06",
+      "effective_to": null,
+      "date_basis": "EXPENSE_DATE"
+    },
+    "confidence": 0.97,
+    "review_status": "AUTO_VALIDATED",
+    "validation_issues": []
+  }
+]

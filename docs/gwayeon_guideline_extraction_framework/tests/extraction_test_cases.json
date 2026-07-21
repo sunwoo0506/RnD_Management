@@ -1,0 +1,133 @@
+[
+  {
+    "test_code": "TC_ALLOW_ITEM",
+    "input_text": "회의비는 회의장 임차료, 통역료 및 회의 개최에 필요한 비용으로 사용할 수 있다.",
+    "expected": {
+      "detected_types": [
+        "ALLOWED_ITEM"
+      ],
+      "minimum_item_count": 3
+    }
+  },
+  {
+    "test_code": "TC_CONDITIONAL_DENY",
+    "input_text": "참여인력만 참석한 회의에 대해서는 식비를 계상하여서는 아니 된다.",
+    "expected": {
+      "rule_type": "PROHIBITED_ITEM",
+      "target_item": "MEETING_MEAL",
+      "condition_fields": [
+        "meeting.external_attendee_count",
+        "meeting.all_attendees_are_project_participants"
+      ],
+      "result_status": "NOT_ALLOWED"
+    }
+  },
+  {
+    "test_code": "TC_LIMIT_WITH_EXCEPTION",
+    "input_text": "전문가 활용비는 직접비의 30퍼센트 이내로 한다. 다만 전담기관이 인정하는 경우에는 이를 초과할 수 있다.",
+    "expected": {
+      "rule_type": "LIMIT",
+      "limit_value": 30,
+      "basis_code": "DIRECT_COST",
+      "exception_result": "RECOGNITION_REQUIRED"
+    }
+  },
+  {
+    "test_code": "TC_APPROVAL_NOT_DENY",
+    "input_text": "원래계획보다 20퍼센트 이상 증액하려는 경우에는 사전승인을 받아야 한다.",
+    "expected": {
+      "result_status": "PRIOR_APPROVAL_REQUIRED",
+      "not_result_status": "NOT_ALLOWED"
+    }
+  },
+  {
+    "test_code": "TC_EVIDENCE_ONE_OF",
+    "input_text": "회의비를 사용할 때에는 내부결재문서 또는 회의록 중 어느 하나와 영수증을 갖추어야 한다.",
+    "expected": {
+      "evidence": [
+        {
+          "requirement": "ONE_OF",
+          "documents": [
+            "INTERNAL_APPROVAL",
+            "MEETING_MINUTES"
+          ]
+        },
+        {
+          "requirement": "ALL",
+          "documents": [
+            "RECEIPT"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "test_code": "TC_DEADLINE",
+    "input_text": "소프트웨어 사용계약은 연구개발기간 종료일 2개월 전까지 체결하여야 한다.",
+    "expected": {
+      "deadline": {
+        "event": "CONTRACT_SIGNED",
+        "base_date_field": "project.end_date",
+        "offset_months": -2
+      }
+    }
+  },
+  {
+    "test_code": "TC_INSTITUTION_SCOPE",
+    "input_text": "영리기관은 연구실운영비 중 소모성 비용을 계상할 수 없다.",
+    "expected": {
+      "scope_institution_types": [
+        "FOR_PROFIT"
+      ],
+      "result_status": "NOT_ALLOWED"
+    }
+  },
+  {
+    "test_code": "TC_SPECIAL_EFFECTIVE_DATE",
+    "input_text": "제25조의2의 개정규정은 2026년 6월 11일부터 시행한다.",
+    "expected": {
+      "rule_type": "VERSION_EFFECTIVE",
+      "target_article": "제25조의2",
+      "effective_from": "2026-06-11"
+    }
+  },
+  {
+    "test_code": "TC_NEW_CATEGORY_CANDIDATE",
+    "input_text": "지역상생활동비는 지역기업과의 공동프로그램 운영에 필요한 비용으로 한다.",
+    "expected": {
+      "mapping_status": "NEW_CATEGORY_CANDIDATE",
+      "automatic_category_creation": false
+    }
+  },
+  {
+    "test_code": "TC_TABLE_CONTEXT",
+    "input_table": {
+      "title": "기관 유형별 간접비율",
+      "columns": [
+        "비목",
+        "영리기관",
+        "비영리기관"
+      ],
+      "rows": [
+        [
+          "간접비",
+          "10%",
+          "기관별 고시비율"
+        ]
+      ]
+    },
+    "expected": {
+      "rule_count": 2,
+      "rules": [
+        {
+          "institution_scope": "FOR_PROFIT",
+          "limit_value": 10
+        },
+        {
+          "institution_scope": "NON_PROFIT",
+          "basis_code": "PUBLISHED_INSTITUTION_RATE"
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,28 @@
+{
+  "package_name": "gwayeon_guideline_extraction_framework",
+  "version": "1.0.0",
+  "generated_at": "2026-07-21",
+  "purpose": "정부지원사업 지침의 표준화된 규칙 DB 자동 추출",
+  "files": [
+    "01_extraction_pipeline.md",
+    "02_extraction_policy.md",
+    "03_database_schema.sql",
+    "README.md",
+    "examples/sample_document_metadata.json",
+    "examples/sample_normalized_rules.json",
+    "implementation_checklist.md",
+    "merge_precedence.md",
+    "prompts/01_document_classifier.md",
+    "prompts/02_structure_parser.md",
+    "prompts/03_rule_candidate_detector.md",
+    "prompts/04_rule_normalizer.md",
+    "prompts/05_rule_validator.md",
+    "reference_extractor.py",
+    "schemas/document_metadata.schema.json",
+    "schemas/extraction_job.schema.json",
+    "schemas/normalized_rule.schema.json",
+    "taxonomy.json",
+    "tests/extraction_test_cases.json",
+    "validation_rules.json"
+  ]
+}

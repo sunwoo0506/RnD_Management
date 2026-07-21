@@ -1,15 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { capFor, categoryOf, documentsFor, getPack, globalRules, makeDraftBudgets, PACKS, rulesFor, transferLimitError, visibleCategories } from './rules';
-import type { Project } from './types';
+import { applyOverlay, articlesForRef, capFor, categoryOf, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories } from './rules';
+import type { Project, RulePack } from './types';
 
 describe('규정 팩 로더', () => {
-  it('예창패·R&D 영리·R&D 정부출연·레거시 4개 팩을 제공한다', () => {
-    expect(PACKS.map((pack) => pack.id).sort()).toEqual(['legacy-rnd', 'prestartup', 'rnd-forprofit', 'rnd-govt']);
+  it('규정 DB 팩(국가연구개발비·팁스·예비창업패키지)과 예시 팩을 함께 제공한다', () => {
+    expect(PACKS.map((pack) => pack.id).sort()).toEqual(['didimdol2026', 'legacy-rnd', 'nrd2026-forprofit', 'nrd2026-nonprofit', 'prestartup', 'prestartup2026', 'rnd-forprofit', 'rnd-govt', 'tips2026']);
   });
 
-  it('모든 팩의 비목·규칙에 출처(문서·조문 위치)가 있고 검증 전 상태다', () => {
+  it('규정 DB로 대체된 예시 팩은 새 과제 선택 목록에서 빠진다', () => {
+    const selectable = selectablePacks().map((pack) => pack.id);
+    expect(selectable).not.toContain('prestartup');   // 2026 공고 기반 prestartup2026으로 대체
+    expect(selectable).not.toContain('legacy-rnd');
+    expect(selectable).toContain('prestartup2026');
+  });
+
+  it('모든 팩의 비목·규칙에 출처(문서·조문 위치)가 있다', () => {
     for (const pack of PACKS) {
-      expect(pack.verified).toBe(false);
+      // 규정DB 패키지에서 온 팩만 검증됨으로 표시된다 — 예시 팩은 여전히 검증 전이다.
+      expect(pack.verified, pack.id).toBe(isRegulationDbPack(pack));
       expect(pack.guideline).toBeTruthy();
       for (const category of pack.categories) expect(category.source.doc).toBeTruthy();
       for (const rule of pack.rules) {
@@ -63,6 +71,95 @@ describe('상한 계산과 배분', () => {
     const pack = getPack('legacy-rnd');
     const budgets = makeDraftBudgets(pack, 100_000_000);
     expect(capFor(pack, budgets, 100_000_000, 'personnel')?.amount).toBe(50_000_000);
+    // 편성 화면이 "총 사업비 1억 × 50%" 계산식을 그대로 보여줄 수 있어야 한다
+    const personnelCap = capFor(pack, budgets, 100_000_000, 'personnel');
+    expect(personnelCap?.basisAmount).toBe(100_000_000);
+    expect(personnelCap?.limitPct).toBe(50);
+    expect(personnelCap?.basisLabel).toBe('총 사업비');
+  });
+
+  // AI 추출 팩은 비목 ID가 문서 이름 기반(doc_0_인건비 등)이라 고정 ID(personnel 등)로는 기준 금액을 못 찾는다.
+  const extractedStylePack = (categories: RulePack['categories'], rules: RulePack['rules']): RulePack => ({
+    id: 'extracted-test', name: '테스트 공고', orgType: '', guideline: '테스트 공고', agency: '테스트',
+    hasRatioLimits: true, verified: false, categories, rules, applicationDocs: [],
+  });
+  const src = { doc: '테스트 공고', ref: '사업비 기준', matchLevel: 'notice' };
+  const cat = (id: string, name: string, draftRate: number): RulePack['categories'][number] => ({ id, name, allowed: true, draftRate, requiredDocs: [], source: src });
+
+  it('AI 추출 팩(문서 기반 비목 ID)에서도 수정인건비 기준 상한이 인건비 이름 매칭으로 계산된다', () => {
+    const pack = extractedStylePack(
+      [cat('doc_0_인건비', '인건비', 40), cat('doc_1_연구수당', '연구수당', 10), cat('doc_2_간접비', '간접비', 10), cat('doc_3_위탁연구개발비', '위탁연구개발비', 40)],
+      [
+        { id: 'r1', kind: 'ratio', item: '연구수당', message: '연구수당은 수정인건비 합계의 20% 이내', limitPct: 20, basis: '수정인건비 합계', categoryIds: ['doc_1_연구수당'], source: src },
+        { id: 'r2', kind: 'ratio', item: '간접비', message: '간접비는 직접비의 10% 이내', limitPct: 10, basis: '직접비(현물, 위탁연구개발비 제외)', categoryIds: ['doc_2_간접비'], source: src },
+      ],
+    );
+    const budgets = [
+      { categoryId: 'doc_0_인건비', amount: 40_000_000 }, { categoryId: 'doc_1_연구수당', amount: 5_000_000 },
+      { categoryId: 'doc_2_간접비', amount: 10_000_000 }, { categoryId: 'doc_3_위탁연구개발비', amount: 20_000_000 },
+    ];
+    // 연구수당 상한 = 인건비(이름 매칭) 40,000,000의 20%
+    expect(capFor(pack, budgets, 100_000_000, 'doc_1_연구수당')?.amount).toBe(8_000_000);
+    // 간접비 상한 = (총 1억 - 간접비 1천만 - 위탁 2천만)의 10% — 현물 미전달 시
+    expect(capFor(pack, budgets, 100_000_000, 'doc_2_간접비')?.amount).toBe(7_000_000);
+    // "현물 제외" 기준이라 민간부담 현물 10,000,000을 추가 차감
+    expect(capFor(pack, budgets, 100_000_000, 'doc_2_간접비', 10_000_000)?.amount).toBe(6_000_000);
+  });
+
+  it('비목에 연결되지 못한 공통 규칙도 비목 이름으로 재매칭해 상한을 계산한다', () => {
+    // categoryIds가 비어 "과제 공통"으로 저장된 추출 규칙 — 예전에는 전 비목이 "제한 없음"이 됐다.
+    const pack = extractedStylePack(
+      [cat('doc_0_인건비', '인건비', 50), cat('doc_1_연구수당', '연구수당', 25), cat('doc_2_연구시설장비비', '연구시설.장비비', 25)],
+      [
+        { id: 'g1', kind: 'ratio', item: '연구수당', message: '연구수당은 수정인건비의 20% 이내', limitPct: 20, basis: '수정인건비', source: src },
+        { id: 'g2', kind: 'ratio', item: '연구시설·장비비', message: '연구시설·장비비는 총 사업비의 30% 이내', limitPct: 30, basis: '총 사업비', source: src },
+      ],
+    );
+    const budgets = [
+      { categoryId: 'doc_0_인건비', amount: 50_000_000 }, { categoryId: 'doc_1_연구수당', amount: 5_000_000 }, { categoryId: 'doc_2_연구시설장비비', amount: 25_000_000 },
+    ];
+    expect(capFor(pack, budgets, 100_000_000, 'doc_1_연구수당')?.amount).toBe(10_000_000);
+    // 중점(·)과 마침표(.) 표기 차이도 이름 매칭을 막지 않는다
+    expect(capFor(pack, budgets, 100_000_000, 'doc_2_연구시설장비비')?.amount).toBe(30_000_000);
+  });
+
+  it('기준이 되는 이름의 비목이 팩에 없으면 상한을 0원으로 단정하지 않고 계산 불가(null)로 둔다', () => {
+    const pack = extractedStylePack(
+      [cat('doc_0_연구수당', '연구수당', 100)],
+      [{ id: 'r1', kind: 'ratio', item: '연구수당', message: '연구수당은 수정인건비 합계의 20% 이내', limitPct: 20, basis: '수정인건비 합계', categoryIds: ['doc_0_연구수당'], source: src }],
+    );
+    const cap = capFor(pack, [{ categoryId: 'doc_0_연구수당', amount: 10_000_000 }], 100_000_000, 'doc_0_연구수당');
+    expect(cap?.amount).toBeNull();
+    expect(cap?.label).toContain('20%');
+  });
+
+  it('규정 DB에서 변환한 국가연구개발비 2026 팩의 연구수당·간접비·위탁 상한이 계산된다', () => {
+    const pack = getPack('nrd2026-forprofit');
+    const budgets = makeDraftBudgets(pack, 100_000_000); // 사용 비목 10개 균등 → 각 10,000,000
+    // 연구수당 = 수정인건비(인건비 편성액 근사) 10,000,000의 20%
+    expect(capFor(pack, budgets, 100_000_000, 'DIRECT_INCENTIVE')?.amount).toBe(2_000_000);
+    // 간접비 = 수정직접비(총 1억 - 간접비 1천만 - 위탁 1천만)의 10%
+    expect(capFor(pack, budgets, 100_000_000, 'INDIRECT')?.amount).toBe(8_000_000);
+    // 위탁연구개발비 = 직접비(위탁 제외 근사)의 40%
+    expect(capFor(pack, budgets, 100_000_000, 'DIRECT_SUBCONTRACT')?.amount).toBe(32_000_000);
+    // 영리기관 팩에서 학생인건비·연구개발부담비는 편성 대상이 아니다
+    expect(pack.categories.find((c) => c.id === 'DIRECT_STUDENT_LABOR')?.allowed).toBe(false);
+    expect(getPack('nrd2026-nonprofit').categories.find((c) => c.id === 'DIRECT_STUDENT_LABOR')?.allowed).toBe(true);
+  });
+
+  it('TIPS 지침 팩: 연구수당·간접비·위탁 상한이 계산되고 현물 포함 기준은 현물을 차감하지 않는다', () => {
+    const pack = getPack('tips2026');
+    expect(pack.categories.filter((c) => c.allowed)).toHaveLength(7); // 직접비 6 + 간접비
+    const budgets = makeDraftBudgets(pack, 70_000_000); // 균등 배분: 인건비 16% (11.2M), 나머지 14% (9.8M)
+    // 연구수당 = 수정인건비(인건비 편성액) 11,200,000의 20%
+    expect(capFor(pack, budgets, 70_000_000, 'DIRECT_INCENTIVE')?.amount).toBe(2_240_000);
+    // 간접비 = 직접비(총 7천만 - 간접비 980만 - 위탁 980만 - 현물 500만)의 10% — "현물 부담액 제외" 기준
+    expect(capFor(pack, budgets, 70_000_000, 'INDIRECT', 5_000_000)?.amount).toBe(4_540_000);
+    // 위탁 = 직접비(현물 포함, 위탁 제외)의 40% — "현물 포함" 기준이라 현물을 차감하지 않는다
+    expect(capFor(pack, budgets, 70_000_000, 'DIRECT_SUBCONTRACT', 5_000_000)?.amount).toBe(20_160_000);
+    // 원문 인용이 규칙에 실려 미리보기 하이라이트 1순위로 쓰인다
+    const incentiveRule = capFor(pack, budgets, 70_000_000, 'DIRECT_INCENTIVE')?.rule;
+    expect(incentiveRule?.quote).toContain('수정인건비');
   });
 
   it('받는 비목이 상한을 초과하는 이동은 오류를 반환하고, 상한 없는 팩은 통과한다', () => {
@@ -73,6 +170,138 @@ describe('상한 계산과 배분', () => {
     const prestartup = getPack('prestartup');
     const preBudgets = makeDraftBudgets(prestartup, 100_000_000);
     expect(transferLimitError(prestartup, preBudgets, 100_000_000, 'cat_personnel', 50_000_000)).toBeNull();
+  });
+});
+
+describe('공통 규정 기준 매칭 (팩에 기준이 없을 때)', () => {
+  it('공고문 추출 팩의 비목 이름으로 규정 DB의 기준을 찾는다', () => {
+    // AI 추출 팩이 흔히 쓰는 이름들 — 규정 체계의 비목·세부 비목에 대응된다
+    expect(referenceStandardFor('기존 인력 인건비')?.category.name).toBe('인건비');
+    expect(referenceStandardFor('신규채용 인건비')?.category.name).toBe('인건비');
+    expect(referenceStandardFor('외부 전문기술 활용비')?.category.name).toBe('외부 전문기술 활용비');
+    expect(referenceStandardFor('연구실운영비')?.category.name).toBe('연구실운영비');
+    expect(referenceStandardFor('간접비')?.category.name).toBe('간접비');
+  });
+
+  it('찾은 기준에는 인정 항목과 근거 조항이 들어 있다', () => {
+    const found = referenceStandardFor('외부 전문기술 활용비');
+    expect(found?.category.allowedItems?.length).toBeGreaterThan(0);
+    expect(found?.category.allowedItems?.[0].source.ref).toBeTruthy();
+  });
+
+  it('더 구체적인 이름이 뭉뚱그려지지 않는다 — 학생인건비는 인건비로 매칭되지 않는다', () => {
+    expect(referenceStandardFor('학생인건비')?.category.name).toBe('학생인건비');
+  });
+
+  it('이미 그 규정 DB 팩을 쓰는 과제에는 같은 기준을 참고로 덧붙이지 않는다', () => {
+    expect(referenceStandardFor('인건비', 'nrd2026-forprofit')?.pack.id).not.toBe('nrd2026-forprofit');
+  });
+
+  it('규정 체계에 없는 비목은 매칭하지 않는다', () => {
+    expect(referenceStandardFor('광고선전비')).toBeNull();
+    expect(referenceStandardFor('임차료')).toBeNull();
+  });
+});
+
+describe('근거 조문 원문 찾기', () => {
+  it('조문 번호로 규정 DB의 원문을 찾는다 (원본 파일 없이도 근거를 열 수 있어야 한다)', () => {
+    const pack = getPack('nrd2026-forprofit');
+    expect(pack.articles?.length).toBeGreaterThan(0);
+    const found = articlesForRef(pack, '제6조');
+    expect(found).toHaveLength(1);
+    expect(found[0].ref).toBe('제6조');
+    expect(found[0].text).toContain('인건비');
+  });
+
+  it('근거가 여러 조문을 묶어 쓰면 각각을 모두 찾는다', () => {
+    const pack = getPack('nrd2026-forprofit');
+    const found = articlesForRef(pack, '제27조제3항·제73조제1항제7호');
+    expect(found.map((a) => a.ref)).toEqual(['제27조', '제73조']);
+  });
+
+  it('조문 번호 체계가 아닌 지침은 앞부분이 겹치는 조항으로 찾는다', () => {
+    const pack = getPack('tips2026');
+    const found = articlesForRef(pack, '지침 11.다.1) 인건비 가)');
+    expect(found).toHaveLength(1);
+    expect(found[0].ref).toBe('지침 11.다.1) 인건비');
+  });
+
+  it('맞는 조문이 없으면 빈 배열 — 엉뚱한 조문을 열지 않는다', () => {
+    expect(articlesForRef(getPack('nrd2026-forprofit'), '제9999조')).toEqual([]);
+    expect(articlesForRef(getPack('legacy-rnd'), '제6조')).toEqual([]);
+  });
+});
+
+describe('기관 유형별 비목 적용 (규정 DB 적용조건)', () => {
+  it('영리기관 팩에서는 기관 자격이 안 되는 비목만 편성 대상에서 빠진다', () => {
+    const forProfit = getPack('nrd2026-forprofit');
+    const names = (pack: typeof forProfit) => pack.categories.filter((c) => c.allowed).map((c) => c.name);
+    expect(names(forProfit)).not.toContain('학생인건비');      // 대학 등 고시 기관 한정
+    expect(names(forProfit)).not.toContain('연구개발부담비');  // 정부출연·직할기관 한정
+    expect(names(forProfit)).toContain('인건비');
+  });
+
+  it('비영리기관 팩은 기관 한정 비목까지 모두 편성할 수 있다', () => {
+    const nonProfit = getPack('nrd2026-nonprofit');
+    const allowed = nonProfit.categories.filter((c) => c.allowed).map((c) => c.name);
+    expect(allowed).toContain('학생인건비');
+    expect(allowed).toContain('연구개발부담비');
+    // "영리기관 현금 인건비 인정 필요"는 사용 조건일 뿐이라 비영리 팩의 인건비를 막으면 안 된다
+    expect(allowed).toContain('인건비');
+  });
+});
+
+describe('인건비 계산', () => {
+  it('참여 개월 수는 양 끝 달을 포함하고, 잘못된 기간은 0이다', () => {
+    expect(monthsBetween('2026-01-01', '2026-12-31')).toBe(12);
+    expect(monthsBetween('2026-03-15', '2026-03-20')).toBe(1);
+    expect(monthsBetween('2026-06-01', '2026-01-01')).toBe(0);
+    expect(monthsBetween(undefined, '2026-12-31')).toBe(0);
+  });
+
+  it('4대보험·퇴직금·참여율·기간을 반영해 사업기간 합계 인건비를 계산한다', () => {
+    const cost = laborCostFor(
+      { id: 'p1', name: '김연구', projectRate: 50, externalRate: 0, monthlyPay: 3_000_000, laborInKind: 5_000_000 },
+      { startDate: '2026-01-01', endDate: '2026-12-31', insuranceRate: 11 },
+    );
+    expect(cost.insurance).toBe(330_000);          // 월급여의 11%
+    expect(cost.severance).toBe(250_000);          // 월급여의 1/12
+    expect(cost.monthly).toBe(1_790_000);          // (300만+33만+25만) × 50%
+    expect(cost.months).toBe(12);
+    expect(cost.total).toBe(21_480_000);
+    expect(cost.inKind).toBe(5_000_000);
+    expect(cost.cash).toBe(16_480_000);
+  });
+
+  it('월급여 미입력이면 0원, 현물 계상액은 합계를 넘지 않는다', () => {
+    const opts = { startDate: '2026-01-01', endDate: '2026-12-31' };
+    expect(laborCostFor({ id: 'p1', name: '김', projectRate: 100, externalRate: 0 }, opts).total).toBe(0);
+    const capped = laborCostFor({ id: 'p2', name: '이', projectRate: 100, externalRate: 0, monthlyPay: 1_000_000, laborInKind: 999_999_999 }, opts);
+    expect(capped.inKind).toBe(capped.total);
+    expect(capped.cash).toBe(0);
+  });
+
+  it('퇴직금은 개인 설정이 과제 기본값보다 우선한다 (1년 미만 근무자 제외)', () => {
+    const opts = { startDate: '2026-01-01', endDate: '2026-12-31', insuranceRate: 11, includeSeverance: true };
+    const base = { id: 'p1', name: '김연구', projectRate: 100, externalRate: 0, monthlyPay: 3_000_000 };
+    // 과제 기본값(포함)을 개인이 해제하면 퇴직금이 빠진다
+    expect(laborCostFor({ ...base, includeSeverance: false }, opts).severance).toBe(0);
+    expect(laborCostFor(base, opts).severance).toBe(250_000);
+    // 반대로 과제 기본값이 해제여도 개인이 켜면 계상된다
+    const offByDefault = { ...opts, includeSeverance: false };
+    expect(laborCostFor(base, offByDefault).severance).toBe(0);
+    expect(laborCostFor({ ...base, includeSeverance: true }, offByDefault).severance).toBe(250_000);
+  });
+
+  it('계상 구분: 현물(전액)은 합계가 모두 현물, 현금(전액)은 현물 입력이 있어도 0이다', () => {
+    const opts = { startDate: '2026-01-01', endDate: '2026-12-31' };
+    const inkind = laborCostFor({ id: 'p1', name: '홍길동', projectRate: 30, externalRate: 0, monthlyPay: 2_000_000, laborFunding: 'inkind' }, opts);
+    expect(inkind.total).toBeGreaterThan(0);
+    expect(inkind.inKind).toBe(inkind.total);
+    expect(inkind.cash).toBe(0);
+    const cash = laborCostFor({ id: 'p2', name: '김', projectRate: 100, externalRate: 0, monthlyPay: 2_000_000, laborFunding: 'cash', laborInKind: 5_000_000 }, opts);
+    expect(cash.inKind).toBe(0);
+    expect(cash.cash).toBe(cash.total);
   });
 });
 
@@ -97,5 +326,56 @@ describe('증빙·표시 규칙', () => {
     const visible = visibleCategories(pack, project);
     expect(visible.some((category) => category.id === 'cat_travel')).toBe(false);
     expect(visible).toHaveLength(8);
+  });
+});
+
+describe('예산편성 비목의 출처', () => {
+  const project = (overrides: Partial<Project>): Project => ({
+    id: 'p1', name: '테스트', totalBudget: 100_000_000, startDate: '2026-01-01', endDate: '2026-12-31',
+    settlementDeadline: '2027-01-31', agency: '', companyName: '', packId: 'didimdol2026',
+    members: [], participants: [], budgets: [], expenses: [], changes: [], emailLogs: [],
+    createdAt: '2026-01-01', ...overrides,
+  });
+
+  const extractedPack: RulePack = {
+    id: 'extracted-1', name: '추출 팩', orgType: '', guideline: '업로드 문서 기준', agency: '',
+    origin: 'extracted', hasRatioLimits: false, verified: false,
+    categories: [{ id: 'x', name: '엉뚱한 비목', allowed: true, draftRate: 100, requiredDocs: [], source: { doc: 'd', ref: 'r', matchLevel: 'notice' } }],
+    rules: [], applicationDocs: [],
+  };
+
+  it('규정DB 팩을 쓰는 과제는 AI 추출 팩이 있어도 규정DB 비목을 쓴다', () => {
+    const pack = packFor(project({ packId: 'didimdol2026', customPack: extractedPack }));
+    expect(pack.id).toBe('didimdol2026');
+    expect(pack.categories.map((c) => c.name)).not.toContain('엉뚱한 비목');
+  });
+
+  it('대응하는 규정DB가 없는 사업은 추출 팩이 비목의 출처가 된다', () => {
+    const pack = packFor(project({ packId: 'extracted-1', customPack: extractedPack }));
+    expect(pack.id).toBe('extracted-1');
+    expect(isRegulationDbPack(pack)).toBe(false);
+  });
+
+  it('오버레이는 같은 id의 규칙을 대체하고 비목은 그대로 둔다', () => {
+    const base = getPack('didimdol2026');
+    const target = base.rules.find((rule) => rule.kind === 'ratio')!;
+    const merged = applyOverlay(base, {
+      basePackId: base.id, appliedAt: '2026-07-22', sourceDocTitles: [],
+      rules: [{ ...target, id: target.id, limitPct: 55, message: '최신 공고 기준 55%' }],
+    });
+    expect(merged.categories).toEqual(base.categories);
+    expect(merged.rules.filter((rule) => rule.id === target.id)).toHaveLength(1);
+    expect(merged.rules.find((rule) => rule.id === target.id)!.limitPct).toBe(55);
+  });
+
+  it('기준 팩이 바뀐 오버레이는 적용하지 않는다', () => {
+    const overlayRule = { id: 'o1', kind: 'warning' as const, message: '다른 팩에서 만든 규칙', source: { doc: 'd', ref: 'r', matchLevel: 'notice' } };
+    const applied = packFor(project({ packId: 'didimdol2026', packOverlay: { basePackId: 'tips2026', appliedAt: '2026-07-22', sourceDocTitles: [], rules: [overlayRule] } }));
+    expect(applied.rules.some((rule) => rule.id === 'o1')).toBe(false);
+  });
+
+  it('규정DB 팩만 검증됨으로 표시된다', () => {
+    expect(isRegulationDbPack(getPack('didimdol2026'))).toBe(true);
+    expect(isRegulationDbPack(getPack('legacy-rnd'))).toBe(false);
   });
 });

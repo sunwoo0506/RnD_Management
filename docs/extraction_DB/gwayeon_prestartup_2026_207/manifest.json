@@ -1,0 +1,51 @@
+{
+  "package_name": "gwayeon_prestartup_2026_207",
+  "document_version": "PRESTARTUP_NOTICE_2026_207",
+  "title": "2026 예비창업패키지 예비창업자 수정 모집공고(2차)",
+  "notice_number": "중소벤처기업부 공고 제2026-207호",
+  "issuer": "중소벤처기업부",
+  "document_type": "PROGRAM_ANNOUNCEMENT",
+  "revision_type": "2차 수정 공고",
+  "effective_from": "2026-03-24",
+  "special_effective_dates": [],
+  "base_document_version": null,
+  "generated_at": "2026-07-22",
+  "source_files": [
+    "2026 예비창업패키지 예비창업자 모집 수정 공고(2차)(2026-207호).hwpx (공고 — 사업화 자금 집행 비목 9종, 선정자 의무, 유의사항)",
+    "[별첨 4] 2026년 예비창업패키지 예비창업자 모집공고 주요 질의응답(수정).pdf (QnA [사업비] 9문답)",
+    "(별첨4) 중소기업창업 지원사업 통합관리지침 제14차.pdf (제35~45조 비목별 집행기준, 제47조 집행 원칙)",
+    "예비창업패키지 세부관리기준(2025년).hwp (제21~22조 창업기업 사업비, 제9조 사업비 변경)",
+    "중소기업창업 지원사업 운영요령(고시)(제2024-101호)(20241206).hwpx (상위 고시 — 제21조 사업비 집행·관리 근거)"
+  ],
+  "source_file_sha256": {
+    "공고": "3e37c6dacd058b9f36ba81d73315f3037eaec8e9f92de445a16b8be7cb201989",
+    "통합관리지침": "29f773ad8ed4827a7e390cc76e50fa772de90cbb0b52dfe8765759dce26b874a",
+    "세부관리기준": "01760919b0a08de068485f920fbea6710f6c4abea773fff85666cab276fb5509",
+    "운영요령": "94fb8fdcbfe660ec0791c53286e48808c80e399a932b97ed8fae0e7061efa16a"
+  },
+  "extraction_scope": "공고 2. 세부 지원내용·선정자 의무 / QnA [사업비] / 통합관리지침 제35~47조 / 세부관리기준 제9·21·22조",
+  "notes": "규정 계층: 공고(2026-207호) > 세부관리기준(2025.7.2. 시행) > 통합관리지침 제14차(2025.12.23. 전부개정) > 운영요령 고시 제2024-101호. 공고가 정한 사항이 우선하고, 공고에 없는 집행 세부기준은 통합관리지침과 세부관리기준을 따른다. 각 규칙의 source_article에 어느 문서인지 표시했다.",
+  "counts": {
+    "categories": 10,
+    "budget_guides": 10,
+    "allowed_items": 21,
+    "limit_rules": 3,
+    "regulation_rules": 42,
+    "source_text": 16
+  },
+  "pack_meta": {
+    "guideline": "2026 예비창업패키지 모집공고 (중소벤처기업부 공고 제2026-207호)",
+    "agency": "중소벤처기업부 · 창업진흥원",
+    "reference_url": "https://www.k-startup.go.kr",
+    "output": "prestartup2026.json",
+    "scopes": [
+      {
+        "scope": "FOR_PROFIT",
+        "id": "prestartup2026",
+        "name": "예비창업패키지 (2026 공고)",
+        "org_type": "예비창업자"
+      }
+    ],
+    "program_name": "예비창업패키지"
+  }
+}

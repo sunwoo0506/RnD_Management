@@ -1,0 +1,107 @@
+[
+  {
+    "code": "VAL_SOURCE_REQUIRED",
+    "severity": "BLOCKER",
+    "applies_to": "ALL_RULES",
+    "condition": "source_nodes is empty OR source_text is empty",
+    "message": "모든 규칙은 근거 노드와 원문을 가져야 합니다."
+  },
+  {
+    "code": "VAL_PERCENT_BASIS_REQUIRED",
+    "severity": "BLOCKER",
+    "applies_to": "LIMIT",
+    "condition": "limit_type == PERCENT AND basis_code is empty",
+    "message": "비율 한도에는 기준금액이 필요합니다."
+  },
+  {
+    "code": "VAL_AMOUNT_UNIT_REQUIRED",
+    "severity": "BLOCKER",
+    "applies_to": "LIMIT",
+    "condition": "limit.value is not null AND limit.unit is empty",
+    "message": "금액 또는 비율 값에는 단위가 필요합니다."
+  },
+  {
+    "code": "VAL_FORMULA_VARIABLE_DEFINED",
+    "severity": "BLOCKER",
+    "applies_to": "FORMULA",
+    "condition": "formula_expression contains undefined variable",
+    "message": "계산식 변수 사전에 없는 변수가 존재합니다."
+  },
+  {
+    "code": "VAL_APPROVAL_AUTHORITY",
+    "severity": "WARNING",
+    "applies_to": "APPROVAL_REQUIRED",
+    "condition": "approval_authority is empty",
+    "message": "승인권자를 확인해야 합니다."
+  },
+  {
+    "code": "VAL_RECOGNITION_NOT_DENY",
+    "severity": "BLOCKER",
+    "applies_to": "RECOGNITION_REQUIRED",
+    "condition": "result.status == NOT_ALLOWED",
+    "message": "인정 후 가능한 규칙을 단순 불가로 저장할 수 없습니다."
+  },
+  {
+    "code": "VAL_EXCEPTION_LINK",
+    "severity": "BLOCKER",
+    "applies_to": "EXCEPTION",
+    "condition": "overrides_rule_id is empty",
+    "message": "예외 규칙은 본문 규칙과 연결되어야 합니다."
+  },
+  {
+    "code": "VAL_CROSS_REFERENCE_EXISTS",
+    "severity": "BLOCKER",
+    "applies_to": "ALL_RULES",
+    "condition": "cross reference does not exist in parsed nodes",
+    "message": "존재하지 않는 조문을 참조하고 있습니다."
+  },
+  {
+    "code": "VAL_DATE_RANGE",
+    "severity": "BLOCKER",
+    "applies_to": "ALL_RULES",
+    "condition": "effective_to < effective_from",
+    "message": "종료일이 시행일보다 빠릅니다."
+  },
+  {
+    "code": "VAL_DELETED_ARTICLE",
+    "severity": "BLOCKER",
+    "applies_to": "ALL_RULES",
+    "condition": "source article status == DELETED AND is_active == true",
+    "message": "삭제 조항에서 활성 규칙을 생성할 수 없습니다."
+  },
+  {
+    "code": "VAL_AMBIGUOUS_MAPPING",
+    "severity": "WARNING",
+    "applies_to": "ALL_RULES",
+    "condition": "mapping_status == AMBIGUOUS",
+    "message": "비목 매핑을 관리자에게 확인받아야 합니다."
+  },
+  {
+    "code": "VAL_NEW_CATEGORY",
+    "severity": "WARNING",
+    "applies_to": "CATEGORY_DEFINE",
+    "condition": "mapping_status == NEW_CATEGORY_CANDIDATE",
+    "message": "신규 비목 후보는 승인 전 운영 DB에 자동 추가하지 않습니다."
+  },
+  {
+    "code": "VAL_CONFLICTING_RULES",
+    "severity": "BLOCKER",
+    "applies_to": "ALL_RULES",
+    "condition": "same target and same condition produce conflicting status",
+    "message": "동일 조건에서 상충하는 규칙이 존재합니다."
+  },
+  {
+    "code": "VAL_TABLE_CONTEXT",
+    "severity": "WARNING",
+    "applies_to": "TABLE_RULE",
+    "condition": "row_header or column_header is missing",
+    "message": "표 규칙은 행·열 제목을 포함해야 합니다."
+  },
+  {
+    "code": "VAL_SPECIAL_EFFECTIVE_DATE",
+    "severity": "BLOCKER",
+    "applies_to": "VERSION_EFFECTIVE",
+    "condition": "supplementary provision has article-specific date but rule uses document default date",
+    "message": "조문별 별도 시행일을 반영해야 합니다."
+  }
+]

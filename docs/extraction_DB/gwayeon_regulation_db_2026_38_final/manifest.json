@@ -1,0 +1,75 @@
+{
+  "package_name": "gwayeon_regulation_db_2026_38_final",
+  "document_version": "NRD_COST_STANDARD_2026_38",
+  "title": "국가연구개발사업 연구개발비 사용 기준",
+  "notice_number": "과학기술정보통신부고시 제2026-38호",
+  "issuer": "과학기술정보통신부",
+  "document_type": "ADMINISTRATIVE_RULE",
+  "revision_type": "일부개정",
+  "effective_from": "2026-05-06",
+  "promulgated_at": "2026-05-06",
+  "special_effective_dates": [
+    {
+      "articles": [
+        "제5조",
+        "제10조의2",
+        "제25조의2"
+      ],
+      "effective_from": "2026-06-11",
+      "reason": "부칙 제1조 단서"
+    }
+  ],
+  "base_document_version": null,
+  "generated_at": "2026-07-21",
+  "source_files": [
+    "국가연구개발사업 연구개발비 사용 기준(고시)(제2026-38호)(20260506) (2).hwpx"
+  ],
+  "source_file_sha256": "0687bc3e6351915b2a9d5f3c891e1bbbbddbe0bdd7d21022cca8d6908ca74ca5",
+  "source_system": "국가법령정보센터",
+  "extraction_scope": "연구개발비 사용 기준 전문 (비목 사용용도·상한·승인·증빙·간접비)",
+  "notes": "국가연구개발사업 공통 기준. 사업별 지침·공고가 별도로 정한 사항은 그 문서가 우선한다.",
+  "counts": {
+    "categories": 27,
+    "budget_guides": 26,
+    "allowed_items": 158,
+    "limit_rules": 23,
+    "regulation_rules": 87,
+    "source_text": 126,
+    "review_issues": 3
+  },
+  "validation": {
+    "document_version": "NRD_COST_STANDARD_2026_38",
+    "checks": {
+      "direct_main_categories": true,
+      "activity_subcategories": true,
+      "indirect_main_categories": true,
+      "allowed_items_expanded": true,
+      "all_guides_have_source": true,
+      "all_items_have_source": true,
+      "all_items_have_category": true,
+      "innovation_effective_date": true
+    },
+    "all_passed": true
+  },
+  "pack_meta": {
+    "guideline": "국가연구개발사업 연구개발비 사용 기준 (과기정통부고시 제2026-38호)",
+    "agency": "과학기술정보통신부",
+    "reference_url": "https://www.law.go.kr",
+    "output": "nrd2026.json",
+    "scopes": [
+      {
+        "scope": "FOR_PROFIT",
+        "id": "nrd2026-forprofit",
+        "name": "R&D 사용기준 2026 (영리기관)",
+        "org_type": "영리기관"
+      },
+      {
+        "scope": "NON_PROFIT",
+        "id": "nrd2026-nonprofit",
+        "name": "R&D 사용기준 2026 (비영리기관)",
+        "org_type": "비영리기관"
+      }
+    ],
+    "program_name": "국가연구개발사업 연구개발비 사용 기준"
+  }
+}

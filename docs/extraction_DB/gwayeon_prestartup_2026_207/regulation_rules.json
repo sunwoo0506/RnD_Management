@@ -1,0 +1,646 @@
+[
+ {
+  "rule_code": "PRE-LBR-001",
+  "rule_name": "대표자 배우자·직계존비속 인건비 지급 불가",
+  "expense_category_code": "PRE_LABOR",
+  "rule_type": "DENY",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "신청자(예비창업자)의 배우자 또는 직계존비속이 소속직원인 경우 인건비를 지급할 수 없습니다."
+  },
+  "source_quote": "* 신청자(예비창업자)의 배우자 또는 직계존비속에게는 인건비 지급 불가",
+  "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목> 인건비·QnA 사업비 7번",
+  "effective_from": "2026-03-24",
+  "is_active": true
+ },
+ {
+  "rule_code": "PRE-LBR-002",
+  "rule_name": "4대보험 가입 인력만 인건비 지급",
+  "expense_category_code": "PRE_LABOR",
+  "rule_type": "ELIGIBILITY",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "RECOGNITION_REQUIRED",
+   "message": "협약체결 이후 4대보험에 가입된 기존·신규고용 인력 모두에게 인건비를 지급할 수 있습니다."
+  },
+  "source_quote": "가능합니다. 협약체결 이후에 4대 보험에 가입된 기존, 신규고용 인력 모두에 대해 인건비 지급이 가능합니다.",
+  "source_article": "QnA 사업비 5번",
+  "effective_from": "2026-03-24",
+  "is_active": true
+ },
+ {
+  "rule_code": "PRE-LBR-003",
+  "rule_name": "인건비 산정 기준",
+  "expense_category_code": "PRE_LABOR",
+  "rule_type": "CALCULATION",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "INFORMATION_REQUIRED",
+   "message": "인건비는 최근 3년간 근로소득 원천징수확인서를 기준으로 계상합니다. 최근 3년 이내 근로소득이 없으면 법정 최저 급여와 임금직업포털(wagework.go.kr)의 직급별 평균 연봉을 참고해 집행 계획을 세웁니다."
+  },
+  "source_quote": "인건비는 전년도(최근 3년간 근로소득 원천징수확인서)으로 계상하며, 최근 3년 이내 근로소득이 없는 경우 법정 최저 급여와 임금직업 포털(wagework.go.kr)의 맞춤형 직급별·임금정보의 평균 연봉을 참고하여 '사업비 집행 계획'을 수립하시기 바랍니다.",
+  "source_article": "QnA 사업비 1번",
+  "effective_from": "2026-03-24",
+  "is_active": true
+ },
+ {
+  "rule_code": "PRE-EQP-001",
+  "rule_name": "사무용 집기·가구·기구 집행 불가",
+  "expense_category_code": "PRE_EQUIPMENT",
+  "rule_type": "DENY_WITH_EXCEPTIONS",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "사무용 공간에 들어가는 집기·가구·기구(서랍, 책상 등)는 사업비로 집행할 수 없습니다. 다만 시제품 개발·제작에 소요되는 재료·원료와 시제품 제작을 위한 외주 공정 비용은 집행할 수 있습니다."
+  },
+  "source_quote": "사무용 공간에 들어가는 집기, 가구, 기구 등은 사업비 집행이 불가합니다. 단, 시제품을 개발·제작하는 데 소요되는 재료 또는 원료 및 시제품 제작을 위한 일부 공정을 외부 업체에 의뢰·제작하는 비용 등은 집행이 가능합니다.",
+  "source_article": "QnA 사업비 4번",
+  "effective_from": "2026-03-24",
+  "is_active": true
+ },
+ {
+  "rule_code": "PRE-USE-001",
+  "rule_name": "협약 전 집행분 소급 불가",
+  "expense_category_code": "ALL",
+  "rule_type": "DENY",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "선정 전에 집행한 비용은 협약체결 이후에 소급해 인정받을 수 없습니다. 사업화 자금은 협약 기간 내에 주관기관의 검토·승인이 완료된 사업비에 한해 집행할 수 있습니다."
+  },
+  "source_quote": "불가합니다. 사업화 자금은 협약 기간 내 주관기관의 검토 및 승인이 완료된 사업비에 한해 집행이 가능합니다.",
+  "source_article": "QnA 사업비 2번",
+  "effective_from": "2026-03-24",
+  "is_active": true
+ },
+ {
+  "rule_code": "PRE-USE-002",
+  "rule_name": "협약 종료 후 잔액 국고 반납",
+  "expense_category_code": "ALL",
+  "rule_type": "DEADLINE",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "사업비는 협약기간 동안만 사용할 수 있습니다. 협약 종료 후 남은 사업비는 전액 국고로 반납해야 하며 회사 잉여금으로 쓸 수 없습니다."
+  },
+  "source_quote": "불가합니다. 사업비는 협약기간 동안 사용이 가능합니다. 협약 종료 후에는 잔여 사업비를 전액 국고로 반납하셔야 합니다.",
+  "source_article": "QnA 사업비 6번",
+  "effective_from": "2026-03-24",
+  "is_active": true
+ },
+ {
+  "rule_code": "PRE-USE-003",
+  "rule_name": "단계별 집행 기간",
+  "expense_category_code": "ALL",
+  "rule_type": "DEADLINE",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "PROCEDURE_REQUIRED",
+   "message": "1단계 사업비는 협약시작일로부터 4개월 이내에, 2단계 사업비는 2단계 선정 이후 협약 4개월 차부터 4개월간 집행합니다. 협약기간은 1·2단계 동일하게 협약 시작일로부터 8개월입니다."
+  },
+  "source_quote": "1단계 사업비 집행 기간: 협약시작일로부터 4개월 이내 / 2단계 사업비 집행 기간: 2단계 선정 이후 협약(4개월 차) 4개월",
+  "source_article": "QnA 사업화 자금 1번·공고 1. 사업개요",
+  "effective_from": "2026-03-24",
+  "is_active": true
+ },
+ {
+  "rule_code": "PRE-USE-004",
+  "rule_name": "지정 계좌·시스템을 통한 집행",
+  "expense_category_code": "ALL",
+  "rule_type": "PAYMENT_METHOD",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "PROCEDURE_REQUIRED",
+   "message": "창업진흥원이 지정한 은행 계좌(사업비 계좌)를 개설하고 '창업사업통합정보관리시스템'을 통해 사업비를 지출(회계처리)해야 합니다. 계좌 개설이나 거래가 불가한 경우 협약체결과 사업화 지원이 불가합니다."
+  },
+  "source_quote": "선정자는 창업진흥원이 지정한 은행 계좌(사업비 계좌) 개설 및 '창업사업통합정보관리시스템'을 통한 사업비 지출(회계처리)이 가능하여야 함",
+  "source_article": "공고 유의사항·QnA 신청 관련",
+  "effective_from": "2026-03-24",
+  "is_active": true
+ },
+ {
+  "rule_code": "PRE-USE-005",
+  "rule_name": "지급 목적 외 사용 금지",
+  "expense_category_code": "ALL",
+  "rule_type": "DENY",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "수령한 정부지원사업비는 지급 목적에 맞게 사용해야 합니다. 다른 용도로 사용하거나 부정한 방법으로 지원받은 경우 형사처벌, 사업비 전액 환수, 창업사업화 지원사업 참여제한 대상이 될 수 있습니다."
+  },
+  "source_quote": "동 사업은 창업 활동에 필요한 사항을 정부가 지원하는 사업으로, 다른 용도의 사업비 사용 또는 거짓 신청, 부정한 방법으로 정부지원사업비를 지원받은 경우 「형법」, 「공공재정 부정청구 금지 및 부정이익 환수 등에 관한 법률」, 「보조금 관리에 관한 법률」, 「중소기업창업 지원사업 통합관리지침」 등에 따라 형사처벌 또는 정부지원사업비 전액 환수 및 창업사업화 지원사업 참여제한 등의 대상이 될 수 있습니다.",
+  "source_article": "공고 유의사항",
+  "effective_from": "2026-03-24",
+  "is_active": true
+ },
+ {
+  "rule_code": "PRE-USE-006",
+  "rule_name": "부정수급 제재부가금",
+  "expense_category_code": "ALL",
+  "rule_type": "DENY",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "사업비 부정수급 시 부정 사용금액을 포함해 반환금액의 최대 5배 수준의 제재부가금이 부과될 수 있습니다."
+  },
+  "source_quote": "동 사업비의 부정수급을 행할 경우 부정 사용금액을 포함하여 반환금액의 최대 5배 수준의 제재부가금이 부과될 수 있습니다.",
+  "source_article": "공고 유의사항",
+  "effective_from": "2026-03-24",
+  "is_active": true
+ },
+ {
+  "rule_code": "PRE-REG-001",
+  "rule_name": "상위 규정 준수 의무",
+  "expense_category_code": "ALL",
+  "rule_type": "REQUIRE",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "INFORMATION_REQUIRED",
+   "message": "선정자는 「중소기업창업 지원사업 운영요령」, 「중소기업창업 지원사업 통합관리지침」, 「동 사업 세부관리기준」, 협약서를 준수해야 합니다. 집행 세부기준은 이 문서들에 있으며 선정자에게 별도 안내됩니다."
+  },
+  "source_quote": "선정자는 「중소기업창업 지원사업 운영요령」 및 「중소기업창업 지원사업 통합관리지침」, 「동 사업 세부관리기준」, 협약서 등의 사항을 준수하며, 사업 완수를 위해 최선의 노력을 다하여야 함",
+  "source_article": "공고 선정자의 의무 및 책임",
+  "effective_from": "2026-03-24",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-37-2",
+  "rule_name": "귀금속·보석·원석 구매 사전승인",
+  "expense_category_code": "PRE_MATERIAL",
+  "rule_type": "APPROVAL_REQUIRED",
+  "institution_scope": "ALL",
+  "approval_status": "PRIOR_APPROVAL_REQUIRED",
+  "result": {
+   "status": "PRIOR_APPROVAL_REQUIRED",
+   "message": "귀금속·보석·원석 등은 원칙적으로 구매할 수 없습니다. 사업계획서상 제품 제작과 연관성이 높고 전문기관 또는 주관기관의 장의 사전승인이 있는 경우에만 예외적으로 구매할 수 있습니다."
+  },
+  "source_quote": "귀금속, 보석, 원석 등은 원칙적으로 구매할 수 없으나, 사업계획서 상의 제품 제작 시 연관성이 높고, 전문기관의 장 또는 주관기관의 장의 사전승인이 있을 경우 예외적으로 구매가능하다.",
+  "source_article": "통합관리지침 제37조제2항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-37-3",
+  "rule_name": "재료 구매 연관성·허위 정산 금지",
+  "expense_category_code": "PRE_MATERIAL",
+  "rule_type": "REQUIRE",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "구매하는 재료는 사업계획서상 제품 제작과 연관성이 있어야 합니다. 수량을 늘리거나 구입하지 않은 재료를 구입한 것처럼 허위 정산한 뒤 되돌려 받으면 제재 대상입니다."
+  },
+  "source_quote": "재료 구매 수량을 늘리거나 실제 구입하지 않은 재료를 구입한 것처럼 허위로 정산서류를 작성하여 정산처리한 후 되돌려 받은 경우는 제재조항에 따라 처리할 수 있다.",
+  "source_article": "통합관리지침 제37조제3항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-38-2",
+  "rule_name": "외주용역 계약 불가 업체",
+  "expense_category_code": "PRE_OUTSOURCING",
+  "rule_type": "DENY",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "다음 업체와는 계약·집행할 수 없습니다 — ① 시제품과 유사한 제품 제작 경험이 없는 업체 ② 과업과 업태·업종 연관성이 없는 업체 ③ 당해연도 동일사업에 참여한 창업기업 ④ 대표자가 재직 중이거나 사업 참여 전 재직했던 기업."
+  },
+  "source_quote": "창업기업등은 다음 각 호의 어느 하나에 해당하는 업체와 계약을 체결하거나 사업비를 집행할 수 없다. 1. 시제품과 유사한 제품에 대한 제작 경험이 없는 업체 2. 외주용역 과업과 사업자등록증 상 업태·업종의 연관성이 없는 업체 3. 당해연도 동일사업에 참여한 창업기업등 4. 창업기업등의 대표자가 현재 재직 중이거나 사업 참여 전 재직하였던 기업",
+  "source_article": "통합관리지침 제38조제2항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-38-3",
+  "rule_name": "2천만원 초과 외주용역 사전심의",
+  "expense_category_code": "PRE_OUTSOURCING",
+  "rule_type": "APPROVAL_REQUIRED",
+  "institution_scope": "ALL",
+  "approval_status": "PRIOR_APPROVAL_REQUIRED",
+  "result": {
+   "status": "PRIOR_APPROVAL_REQUIRED",
+   "message": "용역금액이 부가세 포함 2천만원을 초과하면 주관기관 사업운영위원회 소위원회의 사전 심의를 거쳐야 합니다. 동일 업체와의 누적 거래액이 2천만원을 초과할 때도 같습니다."
+  },
+  "source_quote": "용역금액이 2천만원을 초과(부가가치세 포함)하는 경우에는 주관기관 사업운영위원회 소위원회의 사전 심의를 거쳐야 한다.",
+  "source_article": "통합관리지침 제38조제3항·세부관리기준 제22조제2항제1호",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-38-4",
+  "rule_name": "외주용역 제출 서류",
+  "expense_category_code": "PRE_OUTSOURCING",
+  "rule_type": "EVIDENCE",
+  "institution_scope": "ALL",
+  "required_documents": [
+   "외주용역 계약서(용역명·금액·업체·기간·내용·절차·최종결과물 명시)",
+   "과업지시서",
+   "산출내역서",
+   "견적서"
+  ],
+  "result": {
+   "status": "EVIDENCE_REQUIRED",
+   "message": "외주용역 계약서·과업지시서·산출내역서·견적서를 온라인시스템으로 제출해야 합니다. 용역금액이 부가세 포함 2천만원을 초과하면 2인 이상의 견적서가 필요합니다."
+  },
+  "source_quote": "용역금액이 2천만원을 초과(부가가치세 포함)하는 경우에는 2인 이상으로부터 견적서를 받아 제출하여야 한다.",
+  "source_article": "통합관리지침 제38조제4항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-38-5",
+  "rule_name": "외주용역 선금 50% 이하",
+  "expense_category_code": "PRE_OUTSOURCING",
+  "rule_type": "LIMIT",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "외주용역비는 분할지급할 수 있으나 선금 합계는 전체 용역비의 50% 이하여야 합니다. 선급금이 500만원 이상이면 선금보증보험증권을, 500만원 미만이면 각서를 제출합니다."
+  },
+  "source_quote": "외주용역비는 분할지급(선금, 잔금)할 수 있다. 단, 선금의 합계 금액은 전체 용역비의 50% 이하로 한다. 선급금이 500만원 이상일 경우, 선금보증보험증권을 제출해야하며, 500만원 미만인 경우는 각서로 대체할 수 있다.",
+  "source_article": "통합관리지침 제38조제5항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-38-9",
+  "rule_name": "재하청·양산 금형 집행 불가",
+  "expense_category_code": "PRE_OUTSOURCING",
+  "rule_type": "DENY",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "외주용역업체가 일부 과업을 재하청하면 사업비를 집행할 수 없고, 최초 계약 업체가 모든 과업을 완료해야 합니다. 시제품의 시금형은 제작할 수 있으나 양산 목적의 금형제작비는 집행할 수 없습니다."
+  },
+  "source_quote": "외주용역업체에서 일부 과업을 재하청하는 경우는 사업비를 집행할 수 없으며, 최초 계약 체결한 외주용역업체에서 모든 과업을 완료하여야 한다. 시제품의 시금형을 제작할 수 있으나 양산목적의 금형제작비는 집행할 수 없다.",
+  "source_article": "통합관리지침 제38조제9항·제10항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-39-2",
+  "rule_name": "PC·사무용복합기는 직접 관련 시에만",
+  "expense_category_code": "PRE_EQUIPMENT",
+  "rule_type": "DENY_WITH_EXCEPTIONS",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "RECOGNITION_REQUIRED",
+   "message": "사무용 공간의 집기·가구·기구는 집행할 수 없습니다. PC(노트북·태블릿 포함), 기본 운영체제(OS), 사무용복합기는 해당 과제의 사업화 또는 경영활동과 직접 관련이 있는 경우에만 구매할 수 있습니다. 통신기기(스마트폰 등)도 창업 과제와 직접 연관이 있을 때만 구매할 수 있습니다."
+  },
+  "source_quote": "사무용 공간에 들어가는 집기, 가구, 기구 등은 집행할 수 없으며, PC(노트북 및 태블릿PC 포함), 기본 운영체제(OS 포함), 사무용복합기 등은 반드시 해당 과제의 사업화 또는 경영활동과 직접 관련이 있는 경우에 한하여 구매할 수 있다.",
+  "source_article": "통합관리지침 제39조제2항·제3항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-39-4",
+  "rule_name": "범용 사무용 소프트웨어 사전검토",
+  "expense_category_code": "PRE_EQUIPMENT",
+  "rule_type": "APPROVAL_REQUIRED",
+  "institution_scope": "ALL",
+  "approval_status": "RECOGNITION_REQUIRED",
+  "result": {
+   "status": "RECOGNITION_REQUIRED",
+   "message": "사무용 소프트웨어(MS-Office, 한글, 백신 등) 같은 범용성 소프트웨어는 원칙적으로 구매할 수 없습니다. 제품 제작에 필요 연관성이 높고 전문기관 또는 주관기관의 장의 사전검토를 얻은 경우에만 구매할 수 있습니다."
+  },
+  "source_quote": "사무용 소프트웨어(MS-Office, 한글, 백신 프로그램 등) 등의 범용성 소프트웨어는 원칙적으로 구매할 수 없으나 사업계획서 상의 제품을 제작 시 필요연관성이 높고, 전문기관의 장 또는 주관기관의 장의 사전검토를 얻은 경우 구매할 수 있다.",
+  "source_article": "통합관리지침 제39조제4항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-39-6",
+  "rule_name": "취득자산 처분 제한·5년 관리",
+  "expense_category_code": "PRE_EQUIPMENT",
+  "rule_type": "REQUIRE",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "사업비로 구매한 기계·장비 등 취득자산은 협약기간 중 임의로 처분할 수 없고 협약기간 이후에도 5년간 관리해야 합니다(취득가액 500만원 이하 제외). 취득 후 1개월 이내에 자산관리대장에 명기하고 온라인시스템에 등록해야 합니다."
+  },
+  "source_quote": "협약기간 중 본 사업비로 구매한 기계, 장비 등 취득자산을 임의로 처분할 수 없으며, 협약기간 이후에도 5년간 관리하여야 한다. 다만, 취득가액이 개당 500만원 이하는 그러하지 아니한다.",
+  "source_article": "통합관리지침 제39조제6항·제7항·세부관리기준 제22조제2항제3호",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-40-2",
+  "rule_name": "특허 성공보수 집행 불가",
+  "expense_category_code": "PRE_IP",
+  "rule_type": "DENY",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "특허 등록 시 발생하는 대행 수수료는 집행할 수 있으나 성공보수는 집행할 수 없습니다."
+  },
+  "source_quote": "특허 등록 시 발생하는 대행 수수료의 집행은 가능하나, 성공보수는 집행할 수 없다.",
+  "source_article": "통합관리지침 제40조제2항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-40-4",
+  "rule_name": "출원·등록인은 대표자 본인 또는 법인",
+  "expense_category_code": "PRE_IP",
+  "rule_type": "REQUIRE",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "출원·등록인은 창업기업 대표자 본인(법인은 창업자 본인이 대표이사로 등재된 법인 명의)이어야 합니다. 타인·타기관과 공동 출원 시에는 등록원부에 기재될 예상 지분율에 비례해 부담해야 합니다."
+  },
+  "source_quote": "출원·등록인은 창업기업등 대표자 본인(법인의 경우, 창업자 본인이 대표이사로 등재된 법인명의)이어야 한다. 단, 타인 또는 타기관 등과 공동 출원을 해야 하는 경우 출원 및 등록비용은 등록 시 등록원부에 기재될 예상 지분율에 비례하여 부담해야 한다.",
+  "source_article": "통합관리지침 제40조제4항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-41-1",
+  "rule_name": "대표자 인건비 지급 불가 (현물만 계상)",
+  "expense_category_code": "PRE_LABOR",
+  "rule_type": "DENY",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "창업기업 대표자는 과제수행에 따른 현물로만 계상할 수 있고 사업비로 인건비를 지급할 수 없습니다. 소속 직원의 급여는 과제참여율에 따라 지급합니다."
+  },
+  "source_quote": "창업기업등 대표자는 과제수행에 따른 현물로만 계상할 수 있고 사업비로 인건비를 지급할 수 없다.",
+  "source_article": "통합관리지침 제41조제1항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-41-2",
+  "rule_name": "타 정부지원사업 자기부담 인력 중복 불가",
+  "expense_category_code": "PRE_LABOR",
+  "rule_type": "DENY",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "인건비 지급대상 직원은 타 정부지원사업(중앙부처·지자체·공공기관 등)의 자기부담사업비(현금 또는 현물)로 활용할 수 없습니다. 이미 등재된 직원에게는 인건비를 지급할 수 없습니다."
+  },
+  "source_quote": "인건비 지급대상 직원은 타 정부지원사업(중앙부처, 지자체, 공공기관 등)의 자기부담사업비(현금 또는 현물)로 활용할 수 없다. 타 정부지원사업의 자기부담사업비(현금 또는 현물)로 등재된 직원은 인건비를 지급할 수 없다.",
+  "source_article": "통합관리지침 제41조제2항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-41-3",
+  "rule_name": "현물 계상 총 참여율 100% 이내",
+  "expense_category_code": "PRE_LABOR",
+  "rule_type": "LIMIT",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "소속 임직원의 현물 계상은 지원사업 참여 비율에 따라 계상하며, 전 사업의 총 참여율이 100%를 초과할 수 없습니다. (참여율 기준이며 비목 금액 상한이 아닙니다)"
+  },
+  "source_quote": "창업기업등 소속 임직원의 현물 계상기준은 지원사업에 참여하는 비율에 따라 계상하며, 전 사업의 총 참여율은 100%를 초과할 수 없다.",
+  "source_article": "통합관리지침 제41조제3항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-41-4",
+  "rule_name": "4대사회보험 가입 및 사업자부담분 집행",
+  "expense_category_code": "PRE_LABOR",
+  "rule_type": "REQUIRE",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "EVIDENCE_REQUIRED",
+   "message": "사업비로 인건비를 지출하는 인력은 반드시 4대사회보험에 가입해야 하며, 사업자부담 4대사회보험료를 포함해 집행할 수 있습니다."
+  },
+  "source_quote": "사업비로 인건비를 지출하는 인력에 대해서는 반드시 4대사회보험을 가입하여야 하며, 사업자부담 4대사회보험료를 포함하여 집행 할 수 있다.",
+  "source_article": "통합관리지침 제41조제4항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-41-8",
+  "rule_name": "일반건강진단비만 집행 가능",
+  "expense_category_code": "PRE_LABOR",
+  "rule_type": "ALLOW",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "ALLOWED",
+   "message": "사업비로 인건비를 지출하는 소속 직원에 한해 산업안전보건법 제129조에 따른 일반건강진단비용을 집행할 수 있습니다. 추가건강진단 비용은 집행할 수 없습니다."
+  },
+  "source_quote": "사업비로 인건비를 지출하는 소속 직원에 한하여 산업안전보건법 제129조에 따른 일반건강진단비용을 집행할 수 있다. 단, 일반건강진단 외 추가건강진단 비용은 사업비로 집행할 수 없다.",
+  "source_article": "통합관리지침 제41조제8항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-42-2",
+  "rule_name": "기술이전비 집행 조건",
+  "expense_category_code": "PRE_FEE",
+  "rule_type": "REQUIRE",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "EVIDENCE_REQUIRED",
+   "message": "기술이전비는 창업아이템과 직접 관련된 기술의 이전 및 법적 권리를 보장받는 계약에 한해 집행합니다. 기술이전계약서를 작성하고 증빙자료를 첨부해야 하며, 기술평가기관 평가금액 또는 공공연구기관 자체 기준 금액만 인정됩니다. 평가비와 발명보상금 성격의 비용은 집행할 수 없습니다."
+  },
+  "source_quote": "기술이전 금액은 '기술의 이전 및 사업화 촉진에 관한 법률 제35조(기술평가기관의 지정 등)'에 따른 기술평가기관의 평가금액 또는 공공연구기관이 자체 기준에 따라 책정한 금액에 한하여 인정하며 기술이전 금액 산출을 위한 평가비는 사업비로 집행할 수 없다.",
+  "source_article": "통합관리지침 제42조제2항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-42-3",
+  "rule_name": "학회·전시회 참가비는 협약기간 내 개최분만",
+  "expense_category_code": "PRE_FEE",
+  "rule_type": "DEADLINE",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "학회·세미나 참가비와 전시회·박람회 참가비는 협약기간 내에 개최하는 행사에 한해 집행할 수 있습니다. 인증완료 결과물(시험분석결과서·인증서)도 협약기간 내에 발급되어야 합니다."
+  },
+  "source_quote": "단, 협약기간 내에 개최하는 학회 또는 세미나 참가비에 한하여 집행한다. / 단, 협약기간 내에 개최하는 전시회 참가비에 한하여 집행한다.",
+  "source_article": "통합관리지침 제42조제3항·제4항·제5항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-42-7",
+  "rule_name": "차량 임차·보증금·관리비 집행 불가",
+  "expense_category_code": "PRE_FEE",
+  "rule_type": "DENY",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "차량 등의 임차 경비는 집행할 수 없습니다. 사무실임차료는 월 임차료만 집행할 수 있고 보증금·관리비는 집행할 수 없으며, 거주형태 공간의 임차료도 집행할 수 없습니다."
+  },
+  "source_quote": "차량 등의 임차 경비는 집행할 수 없다. / 사무실임차료는 창업 아이템 개발 등을 위해 공간을 임차하는 경우 발생하는 월 임차료를 집행하는 것을 말하며, 보증금 및 관리비는 집행할 수 없다.",
+  "source_article": "통합관리지침 제42조제7항·제8항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-43-2",
+  "rule_name": "여비는 증빙 가능한 대중교통비만",
+  "expense_category_code": "PRE_TRAVEL",
+  "rule_type": "LIMIT",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "여비는 실 지출금액 증빙이 가능한 대중교통(기차·버스·항공 등) 이용비용만 지출할 수 있고 일반석 등급에 한합니다. 해외 여비의 항공은 Economy Class로 한정합니다. 4대사회보험에 가입된 임직원만 대상이며 가입자명부를 제출해야 합니다."
+  },
+  "source_quote": "여비의 지출항목은 실 지출금액의 증빙이 가능한 대중교통(기차, 버스, 항공 등) 이용비용에 한하여 지출할 수 있다. / 해외 여비인 경우, 운임은 실비를 지급하며 항공은 Economy Class급으로 한정한다.",
+  "source_article": "통합관리지침 제43조제2항~제4항·세부관리기준 제22조제2항제4호",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "PRE-TRV-002",
+  "rule_name": "국외 출장 사전 보고",
+  "expense_category_code": "PRE_TRAVEL",
+  "rule_type": "APPROVAL_REQUIRED",
+  "institution_scope": "ALL",
+  "approval_status": "PRIOR_APPROVAL_REQUIRED",
+  "result": {
+   "status": "PRIOR_APPROVAL_REQUIRED",
+   "message": "국외 출장은 출국일 이전에 출장 개요(목적·기간·출장자·출장국가)와 여비 산출근거를 주관기관의 장에게 보고한 경우에만 사업비를 집행할 수 있습니다."
+  },
+  "source_quote": "국외 출장을 실시하려는 창업기업은 출국일 이전에 출장 개요(목적, 기간, 출장자, 출장국가 등) 및 여비 산출근거, 기타 주관기관이 요청하는 사항의 내용을 주관기관의 장에게 보고한 경우에 한하여 사업비 집행이 가능하다.",
+  "source_article": "세부관리기준 제22조제2항제2호",
+  "effective_from": "2025-07-02",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-44-2",
+  "rule_name": "교육비 환급분·본인부담금 제외",
+  "expense_category_code": "PRE_TRAINING",
+  "rule_type": "DENY",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "고용노동부 등의 교육비 환급과정은 환급금액을 제외한 금액만 지급할 수 있고, 고용노동부 등이 주관하는 교육의 '본인부담금'은 집행할 수 없습니다. 대상은 4대사회보험 가입 임직원입니다."
+  },
+  "source_quote": "고용노동부 등이 주관하는 교육의 '본인부담금'은 사업비로 집행할 수 없다.",
+  "source_article": "통합관리지침 제44조제1항~제3항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-45-4",
+  "rule_name": "광고선전비는 협약기간 내 완료분만",
+  "expense_category_code": "PRE_MARKETING",
+  "rule_type": "DEADLINE",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "광고선전비는 협약기간 내에 홍보가 완료된 건만 지출할 수 있습니다. 온라인 쇼핑몰 입점비와 앱 스토어 등록비용도 집행 대상에 포함됩니다. 광고 선전을 위해 외주용역을 진행하면 외주용역비 규정을 준용합니다."
+  },
+  "source_quote": "광고선전비는 협약기간 내 홍보가 완료된 건만 지출이 가능하다.",
+  "source_article": "통합관리지침 제45조제2항~제4항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-47-3",
+  "rule_name": "주관기관 사전검토 후 집행",
+  "expense_category_code": "ALL",
+  "rule_type": "APPROVAL_REQUIRED",
+  "institution_scope": "ALL",
+  "approval_status": "PRIOR_APPROVAL_REQUIRED",
+  "result": {
+   "status": "PRIOR_APPROVAL_REQUIRED",
+   "message": "사업비는 온라인시스템을 통한 집행이 원칙이며, 창업기업은 주관기관의 사전검토를 받은 뒤 집행할 수 있습니다."
+  },
+  "source_quote": "사업비는 온라인시스템을 통한 집행이 원칙이며 / 창업기업등은 주관기관의 사전검토 후, 사업비를 집행할 수 있다.",
+  "source_article": "통합관리지침 제47조제2항·제3항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-47-4",
+  "rule_name": "목적 외 집행 금지 항목",
+  "expense_category_code": "ALL",
+  "rule_type": "DENY",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "다음은 목적 외 집행입니다 — ① 정부지원사업비를 다른 용도로 집행 ② 부채 상환·이자지급·대표자 인건비 ③ 국세·지방세 등 세금 납부 ④ 증빙자료 허위 제출 또는 부적절한 집행."
+  },
+  "source_quote": "창업기업등은 지원사업의 목적 외로 사업비를 집행할 수 없으며, 목적 외 집행 내용은 다음 각 호와 같다. 1. 정부지원사업비를 다른 용도로 집행하는 경우 2. 창업기업등의 부채 상환 및 이자지급, 대표자 인건비로 집행하는 경우 3. 창업기업등 또는 대표자의 국세·지방세 등의 세금을 납부하는 경우 4. 증빙자료(세금계산서 등)를 허위로 제출하거나 부적절하게 집행한 경우",
+  "source_article": "통합관리지침 제47조제4항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-47-7",
+  "rule_name": "개인과 거래 불가 (멘토링비 제외)",
+  "expense_category_code": "ALL",
+  "rule_type": "PAYMENT_METHOD",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "세금계산서 및 신용카드로 지급할 수 없는 개인과는 거래할 수 없습니다(멘토링비 제외). 해외구매는 최종 거래처에 사업비카드를 사용해야 합니다."
+  },
+  "source_quote": "세금계산서 및 신용카드로 지급할 수 없는 개인과는 거래(멘토링비 제외)할 수 없다.",
+  "source_article": "통합관리지침 제47조제6항·제7항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-47-8",
+  "rule_name": "협약기간 초과 이용분 안분",
+  "expense_category_code": "ALL",
+  "rule_type": "DEADLINE",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "월간지·서버임차·쇼핑몰 입점·검색어 광고 등 이용(구매) 기간이 협약기간을 초과하면 협약기간 이내의 이용분만 집행할 수 있습니다."
+  },
+  "source_quote": "월간지, 서버임차, 쇼핑몰 입점, 검색어 광고 등의 이용(구매) 기간이 협약기간을 초과하는 경우 협약기간 이내의 이용(구매) 건에 한하여 사업비 집행 가능하다.",
+  "source_article": "통합관리지침 제47조제8항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "CG-47-9",
+  "rule_name": "타 지원사업 자부담금액 집행 불가",
+  "expense_category_code": "ALL",
+  "rule_type": "DENY",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "NOT_ALLOWED",
+   "message": "중앙부처·지자체·유관기관 등으로부터 교육·컨설팅·인증·해외 전시회 참가 등을 지원받을 때 발생하는 자부담금액은 집행할 수 없습니다."
+  },
+  "source_quote": "중앙부처, 지자체, 유관기관 등으로부터 교육, 컨설팅, 인증, 해외 전시회 참가, 기타 지원을 받는 경우 발생하는 자부담금액은 집행할 수 없다.",
+  "source_article": "통합관리지침 제47조제9항",
+  "effective_from": "2025-12-23",
+  "is_active": true
+ },
+ {
+  "rule_code": "PRE-CHG-001",
+  "rule_name": "세목 간 사업비 변경 절차",
+  "expense_category_code": "ALL",
+  "rule_type": "PROCEDURE",
+  "institution_scope": "ALL",
+  "result": {
+   "status": "PROCEDURE_REQUIRED",
+   "message": "사업비 변경은 전문기관 승인이 원칙이나, 세목 간 변경금액이 단일 건으로 2천만원 이하이거나 세목 내 산출내역 변경인 경우에는 전문기관 보고와 주관기관 내부결재로 변경할 수 있습니다."
+  },
+  "source_quote": "주관기관은 사업비 변경 사유가 발생하는 경우, 전문기관의 승인을 통해 변경할 수 있으나 다음 각 호에 해당하는 경우 전문기관 보고 및 주관기관 내부결재를 통해 변경할 수 있다. 1. 세목 간 사업비 변경금액이 단일 건으로 2천만원 이하인 경우 2. 세목 내 사업비 산출내역 변경",
+  "source_article": "세부관리기준 제9조제2항",
+  "effective_from": "2025-07-02",
+  "is_active": true
+ },
+ {
+  "rule_code": "PRE-EVD-001",
+  "rule_name": "집행내역별 증빙서류 구비",
+  "expense_category_code": "ALL",
+  "rule_type": "EVIDENCE",
+  "institution_scope": "ALL",
+  "required_documents": [
+   "집행내역별 집행 증빙서류"
+  ],
+  "result": {
+   "status": "EVIDENCE_REQUIRED",
+   "message": "창업기업은 사업비 집행 시 집행내역별 집행 증빙서류를 구비해야 합니다."
+  },
+  "source_quote": "창업기업은 사업비 집행 시, 집행내역별 집행 증빙서류를 구비하여야 한다.",
+  "source_article": "세부관리기준 제21조제2항",
+  "effective_from": "2025-07-02",
+  "is_active": true
+ }
+]

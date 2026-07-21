@@ -1,0 +1,32 @@
+{
+  "endpoint": "GET /api/v1/budget-guides",
+  "query_parameters": {
+    "institution_type": "FOR_PROFIT | NON_PROFIT | GOV_FUNDED | UNIVERSITY",
+    "program_id": "optional",
+    "as_of_date": "YYYY-MM-DD"
+  },
+  "precedence": [
+    "AGREEMENT_SPECIFIC",
+    "PROGRAM_SPECIFIC",
+    "AGENCY",
+    "MINISTRY",
+    "NATIONAL_RND_COMMON"
+  ],
+  "response_schema": {
+    "document_version": "string",
+    "profile_code": "string",
+    "category_code": "string",
+    "display_name": "string",
+    "usage_summary": "string",
+    "allowed_items": "array",
+    "limit": {
+      "display_type": "string",
+      "summary": "string",
+      "formula_expression": "string|null",
+      "calculated_cap": "number|null",
+      "over_limit_action": "string"
+    },
+    "source_articles": "array",
+    "effective_from": "date"
+  }
+}

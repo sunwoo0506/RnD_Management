@@ -1,0 +1,31 @@
+[
+ { "item_code": "PRE_MAT_RAW", "category_code": "PRE_MATERIAL", "item_name": "재료·원료 구입비", "description": "사업계획서상 사업화를 위해 소요되는 재료 또는 원료를 구입하는 비용", "institution_scope": "ALL", "availability_status": "ALLOWED", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "item_code": "PRE_MAT_DATA", "category_code": "PRE_MATERIAL", "item_name": "데이터 구입비", "description": "사업화를 위해 소요되는 데이터 구입 비용", "institution_scope": "ALL", "availability_status": "ALLOWED", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+
+ { "item_code": "PRE_OUT_PROTO", "category_code": "PRE_OUTSOURCING", "item_name": "시제품 제작 외주비", "description": "자체적으로 시제품 제작이 어려운 경우 일부 공정을 외부 업체에 의뢰하고 지급하는 대가", "institution_scope": "ALL", "availability_status": "ALLOWED", "condition_summary": "시제품 제작을 위한 일부 공정의 외부 의뢰에 한한다", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>·QnA 사업비 4번" },
+
+ { "item_code": "PRE_EQP_MACHINE", "category_code": "PRE_EQUIPMENT", "item_name": "기계·설비 구매비", "description": "사업 수행에 필요한 일정 횟수 또는 반영구적으로 사용 가능한 기계 또는 설비 구매 비용", "institution_scope": "ALL", "availability_status": "ALLOWED", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "item_code": "PRE_EQP_TOOL", "category_code": "PRE_EQUIPMENT", "item_name": "공구·기구·비품 구매비", "description": "사업 수행에 필요한 공구·기구·비품 구매 비용", "institution_scope": "ALL", "availability_status": "CONDITIONAL", "restriction_summary": "사무용 공간에 들어가는 집기·가구·기구(서랍, 책상 등)는 집행 불가", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>·QnA 사업비 4번" },
+ { "item_code": "PRE_EQP_SW", "category_code": "PRE_EQUIPMENT", "item_name": "소프트웨어(SW) 구매비", "description": "사업 수행에 필요한 소프트웨어 구매 비용", "institution_scope": "ALL", "availability_status": "ALLOWED", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+
+ { "item_code": "PRE_IP_APPLY", "category_code": "PRE_IP", "item_name": "지식재산권 출원비", "description": "창업아이템과 직접 관련 있는 지식재산권 출원 비용", "institution_scope": "ALL", "availability_status": "CONDITIONAL", "condition_summary": "사업계획서상의 창업아이템과 직접 관련이 있어야 한다", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "item_code": "PRE_IP_REGISTER", "category_code": "PRE_IP", "item_name": "지식재산권 등록비", "description": "창업아이템과 직접 관련 있는 지식재산권 등록 비용", "institution_scope": "ALL", "availability_status": "CONDITIONAL", "condition_summary": "사업계획서상의 창업아이템과 직접 관련이 있어야 한다", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+
+ { "item_code": "PRE_LBR_SALARY", "category_code": "PRE_LABOR", "item_name": "채용 직원 급여", "description": "채용 예정 직원이 사업에 직접 참여하는 경우 근로계약에 따라 지급하는 급여", "institution_scope": "ALL", "availability_status": "CONDITIONAL", "condition_summary": "협약체결 이후 4대보험에 가입된 기존·신규고용 인력에 지급 가능. 최근 3년 근로소득 원천징수확인서 기준으로 계상", "restriction_summary": "신청자(예비창업자)의 배우자 또는 직계존비속에게는 지급 불가", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>·QnA 사업비 1·5·7번" },
+
+ { "item_code": "PRE_FEE_TECH", "category_code": "PRE_FEE", "item_name": "기술이전비", "description": "사업화를 위한 기술이전 대가", "institution_scope": "ALL", "availability_status": "ALLOWED", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "item_code": "PRE_FEE_CONFERENCE", "category_code": "PRE_FEE", "item_name": "학회·세미나 참가비", "description": "사업화를 위한 학회 및 세미나 참가 비용", "institution_scope": "ALL", "availability_status": "ALLOWED", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "item_code": "PRE_FEE_EXHIBITION", "category_code": "PRE_FEE", "item_name": "전시회·박람회 참가비", "description": "사업화를 위한 전시회 및 박람회 참가 비용", "institution_scope": "ALL", "availability_status": "ALLOWED", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "item_code": "PRE_FEE_MENTORING", "category_code": "PRE_FEE", "item_name": "멘토링비", "description": "사업화를 위한 멘토링 대가", "institution_scope": "ALL", "availability_status": "ALLOWED", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "item_code": "PRE_FEE_TEST", "category_code": "PRE_FEE", "item_name": "시험·인증비", "description": "사업화를 위한 시험 및 인증 비용", "institution_scope": "ALL", "availability_status": "ALLOWED", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "item_code": "PRE_FEE_RENT", "category_code": "PRE_FEE", "item_name": "기자재 임차료", "description": "사업화를 위한 기자재 임차 비용", "institution_scope": "ALL", "availability_status": "ALLOWED", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+
+ { "item_code": "PRE_TRV_TRIP", "category_code": "PRE_TRAVEL", "item_name": "국내외 출장비", "description": "예비창업자 및 소속 임직원이 소재지를 벗어나 타 지역 또는 국외 출장 등의 사유로 집행하는 비용", "institution_scope": "ALL", "availability_status": "ALLOWED", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+
+ { "item_code": "PRE_TRN_EDU", "category_code": "PRE_TRAINING", "item_name": "기술·경영교육 이수비", "description": "예비창업자 및 소속 임직원이 사업화를 위해 기술 및 경영교육 이수 시 집행하는 비용", "institution_scope": "ALL", "availability_status": "ALLOWED", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+
+ { "item_code": "PRE_MKT_WEB", "category_code": "PRE_MARKETING", "item_name": "홈페이지 제작비", "description": "제품과 기업을 홍보하기 위한 홈페이지 제작 비용", "institution_scope": "ALL", "availability_status": "CONDITIONAL", "condition_summary": "협약 기간 내 집행", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>·QnA 사업비 8번" },
+ { "item_code": "PRE_MKT_VIDEO", "category_code": "PRE_MARKETING", "item_name": "홍보영상·홍보물 제작비", "description": "제품과 기업 홍보를 위한 홍보영상 및 홍보물 제작 비용", "institution_scope": "ALL", "availability_status": "CONDITIONAL", "condition_summary": "협약 기간 내 집행", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>·QnA 사업비 8번" },
+ { "item_code": "PRE_MKT_DESIGN", "category_code": "PRE_MARKETING", "item_name": "포장 디자인비", "description": "제품 포장 디자인 비용", "institution_scope": "ALL", "availability_status": "ALLOWED", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>" },
+ { "item_code": "PRE_MKT_AD", "category_code": "PRE_MARKETING", "item_name": "광고 게재·온라인 쇼핑몰 입점비", "description": "일간지 등의 광고 게재, 온라인 쇼핑몰 입점비 등 마케팅에 소요되는 비용", "institution_scope": "ALL", "availability_status": "ALLOWED", "source_article": "공고 2. 세부 지원내용 <사업화 자금 집행 비목>·QnA 사업비 8번" }
+]

@@ -1,0 +1,69 @@
+[
+  {
+    "code": "direct_cost",
+    "name": "직접비",
+    "data_type": "money",
+    "description": "직접비 총액"
+  },
+  {
+    "code": "in_kind_direct_cost",
+    "name": "직접비 현물",
+    "data_type": "money",
+    "description": "직접비 중 현물 부담액"
+  },
+  {
+    "code": "subcontract_cost",
+    "name": "위탁연구개발비",
+    "data_type": "money",
+    "description": "위탁연구개발비"
+  },
+  {
+    "code": "international_cost",
+    "name": "국제공동연구개발비",
+    "data_type": "money",
+    "description": "국제공동연구개발비"
+  },
+  {
+    "code": "rnd_contribution_cost",
+    "name": "연구개발부담비",
+    "data_type": "money",
+    "description": "연구개발부담비"
+  },
+  {
+    "code": "modified_direct_cost",
+    "name": "수정직접비",
+    "data_type": "money",
+    "description": "직접비에서 현물·위탁·국제공동·연구개발부담비를 제외한 금액",
+    "formula": "direct_cost - in_kind_direct_cost - subcontract_cost - international_cost - rnd_contribution_cost"
+  },
+  {
+    "code": "modified_labor_cost",
+    "name": "수정인건비",
+    "data_type": "money",
+    "description": "제26조제1항 각 호의 금액 합계"
+  },
+  {
+    "code": "monthly_salary",
+    "name": "월 급여",
+    "data_type": "money",
+    "description": "자체규정 또는 계약에 따른 1개월 급여"
+  },
+  {
+    "code": "labor_cost_rate",
+    "name": "인건비계상률",
+    "data_type": "ratio",
+    "description": "월 단위 과제 참여 정도"
+  },
+  {
+    "code": "participant_count",
+    "name": "참여연구자 수",
+    "data_type": "integer",
+    "description": "연구수당 지급 대상 수"
+  },
+  {
+    "code": "original_plan_amount",
+    "name": "원래계획 금액",
+    "data_type": "money",
+    "description": "협약 당시 또는 승인 변경 후 계획금액"
+  }
+]

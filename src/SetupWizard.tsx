@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, BookOpenCheck, Check, CheckCircle2, CloudUpload, FileSearch, Search, ShieldCheck, Sparkles, Trash2, Upload, Wand2 } from 'lucide-react';
-import { deriveTotalBudget, formatWon, getPack, makeDraftBudgets, previewFunding, SELECTABLE_PACKS } from './rules';
+import { deriveTotalBudget, formatWon, getPack, isRegulationDbPack, makeDraftBudgets, previewFunding, selectablePacks } from './rules';
 import { classifyProgram, guessProgramName, guessYear, type MatchResult } from './matching';
 import { DOCUMENT_TYPE_LABEL, type DocumentType, guessDocumentType, registryEnabled, searchRegistry, submitRegistryShare, type RegistryEntry } from './registry';
 import { annotateVerification, buildCustomPack, fundingScheduleAmountWon, runExtraction, suggestedFundingRates, type Extraction } from './llmExtract';
@@ -22,7 +22,7 @@ interface DocItem {
   error?: string;
 }
 
-export default function SetupWizard({ onCreate }: { onCreate: (project: Project) => void }) {
+export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project: Project) => void; onCancel?: () => void }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [form, setForm] = useState({ name: '', subsidy: '100000000', subsidyRate: '', matchingCashRate: '', start: today(), end: '', deadline: '', company: '', owner: '', email: '' });
   const [participant, setParticipant] = useState('');
@@ -39,7 +39,9 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
   const [share, setShare] = useState(false);
   const [creating, setCreating] = useState(false);
   // ---- AI 세부 규정 추출 ----
-  const [ai, setAi] = useState<{ status: 'idle' | 'working' | 'done' | 'error'; extraction?: Extraction; cached?: boolean; message?: string }>({ status: 'idle' });
+  // DB 우선 원칙: 검색 결과가 있으면 추출 블록을 접어두고, 사용자가 명시적으로 열 때만 쓴다.
+  const [forceAi, setForceAi] = useState(false);
+  const [ai, setAi] = useState<{ status: 'idle' | 'working' | 'done' | 'error'; extraction?: Extraction; cached?: boolean; message?: string; progress?: { done: number; total: number } }>({ status: 'idle' });
   const [acceptedRules, setAcceptedRules] = useState<Set<number>>(new Set());
   const [useDocCats, setUseDocCats] = useState(false);
   const [extractedPack, setExtractedPack] = useState<RulePack | null>(null);
@@ -103,9 +105,12 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
   const runAi = async () => {
     setAi({ status: 'working' });
     try {
-      const { extraction, cached } = await runExtraction(docsText(), match?.packId ?? null);
+      const { extraction, cached } = await runExtraction(docsText(), match?.packId ?? null,
+        (done, total) => setAi((prev) => prev.status === 'working' ? { ...prev, progress: { done, total } } : prev));
       const verified = annotateVerification(extraction, docsText());
       setAi({ status: 'done', extraction: verified, cached });
+      // DB에 없는 사업을 추출했으면 공유 신청을 기본으로 켠다 — 승인되면 DB에 등록돼 다음부터 검색으로 쓴다.
+      if (!registryPick) setShare(true);
       // 원문 대조에 성공한 규칙만 기본 선택 — 실패 항목은 사용자가 직접 확인 후 체크
       setAcceptedRules(new Set(verified.rules.map((rule, index) => rule.verified ? index : -1).filter((index) => index >= 0)));
       setUseDocCats(verified.categories.length > 0 && !match?.packId);
@@ -136,7 +141,12 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
     if (ai.extraction.year) setProgramYear((prev) => prev || String(ai.extraction!.year));
   };
 
-  const chosenPack: RulePack = extractedPack ?? registryPick?.pack ?? getPack(packId);
+  // 예산편성 비목은 근거가 검증된 규정DB 팩에서만 온다. 추출 팩이 비목의 출처가 되는 것은
+  // 대응하는 규정DB가 아직 없는 사업뿐이다 — 규정DB 팩을 고른 채로 공고문을 추출했다면 그 결과는
+  // 보관함에만 담고, 무엇이 달라졌는지는 과제 설정의 "규정 변경사항 확인"에서 검토한다.
+  const selectedPack = registryPick?.pack ?? getPack(packId);
+  const extractedIsBase = !!extractedPack && !isRegulationDbPack(selectedPack);
+  const chosenPack: RulePack = extractedIsBase ? extractedPack! : selectedPack;
 
   const create = async () => {
     if (creating) return;
@@ -165,8 +175,10 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
       onCreate({
         id: uid(), name: form.name, totalBudget, subsidyAmount, subsidyRate, matchingCashRate, startDate: form.start, endDate: form.end,
         settlementDeadline: form.deadline, agency: chosenPack.agency.split(' (')[0], companyName: form.company,
-        packId: extractedPack ? extractedPack.id : registryPick ? `registry:${registryPick.id}` : packId,
-        customPack: extractedPack ?? registryPick?.pack,
+        packId: extractedIsBase ? extractedPack!.id : registryPick ? `registry:${registryPick.id}` : packId,
+        customPack: extractedIsBase ? extractedPack! : registryPick?.pack,
+        // AI로 추출·적용한 팩은 보관함에도 담아 과제 설정 > AI 규정 추출에서 언제든 다시 열람할 수 있게 한다.
+        extractedPacks: extractedPack ? [{ id: uid(), savedAt: new Date().toISOString(), sourceDocTitles: docs.filter((doc) => doc.status === 'done').map((doc) => doc.file.name), pack: extractedPack }] : undefined,
         programName: programName.trim() || registryPick?.programName || (ai.status === 'done' ? ai.extraction?.programName : undefined) || undefined,
         members: [{ id: uid(), name: form.owner, email: form.email, role: '대표' }],
         participants: participant.trim() ? [{ id: uid(), name: participant.trim(), projectRate: 0, externalRate: 0 }] : [],
@@ -176,7 +188,7 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
   };
 
   return <div className="setup-page">
-    <div className="setup-brand"><div className="brand-mark"><Check /></div><span>과제온</span></div>
+    <div className="setup-brand"><div className="brand-mark"><Check /></div><span>과제온</span>{onCancel && <button type="button" className="wizard-cancel" onClick={onCancel}><ArrowLeft /> 기존 과제로 돌아가기</button>}</div>
     <main className="setup-card">
       <div className="setup-copy">
         <span className="eyebrow"><Sparkles size={14} /> 정부지원사업 예산 가이드</span>
@@ -217,15 +229,15 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
         <div><span className="step-pill">2 / 2</span><h2>적용 규정을 정해볼까요?</h2><p>공유 DB 검색, 공고문 업로드, 직접 선택 중 편한 방법을 쓰세요.</p></div>
 
         {registryEnabled() && <div className="wiz-block">
-          <h4><Search /> 사업명으로 공유 규정 DB 검색</h4>
+          <h4><Search /> ① 사업명으로 규정 DB 검색 — 등록된 규정 우선 사용</h4>
           <div className="search-row"><input value={searchQ} placeholder="예: 예비창업패키지" onChange={(e) => setSearchQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); runSearch(); } }} /><button type="button" className="secondary" disabled={searchBusy} onClick={runSearch}>{searchBusy ? '검색 중…' : '검색'}</button></div>
           {searchResults && (searchResults.length
             ? <div className="registry-results">{searchResults.map((entry) => <button type="button" key={entry.id} className={registryPick?.id === entry.id ? 'active' : ''} onClick={() => { setRegistryPick(entry); setProgramName(entry.programName); if (entry.year) setProgramYear(String(entry.year)); }}><strong>{entry.programName}{entry.year ? ` (${entry.year})` : ''}</strong><span>{entry.pack.guideline}{entry.verified ? ' · 검증됨' : ' · 검증 전'}</span></button>)}</div>
-            : <p className="wiz-hint">등록된 사업이 없어요. 공고문을 업로드해 식별하거나 직접 선택하세요.</p>)}
+            : <p className="wiz-hint">아직 DB에 등록되지 않은 사업이에요. 아래에서 공고문·지침을 업로드하면 AI가 규정을 추출해 이 과제에 적용할 수 있고, 공유 신청하면 관리자 승인 후 DB에 등록돼 다음부터는 검색만으로 바로 쓸 수 있어요.</p>)}
         </div>}
 
         <div className="wiz-block">
-          <h4><FileSearch /> 공고문·지침 업로드 — 자동 식별</h4>
+          <h4><FileSearch /> ② 공고문·지침 업로드 — 자동 식별</h4>
           <label className="upload-button wide"><Upload /> 파일 추가 (PDF · HWP · 이미지)<input type="file" multiple accept=".pdf,.hwp,.hwpx,.txt,.md,image/*" onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} /></label>
           {docs.length > 0 && <div className="doc-list">{docs.map((doc) => <div key={doc.id} className={`doc-item ${doc.status}`}>
             <span className="doc-name">{doc.file.name}</span>
@@ -238,13 +250,20 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
             : <div className="match-result none"><AlertCircle /><div><strong>유형을 확정하지 못했어요</strong><span>아래에서 직접 선택해주세요. 문서가 스캔본이면 텍스트 인식이 어려울 수 있어요.</span></div></div>)}
         </div>
 
-        {registryEnabled() && docs.some((doc) => doc.status === 'done') && <div className="wiz-block">
-          <h4><Wand2 /> AI 세부 규정 추출</h4>
-          {ai.status === 'idle' && <>
-            <p className="wiz-hint">읽힌 문서에서 상한·금지·재원 규정과 비목 구성을 추출해 <strong>원문 인용과 함께</strong> 보여드려요. 항목별로 검토·승인해야 적용됩니다.</p>
-            <button type="button" className="secondary" onClick={runAi}><Sparkles /> 문서에서 규정 추출하기</button>
-          </>}
-          {ai.status === 'working' && <p className="wiz-hint">문서를 분석하는 중… (문서 크기에 따라 최대 1~2분 걸릴 수 있어요)</p>}
+        {registryEnabled() && docs.some((doc) => doc.status === 'done') && !registryPick && <div className="wiz-block">
+          <h4><Wand2 /> ③ AI 세부 규정 추출 — DB에 없는 사업용</h4>
+          {ai.status === 'idle' && ((searchResults?.length ?? 0) > 0 && !forceAi
+            ? <>
+              <p className="wiz-hint">공유 DB에 등록된 사업이 검색됐어요. 위 ①에서 선택하면 추출 없이 검증된 규정을 바로 쓸 수 있어요. AI 추출은 DB에 없는 사업을 새로 등록할 때 쓰는 도구예요.</p>
+              <button type="button" className="text-button" onClick={() => setForceAi(true)}>등록된 규정 대신 문서에서 새로 추출하기</button>
+            </>
+            : <>
+              <p className="wiz-hint">{searchResults === null ? '먼저 ①에서 사업명을 검색해보세요 — 등록된 규정이 있으면 추출 없이 바로 쓸 수 있어요. DB에 없다면 ' : ''}읽힌 문서에서 상한·금지·재원 규정과 비목 구성을 추출해 <strong>원문 인용과 함께</strong> 보여드려요. 항목별로 검토·승인해야 적용되고, 공유 신청하면 관리자 승인 후 DB에 등록돼 다음부터 검색으로 바로 쓸 수 있어요.</p>
+              <button type="button" className="secondary" onClick={runAi}><Sparkles /> 문서에서 규정 추출하기</button>
+            </>)}
+          {ai.status === 'working' && <p className="wiz-hint">{ai.progress && ai.progress.total > 1
+            ? `문서가 길어 ${ai.progress.total}조각으로 나눠 분석하는 중… (${ai.progress.done}/${ai.progress.total} 완료)`
+            : '문서를 분석하는 중… (문서 크기에 따라 최대 1~2분 걸릴 수 있어요)'}</p>}
           {ai.status === 'error' && <><p className="field-error"><AlertCircle /> {ai.message}</p><button type="button" className="secondary" onClick={runAi}>다시 시도</button></>}
           {ai.status === 'done' && ai.extraction && <div className="ai-review">
             {ai.cached && <p className="wiz-hint">이 문서는 이전에 분석된 적이 있어 캐시된 결과를 불러왔어요.</p>}
@@ -288,12 +307,12 @@ export default function SetupWizard({ onCreate }: { onCreate: (project: Project)
         </div>}
 
         <div className="wiz-block">
-          <h4><BookOpenCheck /> 적용 규정 확정</h4>
+          <h4><BookOpenCheck /> ④ 적용 규정 확정</h4>
           {extractedPack
             ? <div className="registry-picked"><Wand2 /><div><strong>{extractedPack.name}</strong><span>추출·승인한 규정을 사용합니다 · {extractedPack.guideline} · 비목 {extractedPack.categories.length}개, 규칙 {extractedPack.rules.length}건</span></div><button type="button" className="text-button" onClick={() => setExtractedPack(null)}>해제</button></div>
             : registryPick
             ? <div className="registry-picked"><CheckCircle2 /><div><strong>{registryPick.programName}</strong><span>공유 DB의 규정 팩을 사용합니다 · {registryPick.pack.guideline}</span></div><button type="button" className="text-button" onClick={() => setRegistryPick(null)}>해제</button></div>
-            : <div className="pack-select" role="radiogroup" aria-label="사업 유형">{SELECTABLE_PACKS.map((pack) => <button type="button" key={pack.id} role="radio" aria-checked={packId === pack.id} className={packId === pack.id ? 'active' : ''} onClick={() => setPackId(pack.id)}><strong>{pack.name}</strong><span>{pack.guideline}</span></button>)}</div>}
+            : <div className="pack-select" role="radiogroup" aria-label="사업 유형">{selectablePacks().map((pack) => <button type="button" key={pack.id} role="radio" aria-checked={packId === pack.id} className={packId === pack.id ? 'active' : ''} onClick={() => setPackId(pack.id)}><strong>{pack.name}{isRegulationDbPack(pack) && <em className="pack-verified">근거 검증됨</em>}</strong><span>{pack.guideline}</span></button>)}</div>}
         </div>
 
         {registryEnabled() && <div className="wiz-block share-block">

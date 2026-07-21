@@ -160,10 +160,10 @@ describe('과제온 핵심 사용자 흐름', () => {
     vi.restoreAllMocks();
   });
 
-  it('참여율 합산 110%이면 빨간 경고와 조정 안내를 표시한다', async () => {
+  it('참여율 합산 110%이면 예산 편성 화면에서 빨간 경고와 조정 안내를 표시한다', async () => {
     localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture()));
     const user = userEvent.setup(); render(<App />);
-    await user.click(screen.getByRole('button', { name: '인력 · 담당자' }));
+    await user.click(screen.getByRole('button', { name: '예산 편성' }));
     const external = screen.getByLabelText('박연구 타 과제 참여율');
     await user.clear(external); await user.type(external, '60');
     expect(screen.getByText(/참여율 합산이 100%를 초과했습니다/)).toBeInTheDocument();

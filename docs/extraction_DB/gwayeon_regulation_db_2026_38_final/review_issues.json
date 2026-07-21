@@ -1,0 +1,24 @@
+[
+  {
+    "issue_code": "LEGAL_CROSS_REFERENCE_SUBCONTRACT",
+    "severity": "WARNING",
+    "status": "OPEN",
+    "source_article": "제27조제3항·제73조제1항제7호",
+    "description": "제27조제3항 본문은 위탁연구개발비 증액 사전승인을 제73조제1항제6호로 인용하지만, 시행본 제73조제1항 목록에서 위탁연구개발비 20% 이상 증액은 제7호입니다.",
+    "system_handling": "운영 조건은 제73조제1항제7호를 적용하고, 원문 인용 불일치는 메타데이터에 보존했습니다."
+  },
+  {
+    "issue_code": "PROGRAM_OVERRIDE_REQUIRED",
+    "severity": "INFO",
+    "status": "OPEN",
+    "description": "공통 고시만으로 사업별 별도 상한·현금계상 조건을 확정할 수 없는 경우가 있습니다.",
+    "system_handling": "공고·협약·전문기관 지침은 program_rule_overrides에서 우선순위를 높여 적용합니다."
+  },
+  {
+    "issue_code": "LEGAL_VS_UI_CATEGORY",
+    "severity": "INFO",
+    "status": "RESOLVED",
+    "description": "기존 인력 인건비와 신규채용 인건비는 고시의 법정 비목명이 아니라 화면용 구분입니다.",
+    "system_handling": "법정 비목 DIRECT_LABOR 하위의 UI_PROFILE로 분리했습니다."
+  }
+]

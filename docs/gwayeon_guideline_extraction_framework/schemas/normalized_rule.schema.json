@@ -1,0 +1,325 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gwayeon.local/schemas/normalized_rule.schema.json",
+  "title": "Normalized Regulation Rule",
+  "type": "object",
+  "required": [
+    "rule_id",
+    "version_id",
+    "rule_type",
+    "source_nodes",
+    "source_text",
+    "result",
+    "effective",
+    "confidence",
+    "review_status"
+  ],
+  "properties": {
+    "rule_id": {
+      "type": "string"
+    },
+    "version_id": {
+      "type": "string"
+    },
+    "rule_type": {
+      "type": "string"
+    },
+    "rule_name": {
+      "type": "string"
+    },
+    "target": {
+      "type": "object",
+      "properties": {
+        "category_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "item_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "original_term": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mapping_status": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "original_term"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "institution_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "program_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "project_attributes": {
+          "type": "object"
+        },
+        "stage_scope": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "condition": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "AND/OR/NOT 기반 조건 AST"
+    },
+    "limit": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "limit_type": {
+          "type": "string"
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "basis_code": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "formula_expression": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rounding_rule": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "message": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "approval_authority": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "recognition_authority": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "agreement_change_required": {
+          "type": "boolean"
+        },
+        "block_until_satisfied": {
+          "type": "boolean"
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "requirement",
+          "documents"
+        ],
+        "properties": {
+          "group": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requirement": {
+            "enum": [
+              "ALL",
+              "ONE_OF",
+              "OPTIONAL"
+            ]
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "required_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "deadline": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "event": {
+          "type": "string"
+        },
+        "base_date_field": {
+          "type": "string"
+        },
+        "offset_days": {
+          "type": "integer"
+        },
+        "offset_months": {
+          "type": "integer"
+        }
+      }
+    },
+    "exceptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "condition",
+          "effect"
+        ],
+        "properties": {
+          "condition": {
+            "type": "object"
+          },
+          "effect": {
+            "type": "object"
+          },
+          "source_node_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "overrides_rule_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "source_article": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "source_text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cross_references": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "effective": {
+      "type": "object",
+      "required": [
+        "effective_from"
+      ],
+      "properties": {
+        "effective_from": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "effective_to": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "date_basis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "review_status": {
+      "type": "string"
+    },
+    "validation_issues": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

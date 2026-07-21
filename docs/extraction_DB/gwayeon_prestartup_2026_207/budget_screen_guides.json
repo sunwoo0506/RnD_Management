@@ -1,0 +1,112 @@
+[
+ {
+  "profile_code": "PRE_FUNDING",
+  "category_code": "ALL",
+  "display_name": "사업화 자금 구성",
+  "usage_summary": "시제품 제작, 지식재산권 취득, 사업모델(BM) 개선, 마케팅 등에 소요되는 사업화 자금.",
+  "limit_text": "총사업비 = 정부지원사업비 100% (자기부담 없음)",
+  "limit_detail_text": "평균 0.4억원 지원, 선정평가 결과에 따라 차등. 1단계 20백만원(집행기간 협약시작일로부터 4개월 이내), 2단계는 1단계의 50% 내외를 선정해 20백만원 내외 추가 지원(집행기간 2단계 선정 이후 4개월). 신청자가 신청한 금액 범위 내에서 지급.",
+  "source_articles": ["공고 2. 세부 지원내용", "QnA 사업비 9번", "QnA 사업화 자금 1번"],
+  "effective_from": "2026-03-24",
+  "display_order": 5
+ },
+ {
+  "profile_code": "PRE_MATERIAL",
+  "category_code": "PRE_MATERIAL",
+  "display_name": "재료비",
+  "usage_summary": "사업계획서상 사업화를 위해 소요되는 재료 또는 원료, 데이터 등을 구입하는 비용.",
+  "limit_text": "비목 간 비율 제한 없음",
+  "limit_detail_text": "시제품을 개발·제작하는 데 소요되는 재료·원료는 집행 가능하나, 사무용 공간에 들어가는 집기·가구·기구는 집행할 수 없다.",
+  "source_articles": ["공고 2. 세부 지원내용 <사업화 자금 집행 비목>", "QnA 사업비 4번"],
+  "effective_from": "2026-03-24",
+  "display_order": 110
+ },
+ {
+  "profile_code": "PRE_OUTSOURCING",
+  "category_code": "PRE_OUTSOURCING",
+  "display_name": "외주용역비",
+  "usage_summary": "자체적으로 시제품 제작이 어려운 경우 일부 공정을 외부 업체에 의뢰하고 지급하는 대가.",
+  "limit_text": "비목 간 비율 제한 없음",
+  "limit_detail_text": "시제품 제작을 위한 일부 공정의 외부 의뢰·제작 비용은 집행 가능하다.",
+  "source_articles": ["공고 2. 세부 지원내용 <사업화 자금 집행 비목>", "QnA 사업비 4번"],
+  "effective_from": "2026-03-24",
+  "display_order": 120
+ },
+ {
+  "profile_code": "PRE_EQUIPMENT",
+  "category_code": "PRE_EQUIPMENT",
+  "display_name": "기계장치 (공구·기구, 비품, SW 등)",
+  "usage_summary": "사업 수행에 필요한 일정 횟수 또는 반영구적으로 사용 가능한 기계·설비·비품 구매 비용.",
+  "limit_text": "비목 간 비율 제한 없음",
+  "limit_detail_text": "사무용 공간에 들어가는 집기·가구·기구(서랍, 책상 등)는 집행할 수 없다.",
+  "source_articles": ["공고 2. 세부 지원내용 <사업화 자금 집행 비목>", "QnA 사업비 4번"],
+  "effective_from": "2026-03-24",
+  "display_order": 130
+ },
+ {
+  "profile_code": "PRE_IP",
+  "category_code": "PRE_IP",
+  "display_name": "특허권 등 무형자산 취득비",
+  "usage_summary": "사업계획서상의 창업아이템과 직접 관련 있는 지식재산권 등의 출원·등록 관련 비용.",
+  "limit_text": "비목 간 비율 제한 없음",
+  "limit_detail_text": "창업아이템과 직접 관련이 있어야 한다.",
+  "source_articles": ["공고 2. 세부 지원내용 <사업화 자금 집행 비목>"],
+  "effective_from": "2026-03-24",
+  "display_order": 140
+ },
+ {
+  "profile_code": "PRE_LABOR",
+  "category_code": "PRE_LABOR",
+  "display_name": "인건비",
+  "usage_summary": "채용 예정 직원이 사업에 직접 참여하는 경우 근로계약에 따라 지급하는 급여.",
+  "limit_text": "비목 간 비율 제한 없음",
+  "limit_detail_text": "협약체결 이후 4대보험에 가입된 기존·신규고용 인력 모두에게 지급 가능. 전년도(최근 3년간) 근로소득 원천징수확인서 기준으로 계상하고, 최근 3년 이내 근로소득이 없으면 법정 최저 급여와 임금직업포털(wagework.go.kr)의 직급별 평균 연봉을 참고한다. 신청자의 배우자·직계존비속에게는 지급 불가.",
+  "source_articles": ["공고 2. 세부 지원내용 <사업화 자금 집행 비목>", "QnA 사업비 1·5·7번"],
+  "effective_from": "2026-03-24",
+  "display_order": 150
+ },
+ {
+  "profile_code": "PRE_FEE",
+  "category_code": "PRE_FEE",
+  "display_name": "지급수수료",
+  "usage_summary": "사업화를 위한 거래를 수행하는 대가로 요구하는 비용 (기술이전비, 학회·세미나 참가비, 전시회·박람회 참가비, 멘토링비, 시험·인증비, 기자재 임차비 등).",
+  "limit_text": "비목 간 비율 제한 없음",
+  "limit_detail_text": null,
+  "source_articles": ["공고 2. 세부 지원내용 <사업화 자금 집행 비목>"],
+  "effective_from": "2026-03-24",
+  "display_order": 160
+ },
+ {
+  "profile_code": "PRE_TRAVEL",
+  "category_code": "PRE_TRAVEL",
+  "display_name": "여비",
+  "usage_summary": "예비창업자 및 소속 임직원이 소재지를 벗어나 타 지역 또는 국외 출장 등의 사유로 집행하는 비용.",
+  "limit_text": "비목 간 비율 제한 없음",
+  "limit_detail_text": null,
+  "source_articles": ["공고 2. 세부 지원내용 <사업화 자금 집행 비목>"],
+  "effective_from": "2026-03-24",
+  "display_order": 170
+ },
+ {
+  "profile_code": "PRE_TRAINING",
+  "category_code": "PRE_TRAINING",
+  "display_name": "교육훈련비",
+  "usage_summary": "예비창업자 및 소속 임직원이 사업화를 위해 기술 및 경영교육 이수 시 집행하는 비용.",
+  "limit_text": "비목 간 비율 제한 없음",
+  "limit_detail_text": null,
+  "source_articles": ["공고 2. 세부 지원내용 <사업화 자금 집행 비목>"],
+  "effective_from": "2026-03-24",
+  "display_order": 180
+ },
+ {
+  "profile_code": "PRE_MARKETING",
+  "category_code": "PRE_MARKETING",
+  "display_name": "광고선전비",
+  "usage_summary": "제품과 기업을 홍보하기 위한 홈페이지 제작비, 홍보영상·홍보물 제작비, 포장 디자인비, 일간지 등 광고 게재, 기타 마케팅 비용.",
+  "limit_text": "비목 간 비율 제한 없음",
+  "limit_detail_text": "협약 기간 내의 홈페이지 제작비, 홍보영상·홍보물 제작비, 온라인 쇼핑몰 입점비 등은 집행 가능하다.",
+  "source_articles": ["공고 2. 세부 지원내용 <사업화 자금 집행 비목>", "QnA 사업비 8번"],
+  "effective_from": "2026-03-24",
+  "display_order": 190
+ }
+]

@@ -1,5 +1,9 @@
 import packsData from './rulepacks/packs.json';
-import type { BudgetCategoryId, BudgetItem, PackCategory, PackRule, PaymentMethod, Project, RulePack } from './types';
+import nrd2026Packs from './rulepacks/nrd2026.json';
+import tips2026Packs from './rulepacks/tips2026.json';
+import prestartup2026Packs from './rulepacks/prestartup2026.json';
+import didimdol2026Packs from './rulepacks/didimdol2026.json';
+import type { BudgetCategoryId, BudgetItem, PackArticle, PackCategory, PackOverlay, PackRule, Participant, PaymentMethod, Project, RulePack } from './types';
 
 export const RULES_EFFECTIVE_DATE = '2026-07-19';
 
@@ -34,13 +38,56 @@ const LEGACY_PACK: RulePack = {
 };
 
 // ---- 팩 로더 ----
-export const PACKS: RulePack[] = [...(packsData as RulePack[]), LEGACY_PACK];
-// 새 과제 등록 화면에서 고를 수 있는 팩 (레거시 제외)
-export const SELECTABLE_PACKS: RulePack[] = PACKS.filter((pack) => pack.id !== 'legacy-rnd');
+// 번들에 들어 있는 팩. Supabase가 없거나 아직 응답하지 않았을 때 쓰는 기본값이며, 같은 id의
+// 팩이 규정DB(Supabase)에서 오면 그쪽이 이긴다 — 규정이 개정돼도 재배포 없이 반영되도록.
+export const PACKS: RulePack[] = [...(packsData as RulePack[]), ...(nrd2026Packs as RulePack[]), ...(tips2026Packs as RulePack[]), ...(prestartup2026Packs as RulePack[]), ...(didimdol2026Packs as RulePack[]), LEGACY_PACK];
+// 규정 DB에서 만든 팩으로 대체된 예시 팩 — 기존 과제가 계속 열리도록 남기되 새 과제에서는 고를 수 없다.
+const SUPERSEDED_PACK_IDS = ['legacy-rnd', 'prestartup'];
 
-export const getPack = (packId: string): RulePack => PACKS.find((pack) => pack.id === packId) ?? LEGACY_PACK;
-// 레지스트리에서 불러온 팩 스냅샷(customPack)이 있으면 그것을, 없으면 내장 팩을 쓴다.
-export const packFor = (project: Project): RulePack => project.customPack ?? getPack(project.packId);
+// Supabase 규정DB에서 내려받은 팩 (regulationDb.ts가 채운다). 같은 id의 번들 팩을 덮어쓴다.
+let remotePacks: RulePack[] = [];
+export const setRegulationPacks = (packs: RulePack[]) => { remotePacks = packs; };
+export const regulationPacks = (): RulePack[] => remotePacks;
+
+// 번들 + 원격을 합친 목록. 같은 id면 원격이 이긴다.
+export const allPacks = (): RulePack[] => {
+  const byId = new Map<string, RulePack>(PACKS.map((pack) => [pack.id, pack]));
+  for (const pack of remotePacks) byId.set(pack.id, pack);
+  return [...byId.values()];
+};
+
+// 새 과제 등록 화면에서 고를 수 있는 팩 — 근거가 검증된 규정DB 팩을 앞에 세운다.
+export const selectablePacks = (): RulePack[] => {
+  const packs = allPacks().filter((pack) => !SUPERSEDED_PACK_IDS.includes(pack.id));
+  return packs.sort((a, b) => Number(isRegulationDbPack(b)) - Number(isRegulationDbPack(a)));
+};
+
+export const isRegulationDbPack = (pack: RulePack): boolean => pack.origin === 'regulation_db';
+
+export const getPack = (packId: string): RulePack =>
+  remotePacks.find((pack) => pack.id === packId) ?? PACKS.find((pack) => pack.id === packId) ?? LEGACY_PACK;
+
+// 최신 공고에서 확인해 승인한 변경사항을 기준 팩 위에 얹는다. 비목은 건드리지 않는다 —
+// 같은 id의 규칙은 오버레이 것으로 대체하고, 대체된 기준 규칙은 목록에서 빼 중복 표시를 막는다.
+export const applyOverlay = (base: RulePack, overlay: PackOverlay): RulePack => {
+  const replaced = new Set([...overlay.rules.map((rule) => rule.id), ...(overlay.supersededRuleIds ?? [])]);
+  return { ...base, rules: [...base.rules.filter((rule) => !replaced.has(rule.id)), ...overlay.rules] };
+};
+
+// 예산편성 화면이 쓰는 팩.
+//
+// 비목은 근거가 검증된 규정DB 팩에서만 온다. AI 추출 결과(customPack)는 그 위에 얹는
+// 오버레이로만 반영되고 비목 구성을 바꾸지 못한다 — 화면에 뜬 비목이 언제나 어느 문서 몇 조에서
+// 왔는지 되짚을 수 있어야 하기 때문이다.
+// 예외는 대응하는 규정DB가 아직 없는 사업뿐이다. 이때는 추출 팩으로라도 편성할 수 있게 두되,
+// isRegulationDbPack()이 false라 화면이 "미검증"으로 표시한다.
+export const packFor = (project: Project): RulePack => {
+  const registered = getPack(project.packId);
+  const base = isRegulationDbPack(registered) ? registered : (project.customPack ?? registered);
+  const overlay = project.packOverlay;
+  // 기준 팩이 바뀐 뒤의 오버레이는 근거가 어긋날 수 있으므로 적용하지 않는다.
+  return overlay && overlay.basePackId === base.id ? applyOverlay(base, overlay) : base;
+};
 
 // 저장 데이터에 남은 옛 비목 ID 등 팩에 없는 ID가 와도 화면이 죽지 않도록 스텁을 돌려준다.
 export const categoryOf = (pack: RulePack, id: BudgetCategoryId): PackCategory =>
@@ -60,7 +107,7 @@ export const visibleCategories = (pack: RulePack, project: Project): PackCategor
 // 공고문에서 온 "OO비목에 반드시 N원 이상 계상" 같은 정액 필수 계상 요구사항.
 export interface CategoryMin { amount: number; label: string; rule: PackRule }
 export const minFor = (pack: RulePack, categoryId: BudgetCategoryId): CategoryMin | null => {
-  const rule = pack.rules.find((r) => r.kind === 'minimum' && r.minAmount != null && r.categoryIds?.includes(categoryId));
+  const rule = rulesForWithNameFallback(pack, categoryId, 'minimum').find((r) => r.minAmount != null);
   if (!rule || rule.minAmount == null) return null;
   return { amount: rule.minAmount, label: `${rule.item ? `${rule.item}: ` : ''}${formatWon(rule.minAmount)} 이상 필수 계상`, rule };
 };
@@ -87,27 +134,89 @@ export const rulesFor = (pack: RulePack, categoryId: BudgetCategoryId, kind?: Pa
 export const globalRules = (pack: RulePack, kind?: PackRule['kind']): PackRule[] =>
   pack.rules.filter((rule) => !rule.categoryIds?.length && (!kind || rule.kind === kind));
 
+// 이름 비교용 정규화 — 공백·중점·마침표 차이("연구시설·장비비" vs "연구시설.장비비")를 무시한다.
+const normName = (text: string) => text.replace(/[\s·.,]/g, '');
+
+// 비목에 연결(categoryIds)되지 못한 채 "과제 공통"으로 저장된 규칙을 비목 이름으로 재매칭한다.
+// AI 추출 팩에서 규칙의 item·message가 저장 시점 이름 매칭에 실패하면 상한·필수계상이 통째로
+// "제한 없음"이 되는 문제를, 이미 적용된 팩 데이터까지 포함해 화면 계산 시점에 복구한다.
+const ruleMatchesCategory = (rule: PackRule, categoryName: string): boolean => {
+  const nc = normName(categoryName);
+  if (!nc) return false;
+  if (rule.item) {
+    const ni = normName(rule.item);
+    return ni === nc || ni.includes(nc) || nc.includes(ni);
+  }
+  return normName(rule.message).includes(nc);
+};
+
+const rulesForWithNameFallback = (pack: RulePack, categoryId: BudgetCategoryId, kind: PackRule['kind']): PackRule[] => {
+  const linked = rulesFor(pack, categoryId, kind);
+  if (linked.length) return linked;
+  const name = categoryOf(pack, categoryId).name;
+  return globalRules(pack, kind).filter((rule) => ruleMatchesCategory(rule, name));
+};
+
 // ---- 상한 계산 ----
 // ratio 규칙의 basis를 편성표에서 계산 가능한 경우에만 금액 상한으로 환산한다.
 // (구입가·도입비 등 편성표 밖의 기준은 계산 불가 → 안내 텍스트로만 표시)
-export interface CategoryCap { amount: number | null; label: string; rule: PackRule }
+export interface CategoryCap {
+  amount: number | null;     // 계산된 상한 금액 (기준을 편성표에서 계산할 수 없으면 null)
+  label: string;             // "직접비의 40% 이내" 같은 기준 문구
+  rule: PackRule;
+  basisAmount: number | null; // 상한 계산에 쓴 기준 금액 — 편성 화면에서 계산식을 그대로 보여준다
+  basisLabel: string;        // 기준 이름 (총사업비, 직접비, 수정인건비 합계 …)
+  limitPct: number;          // 적용 비율 %
+  // amount가 null인 이유를 구분한다: partial이면 규칙 대상이 비목 전체가 아니라 그 안의 세부항목이고,
+  // 아니면 기준(구입가 등)이 편성표 밖이라 계산할 수 없다는 뜻이다. 화면 안내 문구가 달라진다.
+  partial: boolean;
+}
 
-export const capFor = (pack: RulePack, budgets: BudgetItem[], totalBudget: number, categoryId: BudgetCategoryId): CategoryCap | null => {
+// 계산식에 쓰는 기준 이름은 괄호 앞까지만 남긴다 —
+// "수정직접비(직접비 중 현물·위탁연구개발비·국제공동연구개발비 제외)"가 칸을 통째로 먹지 않게.
+const shortBasis = (basis: string): string => basis.split(/[(（]/)[0].trim() || basis;
+
+// inKindWon: 민간부담금 중 현물 금액 — basis가 "현물 제외"를 명시한 경우에만 차감한다.
+export const capFor = (pack: RulePack, budgets: BudgetItem[], totalBudget: number, categoryId: BudgetCategoryId, inKindWon = 0): CategoryCap | null => {
   // 하한(이상 지급) 규칙은 상한 검사 대상이 아니다 (예: 학생인건비 10% 이상 지급 관리).
-  const ratio = rulesFor(pack, categoryId, 'ratio').find((rule) => rule.limitPct !== undefined && !/이상/.test(rule.basis ?? ''));
+  const ratio = rulesForWithNameFallback(pack, categoryId, 'ratio').find((rule) => rule.limitPct !== undefined && !/이상/.test(rule.basis ?? ''));
   if (!ratio || ratio.limitPct === undefined) return null;
   const basis = ratio.basis ?? '';
   const amountOf = (id: string) => budgets.find((item) => item.categoryId === id)?.amount ?? 0;
+  // 내장 팩은 고정 비목 ID(personnel 등)를 쓰지만 AI 추출 팩은 문서 비목명 기반 ID(doc_0_인건비 등)라
+  // ID로 못 찾으면 비목 "이름"으로 찾는다 — 안 그러면 인건비 편성액이 0으로 잡혀 상한이 0원이 된다.
+  // 해당 이름의 비목이 아예 없으면 0원으로 단정하지 않고 null(계산 불가 → 안내만)로 둔다.
+  const sumByName = (re: RegExp): number | null => {
+    const matched = pack.categories.filter((category) => re.test(category.name.replace(/\s/g, '')));
+    return matched.length ? matched.reduce((sum, category) => sum + amountOf(category.id), 0) : null;
+  };
+  const resolve = (id: string, re: RegExp): number | null =>
+    pack.categories.some((category) => category.id === id) ? amountOf(id) : sumByName(re);
   let baseAmount: number | null = null;
   if (/총\s*사업비|총액/.test(basis)) baseAmount = totalBudget;
-  else if (/직접비/.test(basis)) baseAmount = totalBudget - amountOf('indirect') - amountOf('outsourcing');
-  else if (/수정인건비|인건비/.test(basis)) baseAmount = amountOf('personnel');
+  else if (/직접비/.test(basis)) {
+    baseAmount = totalBudget - (resolve('indirect', /간접비/) ?? 0) - (resolve('outsourcing', /위탁연구|외주/) ?? 0);
+    // "직접비(현물 제외)"처럼 현물 차감이 명시된 기준만 민간부담 현물을 뺀다 (현물은 편성표 비목이 아니라 재원 구성에서 온다).
+    // "직접비(현물 포함)"은 차감하지 않는다 — 포함 표기가 있으면 제외 문구가 뒤따라도(위탁 제외 등) 현물은 그대로 둔다.
+    const inKindExcluded = /현물[^)]*제외|제외[^)]*현물/.test(basis) && !/현물\s*포함/.test(basis);
+    if (inKindExcluded) baseAmount = Math.max(0, baseAmount - inKindWon);
+  }
+  else if (/수정인건비|인건비/.test(basis)) baseAmount = resolve('personnel', /인건비/);
   const category = categoryOf(pack, categoryId);
   // 규칙 대상이 비목 전체가 아니라 비목 안의 세부 항목(예: 간접비 중 능률성과급)이면 금액 상한으로 강제하지 않고 안내만 한다.
-  const partial = !!ratio.item && ratio.item !== category.name && !category.name.includes(ratio.item);
+  // 이름 비교는 공백·중점·마침표 차이를 무시한다 ("연구시설·장비비" 규칙이 "연구시설.장비비" 비목의 세부 항목으로 오인되지 않게).
+  const partial = !!ratio.item && normName(ratio.item) !== normName(category.name) && !normName(category.name).includes(normName(ratio.item));
   const prefix = partial ? `${ratio.item}: ` : '';
   const label = `${prefix}${ratio.basis ?? '기준'}의 ${ratio.limitPct}% 이내`;
-  return { amount: !partial && baseAmount !== null ? Math.round(baseAmount * ratio.limitPct / 100) : null, label, rule: ratio };
+  const computable = !partial && baseAmount !== null;
+  return {
+    amount: computable ? Math.round(baseAmount! * ratio.limitPct / 100) : null,
+    label, rule: ratio,
+    basisAmount: computable ? baseAmount : null,
+    basisLabel: `${prefix}${shortBasis(ratio.basis ?? '기준')}`,
+    limitPct: ratio.limitPct,
+    partial,
+  };
 };
 
 // 편성 화면의 비목 상태: 상한 초과 여부 (상한 계산 가능할 때만)
@@ -119,14 +228,92 @@ export const isOverCap = (pack: RulePack, budgets: BudgetItem[], totalBudget: nu
 };
 
 // 예산 변경 시 받는 비목이 상한을 넘는지 검사 (상한 규칙이 없는 팩·비목은 통과)
-export const transferLimitError = (pack: RulePack, budgets: BudgetItem[], totalBudget: number, toId: BudgetCategoryId, amount: number): string | null => {
+export const transferLimitError = (pack: RulePack, budgets: BudgetItem[], totalBudget: number, toId: BudgetCategoryId, amount: number, inKindWon = 0): string | null => {
   if (!totalBudget || amount <= 0) return null;
-  const cap = capFor(pack, budgets, totalBudget, toId);
+  const cap = capFor(pack, budgets, totalBudget, toId, inKindWon);
   if (!cap || cap.amount === null) return null;
   const current = budgets.find((item) => item.categoryId === toId)?.amount ?? 0;
   if (current + amount <= cap.amount) return null;
   const category = categoryOf(pack, toId);
   return `${category.name} 편성이 변경 후 ${formatWon(current + amount)}가 되어 허용 상한 ${formatWon(cap.amount)}(${cap.label})을 초과합니다. (근거: ${cap.rule.source.ref})`;
+};
+
+// ---- 규정 DB 기준 조회 (팩 종류와 무관) ----
+// 공고문에서 AI로 추출한 팩이나 내장 예시 팩에는 규정 DB의 인정 항목·상한·근거 조문이 없다.
+// 그래도 비목 이름은 규정 체계를 따르는 경우가 대부분이라(인건비, 외부 전문기술 활용비 …),
+// 이름으로 규정 DB 팩의 기준을 찾아 "공통 규정 기준"으로 함께 보여준다.
+// 국가연구개발사업 연구개발비 사용 기준은 국가 R&D 공통 기준이고, TIPS 지침도 이를 따르되
+// 별도로 정한 것만 우선한다(지침 11.가) — 그래서 공고 기준을 대체하지 않고 참고로만 붙인다.
+const REFERENCE_PACK_IDS = ['nrd2026-forprofit', 'tips2026'];
+
+export interface ReferenceStandard { pack: RulePack; category: PackCategory }
+
+// 이름 비교용 정규화 — 공백·중점·괄호 차이를 무시한다.
+const normCategoryName = (text: string) => text.replace(/[\s·.,()（）]/g, '');
+
+// 규정 DB 팩에서 이 이름에 해당하는 기준을 찾는다. 편성 비목과 참조 비목(세부 비목)을 모두 뒤지고,
+// 이름이 구체적인 것(긴 것)을 먼저 맞춰 "학생인건비"가 "인건비"로 뭉뚱그려지지 않게 한다.
+export const referenceStandardFor = (categoryName: string, currentPackId?: string): ReferenceStandard | null => {
+  const target = normCategoryName(categoryName);
+  if (target.length < 2) return null;
+  let best: { entry: ReferenceStandard; score: number } | null = null;
+  for (const packId of REFERENCE_PACK_IDS) {
+    // 이미 그 규정 DB 팩을 쓰고 있으면 자기 자신을 참고로 붙일 필요가 없다.
+    if (packId === currentPackId) continue;
+    const pack = getPack(packId);
+    if (pack.id !== packId) continue; // getPack은 못 찾으면 LEGACY_PACK을 준다
+    for (const category of [...pack.categories, ...(pack.referenceCategories ?? [])]) {
+      const name = normCategoryName(category.name);
+      if (!name) continue;
+      // 정확 일치 > 화면 비목이 규정 비목을 포함 > 규정 비목이 화면 비목을 포함
+      const score = name === target ? 1000 + name.length
+        : target.includes(name) ? 500 + name.length
+        : name.includes(target) ? 100 + target.length
+        : 0;
+      if (score && (!best || score > best.score)) best = { entry: { pack, category }, score };
+    }
+  }
+  return best?.entry ?? null;
+};
+
+// ---- 조문 원문 찾기 ----
+// 규칙의 근거(ref)로 규정 DB의 조문 원문을 찾는다. HWP에서 뽑은 본문은 자동 매긴 조문 번호가
+// 빠져서 원본 문서 검색이 자주 실패하는데, 이 표에는 번호와 본문이 함께 있어 항상 정확히 열린다.
+const normRef = (text: string) => text.replace(/[\s·.,()]/g, '');
+
+// 화면에서 쓰는 조문 조회. 현재 팩에 조문 원문이 없으면(공고문 AI 추출 팩·내장 예시 팩)
+// 규정 DB 팩에서 같은 조문을 찾는다 — 그 팩의 기준을 참고로 보여주고 있으므로 근거도 그쪽에 있다.
+export const findArticles = (pack: RulePack, ref: string): { pack: RulePack; articles: PackArticle[] } | null => {
+  const own = articlesForRef(pack, ref);
+  if (own.length) return { pack, articles: own };
+  for (const packId of REFERENCE_PACK_IDS) {
+    if (packId === pack.id) continue;
+    const referencePack = getPack(packId);
+    if (referencePack.id !== packId) continue;
+    const found = articlesForRef(referencePack, ref);
+    if (found.length) return { pack: referencePack, articles: found };
+  }
+  return null;
+};
+
+export const articlesForRef = (pack: RulePack, ref: string): PackArticle[] => {
+  const articles = pack.articles;
+  if (!articles?.length || !ref) return [];
+  const found: PackArticle[] = [];
+  const add = (article?: PackArticle) => { if (article && !found.some((a) => a.key === article.key)) found.push(article); };
+  // 근거가 "제27조제3항·제73조제1항제7호"처럼 여러 조문을 묶어 쓰므로 조문 번호를 모두 뽑아 각각 찾는다.
+  for (const match of ref.matchAll(/제\s*\d+(?:의\s*\d+)?\s*조/g)) {
+    const target = normRef(match[0]);
+    add(articles.find((article) => normRef(article.ref) === target));
+  }
+  if (found.length) return found;
+  // 조문 번호 체계가 아닌 지침류("지침 11.다.1) 인건비 가)")는 가장 길게 앞부분이 겹치는 조항을 쓴다.
+  const target = normRef(ref);
+  const prefixed = articles
+    .filter((article) => target.startsWith(normRef(article.ref)) || normRef(article.ref).startsWith(target))
+    .sort((a, b) => normRef(b.ref).length - normRef(a.ref).length);
+  add(prefixed[0]);
+  return found;
 };
 
 // ---- 공용 유틸 ----
@@ -174,6 +361,54 @@ export const previewFunding = (subsidyAmount: number, subsidyRate: number, match
   const matching = Math.max(totalBudget - subsidyAmount, 0);
   const { matchingCash, matchingInKind } = splitMatching(matching, matchingCashRate);
   return { totalBudget, matching, matchingCash, matchingInKind };
+};
+
+// ---- 인건비 계산 (인력·담당자 화면) ----
+// 4대보험 사업자 부담분 근사 요율 % — 국민연금 4.5 + 건강·장기요양 약 4 + 고용 약 1.15 + 산재 약 1.
+// 업종·규모에 따라 다르므로 과제별로 수정할 수 있다 (project.insuranceRate).
+export const DEFAULT_INSURANCE_RATE = 11;
+
+// 참여기간 개월 수 — 양 끝 달을 모두 포함한다 (2026-01 ~ 2026-12 = 12개월).
+export const monthsBetween = (start?: string, end?: string): number => {
+  if (!start || !end) return 0;
+  const s = new Date(start);
+  const e = new Date(end);
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime()) || e < s) return 0;
+  return (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1;
+};
+
+export interface LaborCost {
+  pay: number;       // 월급여
+  insurance: number; // 4대보험 사업자부담 (월)
+  severance: number; // 퇴직급여충당금 (월, 월급여의 1/12)
+  monthly: number;   // 월 인건비 = (월급여+4대보험+퇴직금) × 참여율
+  months: number;    // 참여 개월 수
+  total: number;     // 사업기간 합계 인건비
+  cash: number;      // 합계 중 현금
+  inKind: number;    // 합계 중 현물
+}
+
+// 퇴직급여충당금은 계속근로 1년 이상인 사람만 계상할 수 있어 인력마다 다르다.
+// 개인 설정(participant.includeSeverance)이 있으면 그것을, 없으면 과제 기본값을 따른다.
+export const severanceApplies = (participant: Participant, projectDefault?: boolean): boolean =>
+  participant.includeSeverance ?? projectDefault ?? true;
+
+export const laborCostFor = (
+  participant: Participant,
+  // includeInsurance: 4대보험 계상 여부(사업별로 다름, 전원 일괄). includeSeverance: 퇴직금 과제 기본값 — 개인 설정이 우선한다.
+  opts: { startDate: string; endDate: string; insuranceRate?: number; includeInsurance?: boolean; includeSeverance?: boolean },
+): LaborCost => {
+  const pay = participant.monthlyPay ?? 0;
+  const insurance = (opts.includeInsurance ?? true) ? Math.round(pay * (opts.insuranceRate ?? DEFAULT_INSURANCE_RATE) / 100) : 0;
+  const severance = severanceApplies(participant, opts.includeSeverance) ? Math.round(pay / 12) : 0;
+  const months = monthsBetween(participant.laborStart ?? opts.startDate, participant.laborEnd ?? opts.endDate);
+  const monthly = Math.round((pay + insurance + severance) * participant.projectRate / 100);
+  const total = monthly * months;
+  // 계상 구분: 현물(전액)·현금(전액)은 합계를 그대로 따라가고, 혼합만 laborInKind 입력값을 쓴다.
+  // laborFunding 미지정 구버전 데이터는 laborInKind 입력이 있으면 혼합, 없으면 현금으로 본다.
+  const fundingKind = participant.laborFunding ?? (participant.laborInKind != null ? 'mixed' : 'cash');
+  const inKind = fundingKind === 'inkind' ? total : fundingKind === 'cash' ? 0 : Math.min(participant.laborInKind ?? 0, total);
+  return { pay, insurance, severance, monthly, months, total, cash: total - inKind, inKind };
 };
 
 export const REASON_TEMPLATES = [
