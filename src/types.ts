@@ -20,6 +20,7 @@ export interface PackAllowedItem {
   restriction?: string;      // 제한·불인정 요약
   requiresApproval?: boolean; // 사전 승인 필요
   evidence?: string;         // 필요 증빙 요약
+  evidenceSource?: PackSource; // 증빙 요약의 근거 (비목 정의 근거와 다른 절에 있는 경우)
   source: PackSource;
 }
 

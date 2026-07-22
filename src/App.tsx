@@ -471,7 +471,7 @@ function AllowedItemList({ items, refLink }: { items: PackAllowedItem[]; refLink
         {item.description ? ` ${item.description}` : ''}
         {' '}{refLink({ item: item.name, message: item.description ?? item.name, source: item.source })}
         {/* 규정DB에 항목별 증빙이 있으면 여기서 보여준다 — 예전에는 실려 있어도 화면에 나오지 않았다. */}
-        {item.evidence && <em className="item-evidence"><FileCheck2 /> 증빙 {item.evidence}</em>}</span>
+        {item.evidence && <em className="item-evidence"><FileCheck2 /> 증빙 {item.evidence} {item.evidenceSource && refLink({ item: item.name, message: item.evidence, source: item.evidenceSource })}</em>}</span>
     </p>)}
     {items.length > ALLOWED_ITEM_PREVIEW && <button type="button" className="text-button more-items" onClick={() => setExpanded(!expanded)}>
       {expanded ? '접기' : `${items.length - ALLOWED_ITEM_PREVIEW}건 더 보기`}

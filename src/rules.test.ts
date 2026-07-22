@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOverlay, articlesForRef, baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, fundingCapChecks, maxAmountWithinCap, subItemChoicesFor, fundingRateChecks, packIsMissing, replacementPacksFor, rescaleBudgets, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories } from './rules';
+import { applyOverlay, articlesForRef, baseStandardFor, basisFormula, budgetBases, capFor, evidenceGuide, categoryOf, fundingCapChecks, maxAmountWithinCap, subItemChoicesFor, fundingRateChecks, packIsMissing, replacementPacksFor, rescaleBudgets, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories } from './rules';
 import type { Project, RulePack } from './types';
 
 describe('규정 팩 로더', () => {
@@ -239,6 +239,33 @@ describe('상한 계산과 배분', () => {
     const prestartup = getPack('prestartup');
     const preBudgets = makeDraftBudgets(prestartup, 100_000_000);
     expect(transferLimitError(prestartup, preBudgets, 100_000_000, 'cat_personnel', 50_000_000)).toBeNull();
+  });
+});
+
+describe('집행 증빙 안내', () => {
+  it('앱 예시 기본값과 규정DB 증빙을 섞지 않고 나눠서 준다', () => {
+    const pack = getPack('nrd2026-forprofit');
+    const guide = evidenceGuide(pack, categoryOf(pack, 'DIRECT_ACTIVITY'), 'card');
+    // 앱이 넣어둔 예시 기본값 — 카드 결제라 영수증이 카드 영수증으로 바뀐다
+    expect(guide.template).toEqual(['내부품의서', '결과보고서', '카드 영수증']);
+    // 규정DB 증빙 규칙은 조건이 갈리는 것까지 그대로 (자동으로 합치면 서로 어긋난다)
+    expect(guide.rules.map((rule) => rule.name)).toContain('10만원 초과 회의비 기본 증빙');
+    expect(guide.rules.map((rule) => rule.name)).toContain('10만원 이하 회의비 간소화 증빙');
+    expect(guide.guideline).toContain('국가연구개발사업 연구개발비 사용 기준');
+  });
+
+  it('팁스 지침의 비목별 증빙서류 표가 인정 항목마다 실린다', () => {
+    const pack = getPack('tips2026-general');
+    const activity = evidenceGuide(pack, categoryOf(pack, 'DIRECT_ACTIVITY'), 'card');
+    expect(activity.items).toHaveLength(14);
+    expect(activity.items.find((item) => item.name === '회의 다과·식비')?.evidence).toContain('10만원 이하');
+    expect(activity.items.find((item) => item.name === '국내외 출장비')?.evidence).toContain('출장결과보고서');
+    // 인건비·간접비까지 표가 덮는 세목은 모두 채워졌다
+    expect(evidenceGuide(pack, categoryOf(pack, 'DIRECT_LABOR'), 'card').items).toHaveLength(4);
+    expect(evidenceGuide(pack, categoryOf(pack, 'INDIRECT'), 'card').items).toHaveLength(10);
+    // 증빙 표는 비목 정의와 다른 절에 있어 근거를 따로 단다
+    const item = pack.categories.find((c) => c.id === 'DIRECT_LABOR')?.allowedItems?.[0];
+    expect(item?.evidenceSource?.ref).toBe('지침 11.다.1) 비목별 증빙서류');
   });
 });
 

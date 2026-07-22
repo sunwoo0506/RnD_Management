@@ -258,6 +258,8 @@ const buildAllowedItems = (code, scope) => {
       ...(i.restriction_summary ? { restriction: i.restriction_summary } : {}),
       ...(i.requires_approval ? { requiresApproval: true } : {}),
       ...(i.evidence_summary ? { evidence: i.evidence_summary } : {}),
+      // 증빙 요약이 비목 정의와 다른 절(팁스 지침 11.다.1) 증빙서류 표 등)에서 온 경우 그 위치를 따로 싣는다.
+      ...(i.evidence_source_article ? { evidenceSource: { doc: DOC, ref: i.evidence_source_article, matchLevel: 'guideline' } } : {}),
       source: { doc: DOC, ref: i.source_article ?? '허용 항목 목록', matchLevel: 'guideline' },
     }));
 };
