@@ -267,7 +267,10 @@ export interface EvidenceChecklist {
   sourceName: string;        // 이 증빙이 어느 기준에서 왔는지 (세목명 또는 비목명)
   groups: EvidenceGroup[];   // 조건별 묶음 — '항상 필요'가 맨 앞
   documents: string[];       // 전체 서류 (중복 제거)
-  sources: { ref: string; phrase: string }[]; // 실제 체크리스트를 만든 근거 — 화면 원문 토글과 같은 출처를 쓴다
+  // 실제 체크리스트를 만든 근거 — 화면 원문 토글과 같은 출처를 쓴다.
+  // 한 조문이 여러 인정 항목의 근거인 일이 흔해서(팁스 '비목별 증빙서류' 표 하나에 세목이 다 들어 있다),
+  // 문구를 하나만 들고 있으면 마지막 항목만 남아 엉뚱한 줄이 짚힌다 — 항목마다 하나씩 모은다.
+  sources: { ref: string; phrases: string[] }[];
 }
 
 // 고른 세목의 증빙을 서류 단위로 쪼개 체크리스트로 만든다.
@@ -286,7 +289,12 @@ export const evidenceChecklistFor = (pack: RulePack, categoryId: BudgetCategoryI
     return !!sibling && sibling.category.id !== category.id && withEvidence(sibling.category).length > 0;
   });
   const items = fromSub.length ? fromSub : dividedBySubItem ? [] : withEvidence(category);
-  const sources = new Map<string, { ref: string; phrase: string }>();
+  const sources = new Map<string, { ref: string; phrases: string[] }>();
+  const addSource = (ref: string, phrase: string) => {
+    const entry = sources.get(ref) ?? { ref, phrases: [] };
+    if (!entry.phrases.includes(phrase)) entry.phrases.push(phrase);
+    sources.set(ref, entry);
+  };
 
   const groups: EvidenceGroup[] = [];
   const addGroup = (group: EvidenceGroup) => {
@@ -297,8 +305,16 @@ export const evidenceChecklistFor = (pack: RulePack, categoryId: BudgetCategoryI
   };
   for (const item of items) {
     const ref = item.evidenceSource?.ref ?? item.source.ref;
-    if (ref) sources.set(ref, { ref, phrase: `${item.name} ${item.evidence}` });
-    for (const group of parseEvidenceText(item.evidence!)) addGroup({ ...group, ref });
+    const parsed = parseEvidenceText(item.evidence!);
+    for (const group of parsed) addGroup({ ...group, ref });
+    if (!ref) continue;
+    // 항목 하나가 곧 표의 한 줄이다 — 항목마다 문구를 따로 들고 있어야 제 줄을 짚는다.
+    addSource(ref, `${item.name} ${item.evidence}`);
+    // 조건이 붙은 묶음은 표에서 줄이 갈린다 (출장비 = 국내/국외 × 여비기준 유무 4줄).
+    // 조건 없는 묶음은 어느 비목에나 나오는 일반 서류라 따로 찾으면 남의 줄을 짚는다.
+    for (const group of parsed) {
+      if (group.condition) addSource(ref, `${item.name} ${group.condition} ${group.documents.join(' ')}`);
+    }
   }
 
   // 증빙 규칙은 항목별 증빙과 같은 서류를 다시 적는 경우가 많다(회의비 증빙자료 ↔ 회의비 인정항목).
@@ -310,7 +326,7 @@ export const evidenceChecklistFor = (pack: RulePack, categoryId: BudgetCategoryI
     const documents = rule.documents.filter((document) => !already.has(document));
     if (documents.length) {
       addGroup({ condition: rule.name, documents, ref: rule.source.ref });
-      sources.set(rule.source.ref, { ref: rule.source.ref, phrase: `${rule.name} ${documents.join(' ')}` });
+      addSource(rule.source.ref, `${rule.name} ${documents.join(' ')}`);
     }
   }
 

@@ -206,17 +206,26 @@ const termMatches = (paragraph: string, term: string): boolean => {
 // (두 글자 낱말까지 칠하면 문단이 온통 노랗게 된다).
 export const articleTerms = (text: string): string[] => termsOf(text, 3);
 
-export const markArticleParagraphs = (articleText: string, phrase: string, minHits = 2): { paragraphs: string[]; marked: Set<number>; terms: string[] } => {
+// 문구를 여러 개 받으면 각각이 가리키는 문단을 따로 짚어 합친다.
+// 한 조문이 여러 항목의 근거일 때(팁스 '비목별 증빙서류' 표에는 세목이 통째로 들어 있다)
+// 문구를 하나로 합쳐 찾으면 그중 가장 센 항목의 줄 하나만 남는다 —
+// 외부 전문기술 활용비를 골랐는데 그 안의 연구개발서비스활용비 줄만 짚히던 원인이다.
+export const markArticleParagraphs = (articleText: string, phrase: string | string[], minHits = 2): { paragraphs: string[]; marked: Set<number>; terms: string[] } => {
   const paragraphs = articleText.split('\n');
-  const scoreTerms = termsOf(phrase, 2);
-  const terms = articleTerms(phrase);
-  const hits = paragraphs.map((paragraph) => scoreTerms.filter((term) => termMatches(paragraph, term)).length);
-  // 가장 잘 맞는 문단만 짚는다. 비목별 증빙서류 표처럼 한 조문이 수백 줄이고 '카드매출전표…'가
-  // 반복되는 곳에서는 "N개 이상"으로 자르면 표 절반이 칠해진다.
-  // 최고 점수와 같은 문단만 남기고, 그 최고 점수가 minHits에 못 미치면 아무 데도 짚지 않는다.
-  const best = Math.max(0, ...hits);
-  const threshold = best >= minHits ? best : Infinity;
-  const marked = new Set(hits.flatMap((hit, index) => hit >= threshold ? [index] : []));
+  const phrases = (Array.isArray(phrase) ? phrase : [phrase]).filter((one) => one.trim());
+  const marked = new Set<number>();
+  const terms: string[] = [];
+  for (const one of phrases) {
+    for (const term of articleTerms(one)) if (!terms.includes(term)) terms.push(term);
+    const scoreTerms = termsOf(one, 2);
+    const hits = paragraphs.map((paragraph) => scoreTerms.filter((term) => termMatches(paragraph, term)).length);
+    // 문구 하나가 가장 잘 맞는 문단만 짚는다. 비목별 증빙서류 표처럼 한 조문이 수백 줄이고
+    // '카드매출전표…'가 반복되는 곳에서는 "N개 이상"으로 자르면 표 절반이 칠해진다.
+    // 최고 점수와 같은 문단만 남기고, 그 최고 점수가 minHits에 못 미치면 아무 데도 짚지 않는다.
+    const best = Math.max(0, ...hits);
+    const threshold = best >= minHits ? best : Infinity;
+    hits.forEach((hit, index) => { if (hit >= threshold) marked.add(index); });
+  }
   return { paragraphs, marked, terms };
 };
 
@@ -571,7 +580,7 @@ const capHint = (cap: CategoryCap, inKindAmount: number, hasMatching: boolean): 
 // 유의사항과 증빙이 같은 방식으로 근거를 펼쳐 보게 한다.
 // 근거 번호가 조문 표에 없으면 아무것도 내놓지 않는다. 번호가 비슷한 조문을 대신 붙이면
 // 간접비 증빙에 연구활동비 조문이 달린다 — 엉뚱한 근거는 없는 것만 못하다.
-function ArticleToggle({ pack, refText, phrase, label = '근거 조문 보기' }: { pack: RulePack; refText: string; phrase: string; label?: string }) {
+function ArticleToggle({ pack, refText, phrase, label = '근거 조문 보기' }: { pack: RulePack; refText: string; phrase: string | string[]; label?: string }) {
   const articles = findArticles(pack, refText)?.articles ?? [];
   const located = articles.map((article) => ({ article, ...markArticleParagraphs(article.text, phrase) }));
   // 규정DB에 원문이 안 실린 근거가 있다 (팁스 '비목별 증빙서류' 표 등) — 근거 번호만 밝힌다.
@@ -1647,7 +1656,7 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
             : '해당하지 않는 조건은 체크를 풀어주세요. 켜둔 서류가 이 집행건의 증빙 목록이 됩니다.'}</small>
           {/* 유의사항과 같은 방식으로 근거 조문 원문을 펼쳐 본다. 같은 조문을 가리키는 항목이
               여러 개라(인건비 4개 항목이 모두 '비목별 증빙서류') 조문 단위로 한 번만 낸다. */}
-          {evidenceArticles.map((item) => <ArticleToggle key={item.ref} pack={pack} refText={item.ref} phrase={item.phrase} label="근거 지침 원문 보기" />)}
+          {evidenceArticles.map((item) => <ArticleToggle key={item.ref} pack={pack} refText={item.ref} phrase={item.phrases} label="근거 지침 원문 보기" />)}
           {/* 규정에 없는 서류도 실무에서 요구받는다 (월별 4대보험가입자 명부·완납증명서 등) — 직접 넣을 수 있게 한다. */}
           <div className="doc-add">
             <input aria-label="증빙 직접 추가" value={newDoc} placeholder="규정에 없는 증빙 직접 추가 (예: 4대보험 완납증명서)"

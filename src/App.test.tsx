@@ -541,6 +541,30 @@ describe('집행건 등록 — 비목·세목 먼저', () => {
     expect(shown).not.toContain('정부출연기관 연구개발비 이관');
   });
 
+  it('세목 안의 인정 항목마다 증빙표에서 제 줄을 짚는다', async () => {
+    // 한 조문(증빙표)을 여러 항목이 근거로 쓰면 근거 문구가 마지막 항목 것만 남아,
+    // 외부 전문기술 활용비를 골랐는데 그 안의 연구개발서비스활용비 줄만 짚히던 문제.
+    const base = fixture('tips2026-general');
+    localStorage.setItem('gwajeon.project.v1', JSON.stringify({
+      ...base,
+      budgets: base.budgets.map((b) => b.categoryId !== 'DIRECT_ACTIVITY' ? b : {
+        ...b, amount: 20_000_000, subItems: [{ id: 'ext', name: '외부 전문기술 활용비', amount: 20_000_000 }],
+      }),
+    }));
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole('button', { name: '집행 · 증빙' }));
+    await user.selectOptions(screen.getByLabelText('비목'), 'DIRECT_ACTIVITY');
+    await user.selectOptions(screen.getByLabelText('세목'), 'ext');
+    const step = screen.getByRole('group', { name: /집행 시 유의사항/ });
+    const toggle = [...step.querySelectorAll<HTMLDetailsElement>('.caution-article')]
+      .find((node) => node.querySelector('summary')?.textContent?.includes('비목별 증빙서류'));
+    const marked = [...(toggle?.querySelectorAll('.hit') ?? [])].map((node) => node.textContent ?? '');
+    // 세 인정 항목(기술도입비·전문가활용비·연구개발서비스활용비)이 각각 제 줄을 짚어야 한다
+    expect(marked.some((line) => line.includes('<기술도입비>'))).toBe(true);
+    expect(marked.some((line) => line.includes('<전문가활용비>'))).toBe(true);
+    expect(marked.some((line) => line.includes('<연구개발서비스활용비>'))).toBe(true);
+  });
+
   it('세목을 고르면 그 세목의 증빙 규칙이 나온다', async () => {
     localStorage.setItem('gwajeon.project.v1', JSON.stringify(divided()));
     const user = userEvent.setup(); render(<App />);
