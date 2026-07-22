@@ -50,6 +50,48 @@ describe('과제온 핵심 사용자 흐름', () => {
     expect(within(row as HTMLElement).getByText('상한 초과')).toBeInTheDocument();
   });
 
+  it('막대바를 끝까지 끌어도 상한이 있는 비목은 상한까지만 편성된다', async () => {
+    // 간접비 상한 = 직접비(총사업비 − 간접비 − 위탁)의 10%. 기준이 자기 편성액에 따라 줄어들어서,
+    // 화면에 보이는 상한까지 그대로 끌면 그 순간 상한 초과가 된다.
+    localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture('nrd2026-forprofit')));
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole('button', { name: '예산 편성' }));
+    const indirect = screen.getByLabelText('간접비 편성 금액');
+    await user.clear(indirect); // 잔액 1,000만 원 확보
+    fireEvent.change(screen.getByLabelText('간접비 편성 금액 조절'), { target: { value: '100000000' } });
+    expect(indirect).toHaveValue('8,181,818'); // 잔액(1,000만)이 아니라 상한에서 멈춘다
+    const row = indirect.closest('.table-row')!;
+    expect(within(row as HTMLElement).getByText('정상')).toBeInTheDocument();
+    expect(within(row as HTMLElement).queryByText('상한 초과')).toBeNull();
+  });
+
+  it('연구시설·장비비의 구입가 20% 상한은 현물로 계상할 때만 걸린다고 안내한다', async () => {
+    // 민간부담금 3,000만 원(현금 50%) — 현물 칸이 있는 과제
+    localStorage.setItem('gwajeon.project.v1', JSON.stringify({ ...fixture('nrd2026-forprofit'), subsidyAmount: 70_000_000, matchingCashRate: 50 }));
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole('button', { name: '예산 편성' }));
+    const row = screen.getByLabelText('연구시설·장비비 편성 금액').closest('.table-row')! as HTMLElement;
+    expect(within(row).getByText(/현물이 0원이면 해당하지 않습니다/)).toBeInTheDocument();
+    // 현물을 잡으면 그 금액을 구입가 기준과 직접 대조하라는 안내로 바뀐다
+    await user.type(within(row).getByLabelText('연구시설·장비비 현물 계상액'), '3000000');
+    expect(within(row).getByText(/현물 3,000,000원이 이 상한 안인지/)).toBeInTheDocument();
+  });
+
+  it('세목 나누기에서 계상 가능 세목을 골라 추가한다 — 공고에 없는 세목은 상위 규정에서 온다', async () => {
+    // 디딤돌 공고의 연구활동비 세목은 2개뿐이고, 나머지는 국가연구개발사업 연구개발비 사용 기준을 따른다
+    localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture('didimdol2026')));
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole('button', { name: '예산 편성' }));
+    const row = screen.getByLabelText('연구활동비 편성 금액').closest('.table-row') as HTMLElement;
+    await user.click(within(row).getByRole('button', { name: '+ 세목 나누기' }));
+    const group = row.parentElement as HTMLElement;
+    expect(within(group).getByRole('button', { name: '외부 전문기술 활용비' })).toBeEnabled(); // 공고 기준
+    expect(within(group).getByText(/국가연구개발사업 연구개발비 사용 기준/)).toBeInTheDocument();
+    await user.click(within(group).getByRole('button', { name: '회의비' })); // 상위 규정 기준
+    expect(within(group).getByDisplayValue('회의비')).toBeInTheDocument();
+    expect(within(group).getByRole('button', { name: '회의비' })).toBeDisabled(); // 이미 넣은 세목은 다시 못 고른다
+  });
+
   it('편성 확정 시 0원 비목이 집행 화면 비목 선택에서 사라진다', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture()));

@@ -191,7 +191,15 @@ export interface CategoryCap {
   // amount가 null인 이유를 구분한다: partial이면 규칙 대상이 비목 전체가 아니라 그 안의 세부항목이고,
   // 아니면 기준(구입가 등)이 편성표 밖이라 계산할 수 없다는 뜻이다. 화면 안내 문구가 달라진다.
   partial: boolean;
+  // "구입가의 20% 이내에서 현물로 계상" 처럼 현물로 계상할 때만 걸리는 상한.
+  // 현물이 0원이면 적용될 일이 아예 없으므로 안내 문구를 따로 써야 한다.
+  inKindOnly: boolean;
 }
+
+// 현물 계상에만 걸리는 상한인지 — 규칙 문구에서 "현물(로) 계상"을 찾는다.
+// "직접비(현물 부담액 제외)의 10%"처럼 현물을 기준에서 빼는 규칙과 헷갈리지 않게 붙어 있는 표현만 본다.
+const inKindOnlyRule = (rule: PackRule): boolean =>
+  /현물(으?로)?\s*계상/.test([rule.item, rule.message, rule.quote, rule.note, rule.condition].filter(Boolean).join(' '));
 
 // 계산식에 쓰는 기준 이름은 괄호 앞까지만 남긴다 —
 // "수정직접비(직접비 중 현물·위탁연구개발비·국제공동연구개발비 제외)"가 칸을 통째로 먹지 않게.
@@ -237,7 +245,37 @@ export const capFor = (pack: RulePack, budgets: BudgetItem[], totalBudget: numbe
     basisLabel: `${prefix}${shortBasis(ratio.basis ?? '기준')}`,
     limitPct: ratio.limitPct,
     partial,
+    inKindOnly: inKindOnlyRule(ratio),
   };
+};
+
+// 상한을 넘지 않고 이 비목에 넣을 수 있는 최대 금액 (ceiling = 잔액까지 다 쓸 때의 금액).
+// 상한 기준이 이 비목 편성액에 따라 같이 움직이는 경우가 있어서 필요하다 —
+// 간접비 상한은 "직접비의 10%"인데 직접비 = 총사업비 − 간접비 − 위탁이라, 화면에 보이는
+// 상한 금액까지 슬라이더를 끌면 그 순간 기준이 줄어 곧바로 "상한 초과"가 된다.
+export const maxAmountWithinCap = (
+  pack: RulePack, budgets: BudgetItem[], totalBudget: number,
+  categoryId: BudgetCategoryId, ceiling: number, inKindWon = 0,
+): number => {
+  if (ceiling <= 0) return 0;
+  const capAt = (amount: number): number | null => {
+    const exists = budgets.some((item) => item.categoryId === categoryId);
+    const next = exists
+      ? budgets.map((item) => item.categoryId === categoryId ? { ...item, amount } : item)
+      : [...budgets, { categoryId, amount }];
+    return capFor(pack, next, totalBudget, categoryId, inKindWon)?.amount ?? null;
+  };
+  const top = capAt(ceiling);
+  // 상한이 없거나(계산 불가 포함) 잔액을 다 써도 상한 안이면 잔액까지 그대로 쓸 수 있다.
+  if (top === null || ceiling <= top) return ceiling;
+  // 편성액이 늘면 상한은 줄거나 그대로다 → cap(v) ≥ v 를 만족하는 최대 v를 이분 탐색한다.
+  let low = 0, high = ceiling;
+  while (high - low > 1) {
+    const mid = Math.floor((low + high) / 2);
+    const cap = capAt(mid);
+    if (cap === null || mid <= cap) low = mid; else high = mid;
+  }
+  return low;
 };
 
 // 편성 화면의 비목 상태: 상한 초과 여부 (상한 계산 가능할 때만)
@@ -295,6 +333,65 @@ export const referenceStandardFor = (categoryName: string, currentPackId?: strin
     }
   }
   return best?.entry ?? null;
+};
+
+// ---- 이 사업이 따르는 상위 규정 ----
+// 공고·지침 규정DB는 그 사업이 "따로 정한 것"만 담는다. 디딤돌 공고의 인정 항목이 주요 비목
+// 몇 개뿐인 것도 그래서다 — 나머지는 "국가연구개발사업 연구개발비 사용 기준에 따른다"고만 적혀 있다.
+// 그 관계를 팩의 basePackId 로 들고 있어, 세목·인정 항목을 상위 규정 팩에서 마저 가져온다.
+export const basePackFor = (pack: RulePack): RulePack | null => {
+  if (!pack.basePackId || pack.basePackId === pack.id) return null;
+  return allPacks().find((candidate) => candidate.id === pack.basePackId) ?? null;
+};
+
+// 팩(또는 상위 규정 팩)에서 이 비목에 해당하는 기준을 찾는다.
+// 비목 코드는 규정DB끼리 맞춰져 있지만(DIRECT_ACTIVITY 등), 코드가 다른 팩도 있어 이름으로도 찾는다.
+// 세부 비목(연구활동비 아래 회의비·출장비)은 referenceCategories 쪽에 있다.
+const matchingCategory = (pack: RulePack, category: PackCategory): PackCategory | undefined =>
+  pack.categories.find((c) => c.id === category.id)
+  ?? [...pack.categories, ...(pack.referenceCategories ?? [])].find((c) => normCategoryName(c.name) === normCategoryName(category.name));
+
+// 상위 규정 팩에서 이 비목의 기준(인정 항목 등)을 찾는다 — 공고가 정하지 않은 부분을 채우는 용도.
+export const baseStandardFor = (pack: RulePack, categoryId: BudgetCategoryId): ReferenceStandard | null => {
+  const base = basePackFor(pack);
+  const category = pack.categories.find((c) => c.id === categoryId);
+  if (!base || !category) return null;
+  const matched = matchingCategory(base, category);
+  return matched ? { pack: base, category: matched } : null;
+};
+
+// ---- 계상 가능 세목 후보 ----
+// 편성표에서 "세목 나누기"를 할 때 고를 수 있는 항목. 직접 입력도 되지만, 규정에 있는 이름을
+// 그대로 골라 쓰면 정산 때 비목-세목 대응을 다시 맞출 일이 없다.
+export interface SubItemChoice { name: string; note?: string }
+export interface SubItemChoices {
+  own: SubItemChoice[];       // 이 사업 공고·지침이 직접 정한 세목
+  base: SubItemChoice[];      // 상위 규정(국가연구개발사업 연구개발비 사용 기준 등)에서 온 세목
+  basePack: RulePack | null;  // base가 어디서 왔는지 (화면에 출처를 밝힌다)
+}
+
+const choicesOf = (category?: PackCategory): SubItemChoice[] => {
+  if (!category) return [];
+  const noteOf = (name: string) => {
+    const item = category.allowedItems?.find((entry) => entry.name === name);
+    return item?.condition ?? item?.description ?? item?.restriction;
+  };
+  if (category.subItemOptions?.length) return category.subItemOptions.map((name) => ({ name, note: noteOf(name) }));
+  return (category.allowedItems ?? []).map((item) => ({ name: item.name, note: item.condition ?? item.description ?? item.restriction }));
+};
+
+export const subItemChoicesFor = (pack: RulePack, categoryId: BudgetCategoryId): SubItemChoices => {
+  const category = pack.categories.find((c) => c.id === categoryId);
+  if (!category) return { own: [], base: [], basePack: null };
+  const own = choicesOf(category);
+  // 상위 규정을 따른다고 규정DB가 밝힌 팩만 그 팩의 세목을 덧붙인다. 그런 선언이 없는 팩(예비창업패키지 등)은
+  // 비목 체계 자체가 달라서 이름이 비슷하다고 국가 R&D 세목을 끌어오면 안 된다.
+  // 공고에 기준이 아예 없는 비목은 예전처럼 이름으로 찾은 공통 규정 기준을 쓴다.
+  const basePack = basePackFor(pack) ?? (own.length ? null : referenceStandardFor(category.name, pack.id)?.pack ?? null);
+  if (!basePack) return { own, base: [], basePack: null };
+  const taken = new Set(own.map((choice) => normCategoryName(choice.name)));
+  const base = choicesOf(matchingCategory(basePack, category)).filter((choice) => !taken.has(normCategoryName(choice.name)));
+  return { own, base, basePack: base.length ? basePack : null };
 };
 
 // ---- 조문 원문 찾기 ----

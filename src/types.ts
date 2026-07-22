@@ -121,6 +121,9 @@ export interface RulePack {
   agency: string;
   origin?: PackOrigin;      // 미지정이면 legacy로 취급
   packageName?: string;     // origin='regulation_db' — 출처 규정DB 패키지 폴더명
+  // 이 사업이 따르는 상위 규정 팩. 공고·지침은 "그 밖의 사항은 국가연구개발사업 연구개발비 사용
+  // 기준에 따른다"처럼 자기가 따로 정한 것만 담기 때문에, 인정 항목·세목은 여기서 마저 가져온다.
+  basePackId?: string;
   hasRatioLimits: boolean;  // false면 상한 UI 대신 금지 경고 중심으로 표시
   effectiveFrom?: string | null; // 규정 자체의 시행일 (규정DB 팩) — 화면의 "언제 기준" 표시에 쓴다
   generatedAt?: string | null;   // 이 팩을 만든 날

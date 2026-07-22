@@ -99,6 +99,12 @@ svg { width: 18px; height: 18px; flex: none; }
 .sub-item-row > input { padding: 8px 10px; font-size: 12px; }
 .sub-item-row .money-input { height: 34px; }
 .sub-item-row .danger-button svg { width: 13px; }
+/* 계상 가능 세목 고르기 — 목록이 길어질 수 있어(연구활동비 11개, 장비비 12개) 높이를 묶어 스크롤한다 */
+.sub-picker { display: grid; gap: 6px; border: 1px solid #e4e9f1; background: #fff; border-radius: 10px; padding: 9px 11px; max-height: 190px; overflow-y: auto; }
+.sub-picker-label { font-size: 11px; font-weight: 700; color: #4d586c; }
+.sub-picker-label.base { color: #315dc8; padding-top: 3px; border-top: 1px dashed #dde3ec; }
+.sub-picker-label em { font-style: normal; font-weight: 500; color: var(--muted); }
+.sub-picker .panel-chips button:disabled { opacity: 0.45; }
 .sub-add { justify-self: start; font-size: 12px; padding: 7px 11px; display: inline-flex; align-items: center; gap: 5px; }
 .sub-add svg { width: 13px; }
 .sub-hint { margin: 0; font-size: 11px; color: var(--muted); line-height: 1.6; }
@@ -138,6 +144,8 @@ svg { width: 18px; height: 18px; flex: none; }
 .panel-note { display: flex; gap: 7px; align-items: flex-start; margin: 12px 0 0; padding: 9px 11px; background: #f4f8ff; border: 1px solid #d8e3fb; border-radius: 9px; font-size: 11px; line-height: 1.6; color: #4d586c; }
 .panel-note svg { width: 14px; flex: none; color: var(--blue); margin-top: 1px; }
 .panel-note b { color: #315dc8; }
+/* 블록 안에서 출처를 밝히는 보조 안내 — 블록 머리글 바로 아래 붙는다 */
+.panel-note.sub { margin: 0 0 7px; padding: 7px 9px; }
 .panel-block { padding: 14px 0; border-bottom: 1px solid #f0f2f6; }
 .panel-block:last-child { border-bottom: 0; }
 .panel-block h4 { margin: 0 0 8px; font-size: 11px; font-weight: 800; letter-spacing: .4px; color: #8490a4; text-transform: uppercase; }
@@ -178,6 +186,8 @@ svg { width: 18px; height: 18px; flex: none; }
 .ref-link svg { width: 11px; vertical-align: -1px; margin-left: 1px; }
 .cap-cell small.cap-db { color: #4d586c; font-weight: 600; }
 .cap-cell small.cap-db em { font-style: normal; color: #9aa3b2; font-weight: 500; }
+/* 현물로 계상할 때만 걸리는 상한인데 현물이 0원 — 그냥 회색 안내로 두면 그냥 지나친다 */
+.cap-cell small.cap-inkind em { color: #b45f22; }
 .cap-cell small.cap-formula { color: #7b8598; font-variant-numeric: tabular-nums; }
 .cap-cell small.cap-used { color: #1d8a5f; font-weight: 600; }
 .cap-cell small.cap-used.over { color: #d6453d; }

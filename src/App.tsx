@@ -6,7 +6,7 @@ import {
   Pencil, Plus, RefreshCw, ScanLine, Settings as SettingsIcon, ShieldCheck, Sparkles, Trash2, Upload, UserPlus, Users, WalletCards,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
-import { capFor, categoryOf, DEFAULT_INSURANCE_RATE, packIsMissing, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
+import { baseStandardFor, capFor, categoryOf, DEFAULT_INSURANCE_RATE, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
 import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, getEvidence, getProjectDocument, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
 import { isCloudEnabled, supabase } from './supabase';
@@ -16,7 +16,7 @@ import { initRegulationPacks, type RegulationPackStatus } from './regulationDb';
 import { buildRegulationPackage } from './regulationPackage';
 import { diffExtraction, overlayRulesFrom, summarizeDiff, type PackDiff } from './packDiff';
 import SetupWizard from './SetupWizard';
-import type { CategoryCap, CategoryMin, ReferenceStandard } from './rules';
+import type { CategoryCap, CategoryMin, ReferenceStandard, SubItemChoice, SubItemChoices } from './rules';
 import type { BudgetCategoryId, BudgetItem, BudgetSubItem, Evidence, Expense, PackAllowedItem, PackArticle, PackCategory, PackRule, Participant, PaymentMethod, Project, ProjectDocumentLink, RulePack, SavedRulePack, Screen } from './types';
 
 // 문서 생성 라이브러리(docx·excel)는 무거워서 첫 화면 번들에서 제외하고 버튼 클릭 시에만 불러온다.
@@ -480,12 +480,29 @@ function AllowedItemList({ items, refLink }: { items: PackAllowedItem[]; refLink
 // 비목 기준 사이드 패널 — 편성표 행의 "기준" 버튼으로 연다.
 // 편성 화면에 규정을 길게 나열하지 않고, 궁금한 비목의 기준만 그 자리에서 펼쳐 본다.
 // 블록은 네 가지로 고정: 상한(계산식) / 계상 가능 세목 / 인정 항목 / 주의 · 절차.
+// 금액으로 계산할 수 없는 상한의 안내 문구 — 편성표의 "허용 상한" 칸과 기준 패널이 같은 말을 쓴다.
+// 연구시설·장비비의 "구입가의 20% 이내"처럼 현물로 계상할 때만 걸리는 상한은, 현물이 없으면
+// 적용 자체가 안 되므로 "직접 확인하세요"가 아니라 현물이 필요하다는 것을 알려줘야 한다.
+const capHint = (cap: CategoryCap, inKindAmount: number, hasMatching: boolean): string => {
+  if (cap.inKindOnly) {
+    if (!hasMatching) return '현물로 계상할 때만 적용되는 상한이에요. 이 과제는 전액 지원금이라 현물 계상이 없어 해당하지 않습니다.';
+    if (inKindAmount <= 0) return '현물로 계상할 때만 적용되는 상한이에요. 이 비목 현물이 0원이면 해당하지 않습니다 — 현물로 잡으려면 현물 칸에 금액을 넣으세요.';
+    return `현물 ${formatWon(inKindAmount)}이 이 상한 안인지 직접 확인하세요. 기준 금액(구입가 등)이 편성표 밖이라 자동 계산할 수 없어요.`;
+  }
+  if (cap.partial) return '비목 전체가 아니라 세부항목 기준이라 자동 계산하지 않아요';
+  return '편성표 밖 기준(구입가 등)이라 금액은 직접 확인하세요';
+};
+
 interface StandardPanelProps {
   category: PackCategory;
   reference: PackCategory | null;   // 공고 팩에 기준이 없을 때 이름으로 찾은 공통 규정 비목
   referenceDoc?: string;
   cap: CategoryCap | null;
   amount: number;
+  inKindAmount: number;   // 이 비목에 현물로 잡은 금액 — 현물 전용 상한 안내에 쓴다
+  hasMatching: boolean;   // 민간부담금이 있어 현물 계상이 가능한 과제인지
+  choices: SubItemChoices;              // 계상 가능 세목 (이 사업 기준 + 상위 규정 기준)
+  baseStandard: ReferenceStandard | null; // 이 사업이 따르는 상위 규정의 같은 비목 기준
   min: CategoryMin | null;
   rules: PackRule[];
   refLink: RefLink;
@@ -494,7 +511,7 @@ interface StandardPanelProps {
   onClose: () => void;
 }
 
-function StandardPanel({ category, reference, referenceDoc, cap, amount, min, rules, refLink, onAddSub, canAddSub, onClose }: StandardPanelProps) {
+function StandardPanel({ category, reference, referenceDoc, cap, amount, inKindAmount, hasMatching, choices, baseStandard, min, rules, refLink, onAddSub, canAddSub, onClose }: StandardPanelProps) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -502,7 +519,7 @@ function StandardPanel({ category, reference, referenceDoc, cap, amount, min, ru
   }, [onClose]);
   // 공고 팩에 기준이 없으면 공통 규정 비목의 것을 대신 보여준다 (출처는 헤더에 표시).
   const std = reference ?? category;
-  const subOptions = category.subItemOptions ?? std.subItemOptions ?? std.allowedItems?.map((item) => item.name) ?? [];
+  const subOptions = [...choices.own, ...choices.base];
   const limitText = category.limitText ?? std.limitText;
   const limitDetail = category.limitDetailText ?? std.limitDetailText;
   const warnings = rules.filter((rule) => rule.kind === 'warning');
@@ -528,7 +545,7 @@ function StandardPanel({ category, reference, referenceDoc, cap, amount, min, ru
               <small className={amount > cap.amount! ? 'over' : 'ok'}>현재 {formatWon(amount)} — {amount > cap.amount! ? `${formatWon(amount - cap.amount!)} 초과` : `여유 ${formatWon(cap.amount! - amount)}`}</small>
             </div>
           : cap
-          ? <p className="panel-line">{cap.label}<em>{cap.partial ? '비목 전체가 아니라 세부항목 기준이라 자동 계산하지 않아요' : '편성표 밖 기준(구입가 등)이라 금액은 직접 확인하세요'}</em></p>
+          ? <p className="panel-line">{cap.label}<em>{capHint(cap, inKindAmount, hasMatching)}</em></p>
           : limitText
           ? <p className="panel-line">{limitText}{limitDetail ? <em>{limitDetail}</em> : null}</p>
           : <p className="panel-line muted">별도 상한 없음</p>}
@@ -539,13 +556,30 @@ function StandardPanel({ category, reference, referenceDoc, cap, amount, min, ru
 
       {subOptions.length > 0 && <section className="panel-block">
         <h4>계상 가능 세목 <b>{subOptions.length}</b></h4>
-        <div className="panel-chips">{subOptions.map((name) => <button type="button" key={name} disabled={!canAddSub} onClick={() => onAddSub(name)}><Plus />{name}</button>)}</div>
+        <div className="panel-chips">{choices.own.map((choice) => <button type="button" key={choice.name} title={choice.note ?? choice.name} disabled={!canAddSub} onClick={() => onAddSub(choice.name)}><Plus />{choice.name}</button>)}</div>
+        {choices.base.length > 0 && <>
+          <p className="panel-note sub"><BookOpenCheck /><span>공고가 따로 정하지 않은 항목은 <b>{choices.basePack!.guideline}</b>을 따릅니다.</span></p>
+          <div className="panel-chips">{choices.base.map((choice) => <button type="button" key={choice.name} title={choice.note ?? choice.name} disabled={!canAddSub} onClick={() => onAddSub(choice.name)}><Plus />{choice.name}</button>)}</div>
+        </>}
       </section>}
 
       {allowedItems.length > 0 && <section className="panel-block">
         <h4>인정 항목 <b>{allowedItems.length}</b></h4>
         <AllowedItemList items={allowedItems} refLink={refLink} />
       </section>}
+
+      {/* 공고에 적힌 인정 항목은 주요 비목뿐이고 나머지는 상위 규정을 따른다 — 그 규정의 인정 항목도 함께 본다. */}
+      {(() => {
+        if (!baseStandard) return null;
+        const own = new Set(allowedItems.map((item) => item.name.replace(/\s/g, '')));
+        const items = (baseStandard.category.allowedItems ?? []).filter((item) => !own.has(item.name.replace(/\s/g, '')));
+        if (!items.length) return null;
+        return <section className="panel-block">
+          <h4>{baseStandard.pack.guideline} 인정 항목 <b>{items.length}</b></h4>
+          <p className="panel-note sub"><BookOpenCheck /><span>이 사업 공고·지침이 따로 정하지 않은 부분은 이 기준을 따릅니다.</span></p>
+          <AllowedItemList items={items} refLink={refLink} />
+        </section>;
+      })()}
 
       {cautions > 0 && <section className="panel-block caution">
         <h4>주의 · 절차 <b>{cautions}</b></h4>
@@ -1048,17 +1082,25 @@ function Budget({ project, update, setScreen }: { project: Project; update: (p: 
         <div className="cap-cell">{cap
           ? cap.basisAmount != null
             ? <><strong>{formatWon(cap.amount!)}</strong><small className="cap-formula">{cap.basisLabel} {formatWon(cap.basisAmount)} × {cap.limitPct}%</small>{amount > 0 && cap.amount! > 0 && <small className={over ? 'cap-used over' : 'cap-used'}>{over ? `상한 ${formatWon(amount - cap.amount!)} 초과` : `여유 ${formatWon(cap.amount! - amount)}`}</small>}</>
-            : <small className="cap-db">{cap.label}<br /><em>{cap.partial ? '비목 전체가 아니라 세부항목 기준이라 자동 계산하지 않아요' : '편성표 밖 기준(구입가 등)이라 금액은 직접 확인하세요'}</em></small>
+            : <small className={cap.inKindOnly && funding.matching > 0 && itemInKind <= 0 ? 'cap-db cap-inkind' : 'cap-db'}>{cap.label}<br /><em>{capHint(cap, itemInKind, funding.matching > 0)}</em></small>
           : (category.limitText ?? referenceByCategory.get(category.id)?.category.limitText)
           ? <small className="cap-db">{category.limitText ?? referenceByCategory.get(category.id)?.category.limitText}{!category.limitText && <em> · 공통 규정 기준</em>}</small>
           : <small className="cap-db muted">규정 상한 없음</small>}{min && <small className="cap-min">{min.label}</small>}</div><div className="amount-cell"><label className="money-input"><input aria-label={`${category.name} 편성 금액`} inputMode="numeric" value={withCommas(String(amount))} disabled={confirmed || hasSubs} onChange={(e) => changeAmount(category.id, Number(digitsOnly(e.target.value)) || 0)} /><b>원</b></label>{funding.matching > 0 && <div className="inkind-row"><span>현물</span><label className="money-input"><input aria-label={`${category.name} 현물 계상액`} inputMode="numeric" disabled={confirmed} placeholder="0" value={withCommas(String(itemInKind || ''))} onChange={(e) => setInKindAmount(category.id, Number(digitsOnly(e.target.value)) || 0)} /><b>원</b></label><small>현금 {formatWon(amount - itemInKind)}</small></div>}{hasSubs && <div className="amount-slider"><small>세목 {subs.length}개 합계 자동</small></div>}{!confirmed && !hasSubs && (() => {
           // 막대바 눈금은 총사업비로 고정한다(썸 위치 = 총사업비 대비 비율). 눈금을 "현재 금액+잔액"으로
           // 잡으면 한 비목을 움직일 때마다 잔액이 변해 다른 슬라이더 썸까지 시각적으로 따라 움직인다.
           // 잔액·허용 상한 제한은 드래그된 값에만 적용 — 상한 초과 편성이 필요하면 직접 입력으로 한다.
+          // 상한 금액은 이 비목 편성액에 따라 같이 움직일 수 있어(간접비 = 직접비의 10%) 화면에 보이는
+          // 상한이 아니라 "끌어올린 뒤에도 상한 안에 남는" 최대 금액에서 멈춘다.
           const free = Math.max(0, project.totalBudget - total);
-          const dragLimit = Math.max(amount, Math.min(amount + free, cap?.amount ?? Infinity));
+          const capped = maxAmountWithinCap(pack, project.budgets, project.totalBudget, category.id, amount + free, inKind);
+          const dragLimit = Math.max(amount, capped);
           const step = Math.max(10000, Math.round(project.totalBudget / 200 / 10000) * 10000);
-          return <div className="amount-slider"><input type="range" aria-label={`${category.name} 편성 금액 조절`} min={0} max={project.totalBudget} step={step} value={Math.min(amount, project.totalBudget)} onChange={(e) => changeAmount(category.id, Math.min(Number(e.target.value), dragLimit))} /><small>{free > 0 ? `미편성 잔액 ${formatWon(free)}` : total > project.totalBudget ? '예산 초과 — 줄여주세요' : '남은 잔액 없음'}</small></div>;
+          const hint = free <= 0
+            ? total > project.totalBudget ? '예산 초과 — 줄여주세요' : '남은 잔액 없음'
+            : capped < amount + free
+            ? `미편성 잔액 ${formatWon(free)} · 이 비목은 상한 ${formatWon(capped)}까지`
+            : `미편성 잔액 ${formatWon(free)}`;
+          return <div className="amount-slider"><input type="range" aria-label={`${category.name} 편성 금액 조절`} min={0} max={project.totalBudget} step={step} value={Math.min(amount, project.totalBudget)} onChange={(e) => changeAmount(category.id, Math.min(Number(e.target.value), dragLimit))} /><small>{hint}</small></div>;
         })()}</div><div className="rate-cell"><div className="mini-progress"><i className={over || under ? 'danger' : ''} style={{ width: `${cap?.amount ? Math.min(amount / cap.amount * 100, 100) : Math.min(rate, 100)}%` }} /></div><b>{rate.toFixed(1)}%</b></div><span className={`status ${over || under ? 'bad' : 'good'}`}>{over ? <><AlertCircle /> 상한 초과</> : under ? <><AlertCircle /> 필수 금액 미달</> : <><Check /> 정상</>}</span>
         <button type="button" className={`standard-open ${standardId === category.id ? 'active' : ''}`} aria-label={`${category.name} 기준 보기`} title={`${category.name} 기준 보기`} onClick={() => setStandardId(standardId === category.id ? null : category.id)}><BookOpenCheck /></button></div>
         {open && <div className="sub-items">
@@ -1067,7 +1109,24 @@ function Budget({ project, update, setScreen }: { project: Project; update: (p: 
             <label className="money-input"><input aria-label={`${sub.name || '세목'} 금액`} inputMode="numeric" disabled={confirmed} value={withCommas(String(sub.amount))} onChange={(e) => setSubItems(category.id, subs.map((x) => x.id === sub.id ? { ...x, amount: Number(digitsOnly(e.target.value)) || 0 } : x))} /><b>원</b></label>
             {!confirmed && <button type="button" className="danger-button" aria-label={`${sub.name || '세목'} 삭제`} onClick={() => setSubItems(category.id, subs.filter((x) => x.id !== sub.id))}><Trash2 /></button>}
           </div>)}
-          {!confirmed && <button type="button" className="secondary sub-add" onClick={() => addSubItem(category.id)}><Plus /> 세목 추가</button>}
+          {/* 세목 이름은 직접 입력해도 되지만, 규정에 있는 이름을 골라 쓰면 정산 때 비목-세목 대응을 다시 맞출 일이 없다. */}
+          {!confirmed && (() => {
+            const choices = subItemChoicesFor(pack, category.id);
+            if (!choices.own.length && !choices.base.length) return null;
+            const used = new Set(subs.map((sub) => sub.name.replace(/\s/g, '')));
+            const chip = (choice: SubItemChoice) => <button type="button" key={choice.name} title={choice.note ?? choice.name}
+              disabled={used.has(choice.name.replace(/\s/g, ''))} onClick={() => addSubItem(category.id, choice.name)}><Plus />{choice.name}</button>;
+            return <div className="sub-picker">
+              <span className="sub-picker-label">계상 가능 세목 — 눌러서 추가</span>
+              {choices.own.length > 0 && <div className="panel-chips">{choices.own.map(chip)}</div>}
+              {choices.base.length > 0 && <>
+                {/* 공고·지침은 그 사업이 따로 정한 것만 담는다 — 나머지 세목은 상위 규정에서 가져와 함께 보여준다. */}
+                <span className="sub-picker-label base">{choices.basePack!.guideline} <em>공고에 없는 항목은 이 기준을 따릅니다</em></span>
+                <div className="panel-chips">{choices.base.map(chip)}</div>
+              </>}
+            </div>;
+          })()}
+          {!confirmed && <button type="button" className="secondary sub-add" onClick={() => addSubItem(category.id)}><Plus /> 직접 입력으로 세목 추가</button>}
           <p className="sub-hint">{hasSubs ? `비목 금액은 세목 합계 ${formatWon(amount)}(으)로 자동 계산됩니다. 세목을 모두 지우면 직접 입력으로 돌아가요.` : '세목을 추가하면 비목 금액이 세목 합계로 자동 계산됩니다. 첫 세목에는 지금 편성 금액이 그대로 옮겨져요.'}</p>
         </div>}</div>;
       })}</div>
@@ -1084,6 +1143,10 @@ function Budget({ project, update, setScreen }: { project: Project; update: (p: 
         referenceDoc={reference?.pack.guideline}
         cap={capFor(pack, project.budgets, project.totalBudget, category.id, inKind)}
         amount={project.budgets.find((b) => b.categoryId === category.id)?.amount ?? 0}
+        inKindAmount={(() => { const item = project.budgets.find((b) => b.categoryId === category.id); return Math.min(item?.inKindAmount ?? 0, item?.amount ?? 0); })()}
+        hasMatching={funding.matching > 0}
+        choices={subItemChoicesFor(pack, category.id)}
+        baseStandard={baseStandardFor(pack, category.id)}
         min={minFor(pack, category.id)}
         rules={rulesFor(pack, category.id)}
         refLink={refLink}

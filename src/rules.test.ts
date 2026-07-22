@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOverlay, articlesForRef, capFor, categoryOf, fundingCapChecks, fundingRateChecks, packIsMissing, replacementPacksFor, rescaleBudgets, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories } from './rules';
+import { applyOverlay, articlesForRef, baseStandardFor, capFor, categoryOf, fundingCapChecks, maxAmountWithinCap, subItemChoicesFor, fundingRateChecks, packIsMissing, replacementPacksFor, rescaleBudgets, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories } from './rules';
 import type { Project, RulePack } from './types';
 
 describe('규정 팩 로더', () => {
@@ -162,6 +162,40 @@ describe('상한 계산과 배분', () => {
     expect(incentiveRule?.quote).toContain('수정인건비');
   });
 
+  it('연구시설·장비비의 구입가 20% 상한은 현물 계상에만 걸리는 상한으로 표시된다', () => {
+    // "부가세를 제외한 구입가의 20% 이내에서 현물로 계상할 수 있다" — 현물이 없으면 적용 자체가 안 되는 상한
+    const tips = getPack('tips2026-general');
+    const equipment = capFor(tips, makeDraftBudgets(tips, 70_000_000), 70_000_000, 'DIRECT_EQUIPMENT');
+    expect(equipment?.inKindOnly).toBe(true);
+    expect(equipment?.amount).toBeNull(); // 구입가는 편성표 밖 기준이라 금액으로 못 바꾼다
+    const nrd = getPack('nrd2026-forprofit');
+    expect(capFor(nrd, makeDraftBudgets(nrd, 100_000_000), 100_000_000, 'DIRECT_EQUIPMENT')?.inKindOnly).toBe(true);
+    // "직접비(현물 부담액 제외)의 10%"는 현물을 기준에서 빼는 것일 뿐 현물 전용 상한이 아니다
+    expect(capFor(tips, makeDraftBudgets(tips, 70_000_000), 70_000_000, 'INDIRECT')?.inKindOnly).toBe(false);
+  });
+
+  it('상한 기준이 자기 편성액에 따라 줄어드는 비목은 상한을 실제로 넘지 않는 금액에서 멈춘다', () => {
+    // 간접비 상한 = 직접비(총사업비 − 간접비 − 위탁)의 10%.
+    // 지금 상한 금액(8,500,000)까지 올리면 기준이 줄어 그 순간 상한 초과가 된다.
+    const pack = getPack('nrd2026-forprofit');
+    const budgets = makeDraftBudgets(pack, 100_000_000).map((item) =>
+      item.categoryId === 'INDIRECT' ? { ...item, amount: 5_000_000 } : item);
+    const free = 100_000_000 - budgets.reduce((sum, item) => sum + item.amount, 0);
+    const limit = maxAmountWithinCap(pack, budgets, 100_000_000, 'INDIRECT', 5_000_000 + free);
+    const after = budgets.map((item) => item.categoryId === 'INDIRECT' ? { ...item, amount: limit } : item);
+    expect(capFor(pack, after, 100_000_000, 'INDIRECT')!.amount!).toBeGreaterThanOrEqual(limit);
+    expect(limit).toBeLessThan(capFor(pack, budgets, 100_000_000, 'INDIRECT')!.amount!);
+    // 상한이 자기 편성액과 무관한 비목은 잔액까지 그대로 쓸 수 있다 (총 사업비의 50%)
+    const legacy = getPack('legacy-rnd');
+    const legacyBudgets = makeDraftBudgets(legacy, 100_000_000).map((item) =>
+      item.categoryId === 'personnel' ? { ...item, amount: 0 } : item);
+    expect(maxAmountWithinCap(legacy, legacyBudgets, 100_000_000, 'personnel', 45_000_000)).toBe(45_000_000);
+    expect(maxAmountWithinCap(legacy, legacyBudgets, 100_000_000, 'personnel', 60_000_000)).toBe(50_000_000);
+    // 상한이 없는 팩은 잔액을 그대로 돌려준다
+    const prestartup = getPack('prestartup');
+    expect(maxAmountWithinCap(prestartup, makeDraftBudgets(prestartup, 100_000_000), 100_000_000, 'cat_personnel', 80_000_000)).toBe(80_000_000);
+  });
+
   it('받는 비목이 상한을 초과하는 이동은 오류를 반환하고, 상한 없는 팩은 통과한다', () => {
     const legacy = getPack('legacy-rnd');
     const budgets = makeDraftBudgets(legacy, 100_000_000); // 인건비 45,000,000 / 상한 50,000,000
@@ -170,6 +204,34 @@ describe('상한 계산과 배분', () => {
     const prestartup = getPack('prestartup');
     const preBudgets = makeDraftBudgets(prestartup, 100_000_000);
     expect(transferLimitError(prestartup, preBudgets, 100_000_000, 'cat_personnel', 50_000_000)).toBeNull();
+  });
+});
+
+describe('계상 가능 세목 후보', () => {
+  it('디딤돌 팩은 공고가 정한 세목에 국가연구개발사업 연구개발비 사용 기준의 세목을 이어 붙인다', () => {
+    // 디딤돌 공고·지침은 주요 비목만 적고 나머지는 "국가연구개발사업 연구개발비 사용 기준에 따른다"고만 한다.
+    const pack = getPack('didimdol2026');
+    expect(pack.basePackId).toBe('nrd2026-forprofit');
+    const choices = subItemChoicesFor(pack, 'DIRECT_ACTIVITY');
+    expect(choices.own.map((c) => c.name)).toEqual(['외부 전문기술 활용비', '연구실운영비']);
+    expect(choices.basePack?.id).toBe('nrd2026-forprofit');
+    expect(choices.base.map((c) => c.name)).toEqual(expect.arrayContaining(['회의비', '출장비', '소프트웨어 활용비', '지식재산 창출 활동비']));
+    // 공고가 이미 정한 세목은 상위 규정 목록에서 빠져 두 번 나오지 않는다
+    expect(choices.base.map((c) => c.name)).not.toContain('외부 전문기술 활용비');
+    // 인정 항목도 상위 규정에서 마저 가져온다 (공고에는 연구활동비 인정 항목이 4개뿐)
+    const base = baseStandardFor(pack, 'DIRECT_ACTIVITY');
+    expect(base?.pack.id).toBe('nrd2026-forprofit');
+    expect((base?.category.allowedItems ?? []).length).toBeGreaterThan(10);
+  });
+
+  it('상위 규정을 따른다고 밝히지 않은 팩은 다른 사업의 세목을 끌어오지 않는다', () => {
+    // 예비창업패키지는 비목 체계 자체가 국가 R&D와 달라, 이름이 비슷하다고 세목을 섞으면 안 된다.
+    const pack = getPack('prestartup2026');
+    expect(pack.basePackId).toBeUndefined();
+    const choices = subItemChoicesFor(pack, 'PRE_MATERIAL');
+    expect(choices.own.length).toBeGreaterThan(0);
+    expect(choices.base).toEqual([]);
+    expect(baseStandardFor(pack, 'PRE_MATERIAL')).toBeNull();
   });
 });
 

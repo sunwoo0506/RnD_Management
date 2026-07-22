@@ -79,6 +79,14 @@ const RESULT_KO = {
   APPROVAL_REQUIRED: '사전승인 필요', NOT_AVAILABLE: '사용 불가',
 };
 const APPROVAL_KO = { PRIOR_APPROVAL_REQUIRED: '사전승인 필요', RECOGNITION_REQUIRED: '전문기관 인정 필요', APPROVAL_REQUIRED: '승인 필요' };
+
+// 공고·지침 패키지는 그 사업이 "따로 정한 것"만 담고, 나머지는 상위 규정에 따른다고만 적어둔다
+// (디딤돌: "그 밖의 사항은 국가연구개발사업 연구개발비 사용 기준에 따른다").
+// manifest의 base_document_version이 그 관계를 들고 있어, 화면이 상위 규정 팩을 함께 불러
+// 인정 항목·세목을 채울 수 있도록 basePackId로 옮긴다.
+const BASE_PACK_BY_DOCUMENT = {
+  NRD_COST_STANDARD_2026_38: { FOR_PROFIT: 'nrd2026-forprofit', NON_PROFIT: 'nrd2026-nonprofit' },
+};
 const DOC_KO = {
   RECEIPT: '영수증', INTERNAL_APPROVAL_OR_MEETING_MINUTES: '내부품의서 또는 회의록',
   SIMPLIFIED_MEETING_RECORD: '간소화 회의 기록', OVERSEAS_TRAVEL_PLAN: '국외출장계획서',
@@ -447,8 +455,10 @@ const buildPack = (scope, id, name, orgType, track) => {
   const issues = buildReviewIssues();
   const reference = buildReferenceCategories(scope, track);
   const rules = buildRules(scope, track);
+  const basePackId = BASE_PACK_BY_DOCUMENT[manifest.base_document_version]?.[scope];
   return {
     id, name, orgType,
+    ...(basePackId && basePackId !== id ? { basePackId } : {}),
     guideline: DOC,
     agency: AGENCY,
     // 규정DB 패키지에서 나온 팩임을 표시한다 — 예산편성 화면은 이 표시가 붙은 팩의 비목만 쓴다.
