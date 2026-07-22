@@ -2,7 +2,6 @@ import { Document, HeadingLevel, Packer, Paragraph, Table, TableCell, TableRow, 
 import { saveAs } from 'file-saver';
 import writeXlsxFile from 'write-excel-file/browser';
 import { capFor, categoryOf, formatWon, fundingBreakdown, packFor } from './rules';
-import type { Extraction } from './llmExtract';
 import { packageFiles, type RegulationPackage } from './regulationPackage';
 import type { BudgetChange, Project } from './types';
 
@@ -106,9 +105,10 @@ export const downloadTemplate = async (type: '품의서' | '회의록' | '출장
   saveAs(await Packer.toBlob(doc), `${type}_템플릿.docx`);
 };
 
-// ---- AI 추출 결과 검토본 (Review.xlsx) ----
+// ---- 규정DB 패키지 검토본 (Review.xlsx) ----
 // 로컬 파이프라인의 scripts/make_regulation_review.py와 같은 6시트 구성으로 내보낸다
 // (docs/gwayeon_guideline_extraction_framework/04_mvp_output_spec.md §4.3).
+// 패키지 JSON에서 만들기 때문에, 이 폴더를 그대로 파이썬 스크립트에 태워도 같은 시트가 나온다.
 // 사람이 엑셀에서 검토·보강한 뒤 관리자가 공유 DB에 올리는 흐름을 위한 것이다.
 // write-excel-file의 셀 형식에 맞춘다 — value에 null을 넣을 수 없어 빈 값은 빈 문자열로 둔다.
 type Cell = { value: string | number; type?: StringConstructor | NumberConstructor; fontWeight?: 'bold'; backgroundColor?: string; color?: string; wrap?: boolean };
@@ -119,96 +119,126 @@ const head = (labels: string[]): Cell[] =>
 const text = (value: string | number | null | undefined): Cell =>
   typeof value === 'number' ? { value, type: Number, wrap: true } : { value: value ?? '', type: String, wrap: true };
 
-export const exportExtractionReview = async (extraction: Extraction, meta: { documentTitle?: string; sourceFiles?: string[] }) => {
-  const articleByRef = new Map((extraction.articles ?? []).map((article) => [article.ref.replace(/\s/g, ''), article]));
-  // 규칙에 인용이 없으면 근거 조문 원문으로 채우고, 그 차이를 검토 상태로 남긴다 (로컬 파이프라인과 같은 규칙).
-  const quoteOf = (quote: string | undefined, ref: string) =>
-    quote || articleByRef.get(ref.replace(/\s/g, ''))?.text || '';
-  const statusOf = (quote: string | undefined, ref: string) =>
-    quote ? 'SOURCE_VERIFIED' : articleByRef.has(ref.replace(/\s/g, '')) ? 'ARTICLE_LINKED' : 'NEEDS_QUOTE';
+type Row = Record<string, unknown>;
+const str = (value: unknown): string => value == null ? '' : String(value);
+const normRef = (ref: string) => ref.replace(/\s/g, '');
 
+// 시트마다 이름·열 너비를 각자 갖는다 (write-excel-file의 multi-sheet 형식).
+const sheetOf = (name: string, data: Cell[][], widths: number[]) =>
+  ({ sheet: name, data, columns: widths.map((width) => ({ width })) });
+
+// 패키지(manifest + 6 JSON)에서 검토용 6시트를 만든다.
+// 개별 다운로드와 ZIP 안의 Review.xlsx가 같은 함수를 쓰므로 둘의 내용이 어긋날 수 없다.
+export const buildReviewSheets = (pkg: RegulationPackage) => {
+  const m = pkg.manifest as Row & {
+    counts?: Record<string, number>;
+    validation?: { unverified_rules: number; unverified_items: number; unverified_articles: number; uncertain: string[] };
+  };
+  const articleByRef = new Map(pkg.source_text.map((article) => [normRef(str(article.source_article)), article]));
+  // 인용이 없으면 근거 조문 원문으로 채우고, 그 차이를 검토 상태로 남긴다 (파이썬 스크립트와 같은 규칙).
+  const quoteOf = (row: Row) => str(row.source_quote) || str(articleByRef.get(normRef(str(row.source_article)))?.original_text);
+  const statusOf = (row: Row) => row.verified ? 'SOURCE_VERIFIED'
+    : row.source_quote ? 'QUOTE_UNVERIFIED'
+    : articleByRef.has(normRef(str(row.source_article))) ? 'ARTICLE_LINKED'
+    : 'NEEDS_QUOTE';
+
+  const counts = m.counts ?? {};
+  const v = m.validation;
   const summary: Cell[][] = [
-    [{ value: `과제온 규정 추출 검토본 — ${meta.documentTitle ?? extraction.programName ?? '업로드 문서'}`, type: String, fontWeight: 'bold' }],
+    [{ value: `과제온 규정 DB 검토본 — ${str(m.title) || pkg.package_name}`, type: String, fontWeight: 'bold' }],
     [text('')],
     ...[
-      ['문서', meta.documentTitle ?? extraction.programName ?? ''],
-      ['사업명', extraction.programName ?? ''],
-      ['연도', extraction.year != null ? String(extraction.year) : ''],
-      ['사업 유형', extraction.programType ?? ''],
-      ['원본 파일', (meta.sourceFiles ?? []).join(' / ')],
-      ['생성일', new Date().toISOString().slice(0, 10)],
-      [' ', ''],
-      ['비목', String(extraction.categories.length)],
-      ['인정 항목', String((extraction.allowedItems ?? []).length)],
-      ['규칙', String(extraction.rules.length)],
-      ['조문 원문', String((extraction.articles ?? []).length)],
-      ['AI 판단 보류', (extraction.uncertain ?? []).join(' / ')],
+      ['문서', str(m.title)],
+      ['고시·공고 번호', str(m.notice_number)],
+      ['발행기관', str(m.issuer)],
+      ['문서 유형', str(m.document_type)],
+      ['시행', str(m.effective_from)],
+      ['생성일', `${str(m.generated_at)}${m.generated_by ? ` (${str(m.generated_by)})` : ''}`],
+      ['원본 파일', ((m.source_files as string[]) ?? []).join(' / ')],
+      ['비고', str(m.notes)],
+      [' ', ''],
+      ['비목', str(counts.categories ?? pkg.expense_categories.length)],
+      ['화면 가이드', str(counts.budget_guides ?? pkg.budget_screen_guides.length)],
+      ['사용 가능 항목', str(counts.allowed_items ?? pkg.expense_allowed_items.length)],
+      ['허용상한 규칙', str(counts.limit_rules ?? pkg.expense_limit_rules.length)],
+      ['판정 규칙', str(counts.regulation_rules ?? pkg.regulation_rules.length)],
+      ['조문 원문', str(counts.source_text ?? pkg.source_text.length)],
+      ...(v ? [
+        [' ', ''],
+        ['원문 대조 실패 — 규칙', str(v.unverified_rules)],
+        ['원문 대조 실패 — 인정 항목', str(v.unverified_items)],
+        ['원문 대조 실패 — 조문', str(v.unverified_articles)],
+        ['AI 판단 보류', (v.uncertain ?? []).join(' / ')],
+      ] : []),
     ].map(([key, value]) => [{ value: key, fontWeight: 'bold' as const }, text(value)]),
   ];
 
   const budgetTree: Cell[][] = [
-    head(['비목명', '상위 비목', '사용 가능', '정의', '상한 %', '상한 기준', '근거', '원문 확인']),
-    ...extraction.categories.map((category) => [
-      text(category.name), text(category.parentName ?? ''), text(category.allowed ? 'Y' : 'N'),
-      text(category.definition), text(category.limitPct), text(category.limitBasis),
-      text(category.ref), text(category.verified ? 'SOURCE_VERIFIED' : 'NEEDS_QUOTE'),
+    head(['비목 코드', '비목명', '상위 비목', '구분', '레벨', '최하위', '하위 수', '사용 항목 수', '정렬', '근거']),
+    ...pkg.expense_categories.map((c) => [
+      text(str(c.category_code)), text(str(c.category_name)), text(str(c.parent_code)), text(str(c.cost_class)),
+      text(c.level as number), text(str(c.is_leaf_category)), text(c.child_category_count as number),
+      text(c.allowed_item_count as number), text(c.display_order as number), text(str(c.source_article)),
     ]),
   ];
 
   const budgetGuides: Cell[][] = [
-    head(['비목명', '사용 요약', '허용 상한', '근거']),
-    ...extraction.categories.map((category) => [
-      text(category.name), text(category.definition),
-      text(category.limitPct != null ? `${category.limitBasis ?? '기준'}의 ${category.limitPct}% 이내` : '별도 상한 없음'),
-      text(category.ref),
+    head(['비목 코드', '화면명', '사용 요약', '허용 상한', '상세 기준', '근거', '시행일']),
+    ...pkg.budget_screen_guides.map((g) => [
+      text(str(g.category_code)), text(str(g.display_name)), text(str(g.usage_summary)),
+      text(str(g.limit_text)), text(str(g.limit_detail_text)),
+      text(((g.source_articles as string[]) ?? []).join(', ')), text(str(g.effective_from)),
     ]),
   ];
 
   const allowedItems: Cell[][] = [
-    head(['비목', '사용 가능 항목', '설명', '상태', '조건', '제한', '근거', '원문 인용', '검토 상태']),
-    ...(extraction.allowedItems ?? []).map((item) => [
-      text(item.categoryName), text(item.name), text(item.description), text(item.status),
-      text(item.condition), text(item.restriction), text(item.ref),
-      text(quoteOf(item.quote, item.ref)), text(statusOf(item.quote, item.ref)),
+    head(['항목 코드', '비목 코드', '사용 가능 항목', '설명', '적용 기관', '가용 상태', '조건', '제한', '사전승인', '증빙', '근거', '원문 인용', '검토 상태']),
+    ...pkg.expense_allowed_items.map((i) => [
+      text(str(i.item_code)), text(str(i.category_code)), text(str(i.item_name)), text(str(i.description)),
+      text(str(i.institution_scope)), text(str(i.availability_status)), text(str(i.condition_summary)),
+      text(str(i.restriction_summary)), text(i.requires_approval ? 'Y' : ''), text(str(i.evidence_summary)),
+      text(str(i.source_article)), text(quoteOf(i)), text(statusOf(i)),
     ]),
   ];
 
   const limitRules: Cell[][] = [
-    head(['비목·항목', '규칙명', 'MVP 유형', '값', '산정 기준', '화면 문구', '근거', '원문 인용']),
-    ...extraction.rules.filter((rule) => rule.kind === 'ratio' || rule.minAmount != null).map((rule) => [
-      text(rule.item), text(rule.message), text(rule.limitType ?? (rule.minAmount != null ? 'FIXED_AMOUNT' : 'PERCENT')),
-      text(rule.minAmount ?? rule.limitPct), text(rule.basis), text(rule.message),
-      text(rule.ref), text(quoteOf(rule.quote, rule.ref)),
+    head(['규칙 코드', '비목 코드', '규칙명', 'MVP 유형', '값', '단위', '산정 기준', '화면 문구', '초과 처리', '적용 기관', '근거', '원문 인용', '검토 상태']),
+    ...pkg.expense_limit_rules.map((r) => [
+      text(str(r.limit_code)), text(str(r.category_code)), text(str(r.limit_name)), text(str(r.limit_type)),
+      text(r.limit_value as number), text(str(r.limit_unit)), text(str(r.basis_ko ?? r.basis_code)),
+      text(str(r.ui_summary)), text(str(r.over_limit_action)), text(str(r.institution_scope)),
+      text(str(r.source_article)), text(quoteOf(r)), text(statusOf(r)),
     ]),
   ];
 
   const ruleReview: Cell[][] = [
-    head(['비목·항목', '규칙 구분', '판정 결과', '승인·인정', '요구 증빙', '화면 문구', '원문 인용', '근거', '검토 상태']),
-    ...extraction.rules.map((rule) => [
-      text(rule.item), text(rule.minAmount != null ? '필수계상' : RULE_KIND_KO[rule.kind] ?? rule.kind),
-      text(rule.severity === 'high' ? 'BLOCKING' : 'WARNING'),
-      text(rule.approvalStatus === 'PRIOR_APPROVAL_REQUIRED' ? '사전승인 필요' : rule.approvalStatus === 'RECOGNITION_REQUIRED' ? '전문기관 인정 필요' : ''),
-      text((rule.requiredDocuments ?? []).join(' · ')),
-      text(rule.message), text(quoteOf(rule.quote, rule.ref)), text(rule.ref), text(statusOf(rule.quote, rule.ref)),
-    ]),
+    head(['규칙 코드', '규칙명', '비목', '규칙 구분', '판정 결과', '승인·인정', '요구 증빙', '근거', '시행일', '원문 인용', '검토 상태']),
+    ...pkg.regulation_rules.map((r) => {
+      const result = (r.result ?? {}) as { status?: string; message?: string };
+      return [
+        text(str(r.rule_code)), text(str(r.rule_name)), text(str(r.expense_category_code)), text(str(r.rule_type)),
+        text(str(result.status)), text(str(r.approval_status)),
+        text(((r.required_documents as string[]) ?? []).join(' · ')),
+        text(str(r.source_article)), text(str(r.effective_from)), text(quoteOf(r)), text(statusOf(r)),
+      ];
+    }),
   ];
 
-  // 시트마다 이름·열 너비를 각자 갖는다 (write-excel-file의 multi-sheet 형식).
-  const sheet = (name: string, data: Cell[][], widths: number[]) =>
-    ({ sheet: name, data, columns: widths.map((width) => ({ width })) });
-
-  const file = writeXlsxFile([
-    sheet('Summary', summary, [26, 90]),
-    sheet('BudgetTree', budgetTree, [24, 18, 10, 48, 10, 24, 24, 16]),
-    sheet('BudgetGuides', budgetGuides, [24, 48, 32, 24]),
-    sheet('AllowedItems', allowedItems, [20, 26, 44, 12, 32, 32, 22, 56, 16]),
-    sheet('LimitRules', limitRules, [22, 34, 18, 12, 24, 44, 22, 56]),
-    sheet('RuleReview', ruleReview, [20, 14, 14, 18, 30, 46, 56, 22, 16]),
-  ]);
-  await file.toFile(`Review_${safeName(extraction.programName || '추출결과')}.xlsx`);
+  return [
+    sheetOf('Summary', summary, [26, 90]),
+    sheetOf('BudgetTree', budgetTree, [24, 22, 18, 10, 6, 8, 8, 12, 6, 24]),
+    sheetOf('BudgetGuides', budgetGuides, [22, 18, 48, 28, 44, 26, 11]),
+    sheetOf('AllowedItems', allowedItems, [22, 22, 26, 44, 12, 14, 32, 32, 9, 26, 24, 56, 16]),
+    sheetOf('LimitRules', limitRules, [22, 20, 26, 16, 10, 9, 24, 44, 18, 12, 24, 56, 16]),
+    sheetOf('RuleReview', ruleReview, [20, 40, 20, 18, 22, 18, 30, 24, 11, 56, 16]),
+  ];
 };
 
-const RULE_KIND_KO: Record<string, string> = { ratio: '상한', warning: '금지·주의', funding: '재원', info: '참고' };
+// 검토본 엑셀 한 개만 내려받는다 (ZIP 안의 Review.xlsx와 같은 내용).
+export const exportExtractionReview = async (pkg: RegulationPackage) => {
+  const file = writeXlsxFile(buildReviewSheets(pkg));
+  await file.toFile(`Review_${safeName(pkg.package_name)}.xlsx`);
+};
 
 // 규정DB 패키지를 ZIP으로 내려받는다 — docs/extraction_DB/<폴더>/ 와 같은 구성이라, 받은 그대로
 // 폴더에 풀면 make_regulation_review.py · convert-regulation-db.mjs · upload-regulation-db.mjs 를
@@ -217,5 +247,9 @@ export const exportRegulationPackage = async (pkg: RegulationPackage) => {
   const { strToU8, zipSync } = await import('fflate');
   const files: Record<string, Uint8Array> = {};
   for (const file of packageFiles(pkg)) files[`${pkg.package_name}/${file.name}`] = strToU8(file.content);
+  // Review.xlsx는 바이너리라 packageFiles(문자열 목록)에 못 넣는다 — 여기서 구워 같은 폴더에 담는다.
+  // README의 파일 목록이 이 파일을 안내하므로 빠지면 목록과 실물이 어긋난다.
+  const review = await writeXlsxFile(buildReviewSheets(pkg)).toBlob();
+  files[`${pkg.package_name}/Review.xlsx`] = new Uint8Array(await review.arrayBuffer());
   saveAs(new Blob([zipSync(files)], { type: 'application/zip' }), `${safeName(pkg.package_name)}.zip`);
 };

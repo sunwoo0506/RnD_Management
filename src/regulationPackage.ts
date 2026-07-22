@@ -247,8 +247,94 @@ export const buildRegulationPackage = (extraction: Extraction, meta: PackageMeta
   };
 };
 
+// 패키지 README — 사람이 만든 패키지와 같은 구성(기준 / 원본 / 파일 / 이 사업의 특징 / 갱신 방법).
+// 검토자가 이 폴더만 받아도 무엇을 확인해야 하는지 알 수 있어야 한다.
+export const buildPackageReadme = (pkg: RegulationPackage): string => {
+  const m = pkg.manifest as {
+    title: string; notice_number: string | null; issuer: string | null; effective_from: string;
+    generated_at: string; source_files: string[]; notes: string;
+    validation: { unverified_rules: number; unverified_items: number; unverified_articles: number; uncertain: string[] };
+  };
+  const v = m.validation;
+  const unverified = v.unverified_rules + v.unverified_items + v.unverified_articles;
+  const limitRows = pkg.expense_limit_rules.map((rule) => {
+    const r = rule as { limit_name: string; limit_value: number | null; limit_unit: string; basis_ko: string; source_article: string };
+    const value = r.limit_value == null ? '-' : r.limit_unit === 'KRW' ? `${r.limit_value.toLocaleString('ko-KR')}원` : `${r.limit_value}%`;
+    return `| ${r.limit_name} | ${value} | ${r.basis_ko} | ${r.source_article} |`;
+  });
+
+  return `# 과제온 ${m.title} 규정 DB
+
+앱 내 AI 추출로 만든 패키지입니다. MVP 산출물 규격
+(\`docs/gwayeon_guideline_extraction_framework/04_mvp_output_spec.md\`)에 맞춰 파일명·필드명을
+사람이 만든 패키지와 동일하게 맞췄습니다.
+
+> **아직 검증 전입니다.** 근거 조문 대조를 사람이 확인하지 않았으므로, 관리자 검토를 거쳐야
+> 예산편성 화면의 비목으로 쓸 수 있습니다.
+
+## 기준
+
+- 문서: ${m.title}
+- 공고: ${m.notice_number ?? '(미확인)'}
+- 발행기관: ${m.issuer || '(미확인)'}
+- 시행: ${m.effective_from}
+- 생성: ${m.generated_at} (앱 추출)
+
+## 원본
+
+${m.source_files.length ? m.source_files.map((file) => `- ${file}`).join('\n') : '- (기록된 원본 파일 없음)'}
+
+## 파일
+
+| 파일 | 담는 것 | 건수 |
+|---|---|---|
+| \`manifest.json\` | 문서 메타·시행일·건수 | — |
+| \`expense_categories.json\` | 비목 계층 | ${pkg.expense_categories.length} |
+| \`budget_screen_guides.json\` | 비목별 사용 요약·상한 문구 | ${pkg.budget_screen_guides.length} |
+| \`expense_allowed_items.json\` | 비목 아래 사용 가능 항목 | ${pkg.expense_allowed_items.length} |
+| \`expense_limit_rules.json\` | 금액·비율 상한 | ${pkg.expense_limit_rules.length} |
+| \`regulation_rules.json\` | 금지·자격·승인·증빙 | ${pkg.regulation_rules.length} |
+| \`source_text.json\` | 조문 원문 | ${pkg.source_text.length} |
+| \`Review.xlsx\` | 사람이 검토하는 6시트 통합본 | — |
+
+## 검토가 필요한 지점
+
+${unverified > 0
+  ? `**원문 대조에 실패한 항목이 ${unverified}건 있습니다.** 인용문을 원본 문서에서 찾지 못한 것이라, 승인 전에 원문을 직접 확인해야 합니다.
+
+| 구분 | 미확인 |
+|---|---|
+| 규칙 | ${v.unverified_rules} |
+| 인정 항목 | ${v.unverified_items} |
+| 조문 원문 | ${v.unverified_articles} |`
+  : '추출된 항목의 인용이 모두 원문에서 확인됐습니다. 그래도 값 자체가 맞는지는 사람이 봐야 합니다.'}
+${v.uncertain.length ? `\nAI가 판단을 보류한 항목: ${v.uncertain.join(' / ')}\n` : ''}
+## 뽑힌 상한
+
+${limitRows.length ? `| 규칙 | 값 | 기준 | 근거 |\n|---|---|---|---|\n${limitRows.join('\n')}` : '금액·비율 상한이 추출되지 않았습니다. 상한이 없는 사업이거나 추출이 놓친 것이니 원문을 확인하세요.'}
+
+## 비목 코드에 대해
+
+표준 비목명과 정확히 일치하는 것만 표준 코드(\`DIRECT_LABOR\` 등)를 붙였고, 나머지는
+\`CAT_01\` 형식으로 두고 이름만 남겼습니다. 억지로 끼워 맞추면 상위 규정의 엉뚱한 기준이
+따라붙기 때문입니다. 검토하면서 표준 비목으로 바꿀 수 있으면 코드를 고쳐주세요.
+
+## 갱신 방법
+
+이 폴더를 \`docs/extraction_DB/${pkg.package_name}/\` 에 두면 기존 패키지와 같은 스크립트를 씁니다.
+
+\`\`\`bash
+python scripts/make_regulation_review.py docs/extraction_DB/${pkg.package_name}
+node scripts/convert-regulation-db.mjs docs/extraction_DB/${pkg.package_name}
+node scripts/upload-regulation-db.mjs docs/extraction_DB/${pkg.package_name}
+\`\`\`
+`;
+};
+
 // 패키지를 docs/extraction_DB/<폴더>/ 와 같은 파일 목록으로 편다 — ZIP 내려받기·업로드에 쓴다.
+// Review.xlsx 는 바이너리라 여기 넣지 않는다 — exporters.ts 가 ZIP을 만들 때 함께 굽는다.
 export const packageFiles = (pkg: RegulationPackage): { name: string; content: string }[] => [
+  { name: 'README.md', content: buildPackageReadme(pkg) },
   { name: 'manifest.json', content: JSON.stringify(pkg.manifest, null, 2) },
   { name: 'expense_categories.json', content: JSON.stringify(pkg.expense_categories, null, 1) },
   { name: 'budget_screen_guides.json', content: JSON.stringify(pkg.budget_screen_guides, null, 1) },
