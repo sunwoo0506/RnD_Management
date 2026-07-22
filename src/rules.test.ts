@@ -263,8 +263,13 @@ describe('집행 증빙 안내', () => {
     // 인건비·간접비까지 표가 덮는 세목은 모두 채워졌다
     expect(evidenceGuide(pack, categoryOf(pack, 'DIRECT_LABOR'), 'card').items).toHaveLength(4);
     expect(evidenceGuide(pack, categoryOf(pack, 'INDIRECT'), 'card').items).toHaveLength(10);
+    // 인건비 증빙은 표가 나눈 대로 내부·외부로 갈려 있다 (참여연구자 급여 같은 '비용의 종류'에는
+    // 표에 자기 줄이 없어서, 둘을 뭉뚱그려 달면 어느 세목을 골라도 남의 서류가 딸려온다)
+    const labor = evidenceGuide(pack, categoryOf(pack, 'DIRECT_LABOR'), 'card');
+    expect(labor.items.find((item) => item.name === '외부 인건비')?.evidence).toContain('외부참여연구자 소속 기관장 확인서');
+    expect(labor.items.find((item) => item.name === '내부 인건비')?.evidence).not.toContain('외부참여연구자');
     // 증빙 표는 비목 정의와 다른 절에 있어 근거를 따로 단다
-    const item = pack.categories.find((c) => c.id === 'DIRECT_LABOR')?.allowedItems?.[0];
+    const item = pack.categories.find((c) => c.id === 'DIRECT_LABOR')?.allowedItems?.find((entry) => entry.evidence);
     expect(item?.evidenceSource?.ref).toBe('지침 11.다.1) 비목별 증빙서류');
   });
 });

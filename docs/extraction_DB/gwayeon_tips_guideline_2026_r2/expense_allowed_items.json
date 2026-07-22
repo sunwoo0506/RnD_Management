@@ -6,9 +6,7 @@
   "description": "참여기간 동안 참여연구자에게 지급하는 급여(4대보험 본인부담금 포함)",
   "institution_scope": "ALL",
   "availability_status": "ALLOWED",
-  "source_article": "지침 11.다.1) 인건비 가)",
-  "evidence_summary": "참여연구자 현황표(연구자명·참여기간·총 인건비 계상률·변경사항), 급여명세서(월별), 계좌이체증명. 외부 참여연구자는 근로계약서(타 대학 소속 학생연구자는 재학증명서)·소속 기관장 확인서, 프리랜서·개인사업자는 과제참여계약서. 현물 계상 시 국가연구개발사업 현물부담확인서",
-  "evidence_source_article": "지침 11.다.1) 비목별 증빙서류"
+  "source_article": "지침 11.다.1) 인건비 가)"
  },
  {
   "item_code": "TIPS_LABOR_INSURANCE",
@@ -17,9 +15,7 @@
   "description": "참여기간 동안 참여연구자에 대한 4대보험의 기관부담금",
   "institution_scope": "ALL",
   "availability_status": "ALLOWED",
-  "source_article": "지침 11.다.1) 인건비 가)",
-  "evidence_summary": "참여연구자 현황표(연구자명·참여기간·총 인건비 계상률·변경사항), 급여명세서(월별), 계좌이체증명. 외부 참여연구자는 근로계약서(타 대학 소속 학생연구자는 재학증명서)·소속 기관장 확인서, 프리랜서·개인사업자는 과제참여계약서. 현물 계상 시 국가연구개발사업 현물부담확인서",
-  "evidence_source_article": "지침 11.다.1) 비목별 증빙서류"
+  "source_article": "지침 11.다.1) 인건비 가)"
  },
  {
   "item_code": "TIPS_LABOR_SEVERANCE",
@@ -28,9 +24,7 @@
   "description": "참여기간 동안 참여연구자에 대한 퇴직급여충당금",
   "institution_scope": "ALL",
   "availability_status": "ALLOWED",
-  "source_article": "지침 11.다.1) 인건비 가)",
-  "evidence_summary": "참여연구자 현황표(연구자명·참여기간·총 인건비 계상률·변경사항), 급여명세서(월별), 계좌이체증명. 외부 참여연구자는 근로계약서(타 대학 소속 학생연구자는 재학증명서)·소속 기관장 확인서, 프리랜서·개인사업자는 과제참여계약서. 현물 계상 시 국가연구개발사업 현물부담확인서",
-  "evidence_source_article": "지침 11.다.1) 비목별 증빙서류"
+  "source_article": "지침 11.다.1) 인건비 가)"
  },
  {
   "item_code": "TIPS_LABOR_NEW_HIRE",
@@ -40,8 +34,50 @@
   "institution_scope": "ALL",
   "availability_status": "CONDITIONAL",
   "condition_summary": "1인당 인건비 계상률 100%까지 계상 가능",
-  "source_article": "지침 11.다.1) 인건비 다)·라)",
-  "evidence_summary": "참여연구자 현황표(연구자명·참여기간·총 인건비 계상률·변경사항), 급여명세서(월별), 계좌이체증명. 외부 참여연구자는 근로계약서(타 대학 소속 학생연구자는 재학증명서)·소속 기관장 확인서, 프리랜서·개인사업자는 과제참여계약서. 현물 계상 시 국가연구개발사업 현물부담확인서. 영리기관 신규채용 참여연구자는 건강보험자격득실확인서와 현금계상 인건비 관리 계획 및 현황",
+  "source_article": "지침 11.다.1) 인건비 다)·라)"
+ },
+ {
+  "item_code": "TIPS_LABOR_INTERNAL",
+  "category_code": "LABOR_INTERNAL_EXISTING",
+  "item_name": "내부 인건비",
+  "description": "기존 소속 참여연구자에게 지급하는 인건비",
+  "institution_scope": "ALL",
+  "availability_status": "ALLOWED",
+  "evidence_summary": "참여연구자 현황표(연구자명·참여기간·총 인건비 계상률·변경사항), 급여명세서(월별), 계좌이체증명. 연 단위로 인건비 계상한도를 관리하는 연구개발기관은 연 단위 인건비 계상기준 준수 여부 판단자료로 대체 가능. 영리기관 신규채용 참여연구자는 건강보험자격득실확인서. 영리기관이 인건비를 현금으로 계상한 경우 현금계상 인건비 관리 계획 및 현황. 현물 계상 시 국가연구개발사업 현물부담확인서",
+  "source_article": "지침 11.다.1) 인건비 가)",
+  "evidence_source_article": "지침 11.다.1) 비목별 증빙서류"
+ },
+ {
+  "item_code": "TIPS_LABOR_INTERNAL_NEW",
+  "category_code": "LABOR_INTERNAL_NEW_GENERAL",
+  "item_name": "내부 인건비",
+  "description": "신규 채용한 소속 참여연구자에게 지급하는 인건비",
+  "institution_scope": "ALL",
+  "availability_status": "ALLOWED",
+  "evidence_summary": "참여연구자 현황표(연구자명·참여기간·총 인건비 계상률·변경사항), 급여명세서(월별), 계좌이체증명. 연 단위로 인건비 계상한도를 관리하는 연구개발기관은 연 단위 인건비 계상기준 준수 여부 판단자료로 대체 가능. 영리기관 신규채용 참여연구자는 건강보험자격득실확인서. 영리기관이 인건비를 현금으로 계상한 경우 현금계상 인건비 관리 계획 및 현황. 현물 계상 시 국가연구개발사업 현물부담확인서",
+  "source_article": "지침 11.다.1) 인건비 가)",
+  "evidence_source_article": "지침 11.다.1) 비목별 증빙서류"
+ },
+ {
+  "item_code": "TIPS_LABOR_INTERNAL_YOUTH",
+  "category_code": "LABOR_INTERNAL_NEW_YOUTH",
+  "item_name": "내부 인건비",
+  "description": "의무채용 청년인력으로 신규 채용한 참여연구자에게 지급하는 인건비",
+  "institution_scope": "ALL",
+  "availability_status": "ALLOWED",
+  "evidence_summary": "참여연구자 현황표(연구자명·참여기간·총 인건비 계상률·변경사항), 급여명세서(월별), 계좌이체증명. 연 단위로 인건비 계상한도를 관리하는 연구개발기관은 연 단위 인건비 계상기준 준수 여부 판단자료로 대체 가능. 영리기관 신규채용 참여연구자는 건강보험자격득실확인서. 영리기관이 인건비를 현금으로 계상한 경우 현금계상 인건비 관리 계획 및 현황. 현물 계상 시 국가연구개발사업 현물부담확인서",
+  "source_article": "지침 11.다.1) 인건비 가)",
+  "evidence_source_article": "지침 11.다.1) 비목별 증빙서류"
+ },
+ {
+  "item_code": "TIPS_LABOR_EXTERNAL",
+  "category_code": "LABOR_EXTERNAL",
+  "item_name": "외부 인건비",
+  "description": "외부 참여연구자에게 지급하는 인건비",
+  "institution_scope": "ALL",
+  "availability_status": "ALLOWED",
+  "evidence_summary": "근로계약서(타 대학 소속 학생연구자는 재학증명서), 급여명세서(월별), 계좌이체증명, 건강보험자격득실확인서, 외부참여연구자 소속 기관장 확인서. 프리랜서·개인사업자는 과제참여계약서",
+  "source_article": "지침 11.다.1) 인건비 가)",
   "evidence_source_article": "지침 11.다.1) 비목별 증빙서류"
  },
  {

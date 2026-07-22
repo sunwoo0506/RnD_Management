@@ -541,6 +541,29 @@ describe('집행건 등록 — 비목·세목 먼저', () => {
     expect(shown).not.toContain('정부출연기관 연구개발비 이관');
   });
 
+  it('인건비는 내부·외부 세목이 각자의 증빙만 요구한다', async () => {
+    // 증빙표는 내부/외부 인건비를 다른 줄로 나눠 적는데, 규정DB가 둘을 한 문구로 묶어 두어
+    // 어느 세목을 골라도 두 줄이 함께 짚히고 서류도 뒤섞였다.
+    const base = fixture('tips2026-general');
+    localStorage.setItem('gwajeon.project.v1', JSON.stringify({
+      ...base,
+      budgets: base.budgets.map((b) => b.categoryId !== 'DIRECT_LABOR' ? b : {
+        ...b, amount: 30_000_000, subItems: [{ id: 'ext', name: '외부 인건비', amount: 30_000_000 }],
+      }),
+    }));
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole('button', { name: '집행 · 증빙' }));
+    await user.selectOptions(screen.getByLabelText('비목'), 'DIRECT_LABOR');
+    await user.selectOptions(screen.getByLabelText('세목'), 'ext');
+    // 외부 인건비 전용 서류는 나오고, 내부 인건비 전용 서류는 나오지 않는다
+    expect(screen.getByRole('checkbox', { name: /외부참여연구자 소속 기관장 확인서/ })).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /참여연구자 현황표/ })).toBeNull();
+    const step = screen.getByRole('group', { name: /집행 시 유의사항/ });
+    const marked = [...step.querySelectorAll('.caution-article .hit')].map((node) => node.textContent ?? '');
+    expect(marked.some((line) => line.startsWith('외부 인건비'))).toBe(true);
+    expect(marked.some((line) => line.startsWith('인건비 내부 인건비'))).toBe(false);
+  });
+
   it('세목 안의 인정 항목마다 증빙표에서 제 줄을 짚는다', async () => {
     // 한 조문(증빙표)을 여러 항목이 근거로 쓰면 근거 문구가 마지막 항목 것만 남아,
     // 외부 전문기술 활용비를 골랐는데 그 안의 연구개발서비스활용비 줄만 짚히던 문제.
