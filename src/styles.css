@@ -107,6 +107,7 @@ svg { width: 18px; height: 18px; flex: none; }
 .basis-item > span { font-size: 11px; font-weight: 700; color: #4d586c; }
 .basis-item strong { font-size: 13.5px; color: var(--navy); font-variant-numeric: tabular-nums; }
 .basis-item small { font-size: 10.5px; color: var(--muted); }
+.basis-item .basis-formula { color: #7b8598; font-variant-numeric: tabular-nums; line-height: 1.5; }
 .basis-note { margin: 0; font-size: 10.5px; color: var(--muted); line-height: 1.6; }
 /* 비목 칸은 이름만 두고, 용도 설명은 마우스를 올렸을 때 오른쪽에 띄운다.
    pointer-events를 꺼둬야 카드가 덮은 편성 금액·막대바를 그대로 조작할 수 있다. */
@@ -210,6 +211,10 @@ svg { width: 18px; height: 18px; flex: none; }
 /* 현물로 계상할 때만 걸리는 상한인데 현물이 0원 — 그냥 회색 안내로 두면 그냥 지나친다 */
 .cap-cell small.cap-inkind em { color: #b45f22; }
 .cap-cell small.cap-formula { color: #7b8598; font-variant-numeric: tabular-nums; }
+/* 세부항목에 걸리는 상한 — 금액은 알려주되 비목 전체의 상한과 구분되게 둔다 */
+.cap-cell strong.cap-partial, .panel-cap strong.cap-partial { color: #4d586c; }
+.cap-cell strong.cap-partial::before, .panel-cap strong.cap-partial::before { content: '세부항목 '; font-size: 10px; color: #8f98a9; font-weight: 700; }
+.panel-cap-formula { color: #8f98a9; font-variant-numeric: tabular-nums; }
 .cap-cell small.cap-used { color: #1d8a5f; font-weight: 600; }
 .cap-cell small.cap-used.over { color: #d6453d; }
 .participants-panel { margin-bottom: 15px; }
@@ -234,7 +239,7 @@ label { display: grid; gap: 6px; color: #4d586c; font-size: 13px; font-weight: 7
 .team-grid { display: grid; grid-template-columns: .8fr 1.2fr; gap: 15px; align-items: start; }.member-list { padding: 0 20px; }.member-list > div { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid var(--line); }.member-list span { display: grid; }.member-list strong { font-size: 13px; }.member-list strong b { margin-left: 4px; font-size: 10px; color: var(--blue); background: #eaf0ff; padding: 2px 5px; border-radius: 4px; }.member-list small { color: var(--muted); font-size: 11px; }.member-list > div > svg { margin-left: auto; color: #2aa176; }.inline-add, .person-add { border-top: 1px solid var(--line); margin-top: 10px; padding: 16px 20px 20px; }.inline-add h4 { margin: 0 0 12px; font-size: 13px; display: flex; gap: 5px; }.inline-add button { margin-top: 10px; width: 100%; }.limit-note, .inline-warning { margin: 12px 20px 18px; background: #eef5ff; color: #5370a8; padding: 10px; border-radius: 8px; font-size: 11px; display: flex; gap: 5px; align-items: center; }
 /* 참여인력은 한 명 = 한 줄. 카드로 쌓으면 인원이 늘수록 편성표가 화면 밖으로 밀린다. */
 .labor-table { padding: 0 20px 2px; }
-.labor-head, .labor-row { display: grid; grid-template-columns: .95fr .8fr 1.3fr 1fr 1.05fr 1fr 1.15fr 26px; gap: 9px; align-items: center; }
+.labor-head, .labor-row { display: grid; grid-template-columns: .8fr .75fr 1.2fr .95fr 1.5fr .95fr 1.1fr 26px; gap: 9px; align-items: center; }
 .labor-head { height: 32px; font-size: 11px; font-weight: 700; color: #8490a4; border-bottom: 1px solid var(--line); }
 .labor-row { padding: 9px 0; border-bottom: 1px solid #edf0f4; }
 .labor-row.over { background: #fff8f7; }
@@ -246,10 +251,10 @@ label { display: grid; gap: 6px; color: #4d586c; font-size: 13px; font-weight: 7
 .labor-pay .money-input input, .labor-fund .money-input input { font-size: 12px; }
 .labor-sev { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--muted); font-weight: 600; cursor: pointer; }
 .labor-sev input { width: auto; margin: 0; flex: none; }
-.labor-rates { display: grid; grid-template-columns: 1fr 1fr auto; gap: 5px; align-items: center; }
+.labor-rates { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; align-items: center; }
 .labor-rates label { position: relative; }
-.labor-rates label input { padding-right: 16px; text-align: right; }
-.labor-rates label b { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); font-size: 10px; color: var(--muted); }
+.labor-rates label input { padding-right: 19px; text-align: right; }
+.labor-rates label b { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 10.5px; color: var(--muted); }
 /* 스피너가 %% 표시를 덮는다 — 숫자만 남긴다 */
 .labor-rates input::-webkit-outer-spin-button, .labor-rates input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .labor-rates .sum { font-size: 12px; color: #4d586c; font-weight: 700; }

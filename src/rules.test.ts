@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOverlay, articlesForRef, baseStandardFor, budgetBases, capFor, categoryOf, fundingCapChecks, maxAmountWithinCap, subItemChoicesFor, fundingRateChecks, packIsMissing, replacementPacksFor, rescaleBudgets, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories } from './rules';
+import { applyOverlay, articlesForRef, baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, fundingCapChecks, maxAmountWithinCap, subItemChoicesFor, fundingRateChecks, packIsMissing, replacementPacksFor, rescaleBudgets, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories } from './rules';
 import type { Project, RulePack } from './types';
 
 describe('규정 팩 로더', () => {
@@ -164,6 +164,22 @@ describe('상한 계산과 배분', () => {
     // 원문 인용이 규칙에 실려 미리보기 하이라이트 1순위로 쓰인다
     const incentiveRule = capFor(pack, budgets, 70_000_000, 'DIRECT_INCENTIVE')?.rule;
     expect(incentiveRule?.quote).toContain('수정인건비');
+  });
+
+  it('세부항목 기준 상한도 금액은 알려주되 비목 전체의 상한으로 강제하지 않는다', () => {
+    // "외부 전문기술 활용비는 직접비의 40%" — 연구활동비 전체가 아니라 그 안의 세목에 걸리는 상한이다.
+    const pack = getPack('tips2026-general');
+    const budgets = makeDraftBudgets(pack, 70_000_000);
+    const cap = capFor(pack, budgets, 70_000_000, 'DIRECT_ACTIVITY');
+    expect(cap?.partial).toBe(true);
+    expect(cap?.rule.item).toBe('외부 전문기술 활용비');
+    expect(cap?.amount).toBeNull();                                  // 비목 전체를 묶지 않는다
+    expect(cap?.referenceAmount).toBe(24_080_000);                   // 직접비 60,200,000 × 40%
+    expect(cap?.basisAmount).toBe(60_200_000);
+    // 그래서 편성 금액을 이 값 위로 올려도 막지 않는다 (막대바도 잔액까지 그대로 열린다)
+    expect(maxAmountWithinCap(pack, budgets, 70_000_000, 'DIRECT_ACTIVITY', 40_000_000)).toBe(40_000_000);
+    // 기준 금액이 어떻게 나왔는지도 함께 준다
+    expect(basisFormula(cap!.basisParts)).toBe('총 사업비 70,000,000원 − 간접비 9,800,000원');
   });
 
   it('기준 금액을 한자리에 모아 보여준다 — 같은 "직접비"라도 빼는 것이 다르면 따로 세운다', () => {

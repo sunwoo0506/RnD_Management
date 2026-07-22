@@ -6,7 +6,7 @@ import {
   Pencil, Plus, RefreshCw, ScanLine, Settings as SettingsIcon, ShieldCheck, Sparkles, Trash2, Upload, UserPlus, Users, WalletCards,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
-import { baseStandardFor, budgetBases, capFor, categoryOf, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
+import { baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
 import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, getEvidence, getProjectDocument, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
 import { isCloudEnabled, supabase } from './supabase';
@@ -538,11 +538,19 @@ function StandardPanel({ category, reference, referenceDoc, cap, amount, inKindA
 
       <section className="panel-block">
         <h4>상한</h4>
-        {cap?.basisAmount != null
+        {cap?.amount != null
           ? <div className="panel-cap">
-              <strong>{formatWon(cap.amount!)}</strong>
-              <small>{cap.basisLabel} {formatWon(cap.basisAmount)} × {cap.limitPct}%</small>
-              <small className={amount > cap.amount! ? 'over' : 'ok'}>현재 {formatWon(amount)} — {amount > cap.amount! ? `${formatWon(amount - cap.amount!)} 초과` : `여유 ${formatWon(cap.amount! - amount)}`}</small>
+              <strong>{formatWon(cap.amount)}</strong>
+              <small>{cap.basisLabel} {formatWon(cap.basisAmount!)} × {cap.limitPct}%</small>
+              <small className="panel-cap-formula">{basisFormula(cap.basisParts)}</small>
+              <small className={amount > cap.amount ? 'over' : 'ok'}>현재 {formatWon(amount)} — {amount > cap.amount ? `${formatWon(amount - cap.amount)} 초과` : `여유 ${formatWon(cap.amount - amount)}`}</small>
+            </div>
+          : cap?.referenceAmount != null
+          ? <div className="panel-cap">
+              <strong className="cap-partial">{formatWon(cap.referenceAmount)}</strong>
+              <small>{cap.basisLabel} {formatWon(cap.basisAmount!)} × {cap.limitPct}%</small>
+              <small className="panel-cap-formula">{basisFormula(cap.basisParts)}</small>
+              <small>{cap.rule.item}에 걸리는 상한 — 비목 전체가 아니라 이 세목 합계를 이 금액 안에서 잡으세요.</small>
             </div>
           : cap
           ? <p className="panel-line">{cap.label}<em>{capHint(cap, inKindAmount, hasMatching)}</em></p>
@@ -715,9 +723,11 @@ function BudgetComposition({ pack, project, cats, bases }: { pack: RulePack; pro
     <div className="basis-items">{bases.map((basis) => <div className="basis-item" key={basis.basis} title={basis.basis}>
       <span>{basis.label}</span>
       <strong>{formatWon(basis.amount)}</strong>
+      {/* 계산식을 보여줘야 "왜 이 금액이 안 움직이지"가 풀린다 — 직접비 기준은 간접비·위탁을 바꿔야 움직인다. */}
+      <small className="basis-formula">{basis.formula}</small>
       <small>{basis.categories.join(' · ')} 상한의 기준</small>
     </div>)}</div>
-    <p className="basis-note">편성 금액이 바뀌면 기준 금액도 함께 바뀝니다. 이름 위에 마우스를 올리면 규정 문구 그대로 볼 수 있어요.</p>
+    <p className="basis-note">계산식에 있는 비목의 편성 금액을 바꿔야 기준 금액이 움직입니다. 이름 위에 마우스를 올리면 규정 문구 그대로 볼 수 있어요.</p>
   </div>;
   if (!project.totalBudget || planned === 0) return basisBlock && <div className="budget-comp">{basisBlock}</div>;
   const folded = entries.filter((e) => e.slot >= COMP_SLOTS);
@@ -1127,8 +1137,11 @@ function Budget({ project, update, setScreen }: { project: Project; update: (p: 
           {definition && <div className="def-card" role="tooltip"><strong>{category.name}</strong><p>{definition}</p>{!category.definition && <em>{referenceByCategory.get(category.id)?.pack.guideline} 기준</em>}</div>}</div>
         {/* 상한의 근거·조건은 "기준" 패널에 있으므로, 여기서는 금액이 어떻게 나왔는지 계산식만 보여준다. */}
         <div className="cap-cell">{cap
-          ? cap.basisAmount != null
-            ? <><strong>{formatWon(cap.amount!)}</strong><small className="cap-formula">{cap.basisLabel} {formatWon(cap.basisAmount)} × {cap.limitPct}%</small>{amount > 0 && cap.amount! > 0 && <small className={over ? 'cap-used over' : 'cap-used'}>{over ? `상한 ${formatWon(amount - cap.amount!)} 초과` : `여유 ${formatWon(cap.amount! - amount)}`}</small>}</>
+          ? cap.amount != null
+            ? <><strong>{formatWon(cap.amount)}</strong><small className="cap-formula">{cap.basisLabel} {formatWon(cap.basisAmount!)} × {cap.limitPct}%</small>{amount > 0 && cap.amount > 0 && <small className={over ? 'cap-used over' : 'cap-used'}>{over ? `상한 ${formatWon(amount - cap.amount)} 초과` : `여유 ${formatWon(cap.amount - amount)}`}</small>}</>
+            // 세부항목에 걸리는 상한도 금액은 알려준다 — 얼마까지 쓸 수 있는지 알아야 세목을 짠다.
+            : cap.referenceAmount != null
+            ? <><strong className="cap-partial">{formatWon(cap.referenceAmount)}</strong><small className="cap-formula">{cap.basisLabel} {formatWon(cap.basisAmount!)} × {cap.limitPct}%</small><small className="cap-db"><em>{cap.rule.item}에 걸리는 상한이에요 — 비목 전체가 아니라 이 세목 합계를 이 금액 안에서 잡으세요.</em></small></>
             : <small className={cap.inKindOnly && funding.matching > 0 && itemInKind <= 0 ? 'cap-db cap-inkind' : 'cap-db'}>{cap.label}<br /><em>{capHint(cap, itemInKind, funding.matching > 0)}</em></small>
           : (category.limitText ?? referenceByCategory.get(category.id)?.category.limitText)
           ? <small className="cap-db">{category.limitText ?? referenceByCategory.get(category.id)?.category.limitText}{!category.limitText && <em> · 공통 규정 기준</em>}</small>
