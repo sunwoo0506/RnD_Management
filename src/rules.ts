@@ -64,6 +64,19 @@ export const selectablePacks = (): RulePack[] => {
 
 export const isRegulationDbPack = (pack: RulePack): boolean => pack.origin === 'regulation_db';
 
+// ---- 과제가 쓰던 규정 팩이 사라졌는지 ----
+// 규정이 개정되면 팩이 갈리거나(tips2026 → 일반/딥테크) 이름이 바뀐다. 그때 과제에 저장된
+// packId 는 어디에도 없는 id 가 되고, packFor()는 적용 시점 스냅샷(customPack)으로 되돌아간다.
+// 화면은 그대로 동작하지만 새로 생긴 한도·규칙이 반영되지 않으므로, 사용자에게 알려야 한다.
+export const packIsMissing = (project: Project): boolean =>
+  !allPacks().some((pack) => pack.id === project.packId);
+
+// 사라진 팩을 대신할 후보 — 같은 팩이 갈린 것이라면 id 가 접두사를 공유한다
+// (tips2026 → tips2026-general / tips2026-deeptech). 없으면 빈 배열이고 사용자가 직접 고른다.
+export const replacementPacks = (packId: string): RulePack[] =>
+  allPacks().filter((pack) => pack.id !== packId
+    && (pack.id.startsWith(`${packId}-`) || packId.startsWith(`${pack.id}-`)));
+
 export const getPack = (packId: string): RulePack =>
   remotePacks.find((pack) => pack.id === packId) ?? PACKS.find((pack) => pack.id === packId) ?? LEGACY_PACK;
 

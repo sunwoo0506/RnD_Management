@@ -6,7 +6,7 @@ import {
   Pencil, Plus, RefreshCw, ScanLine, Settings as SettingsIcon, ShieldCheck, Sparkles, Trash2, Upload, UserPlus, Users, WalletCards,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
-import { capFor, categoryOf, DEFAULT_INSURANCE_RATE, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
+import { capFor, categoryOf, DEFAULT_INSURANCE_RATE, packIsMissing, replacementPacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
 import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, getEvidence, getProjectDocument, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
 import { isCloudEnabled, supabase } from './supabase';
@@ -896,6 +896,37 @@ function Budget({ project, update, setScreen }: { project: Project; update: (p: 
   return <div className="page-content"><div className="page-title"><div><span className="eyebrow">모듈 1</span><h2>예산 편성 도우미</h2><p>{pack.name} 규정 체계 기준 초안입니다. 협약서의 개별 조건이 항상 우선합니다.</p></div><div className="title-actions"><button className="secondary" onClick={() => withExporters((m) => m.exportBudgetXlsx(project))}><Download /> 엑셀 내보내기</button><button className={confirmed ? 'secondary' : 'primary'} onClick={toggleConfirm}>{confirmed ? <><Pencil /> 편성 수정</> : <><Check /> 편성 확정</>}</button></div></div>
     <div className={`notice ${pack.verified ? 'soft' : ''}`}><BookOpenCheck /><div><strong>{pack.verified ? '규정DB 검증본' : '예시 기준 (검증 전)'} · {pack.guideline}</strong><span>{pack.agency} 기준으로 정리한 데이터입니다 ({packBasisDate(pack)}). 실제 협약 및 최신 공고 원문이 항상 우선합니다. {(() => { const doc = docForSource({ doc: pack.guideline, matchLevel: 'guideline' }); return doc ? <button type="button" className="ref-link" onClick={() => viewDoc(doc)}>저장된 원문 보기 ({doc.fileName}) →</button> : pack.referenceUrl ? <a href={pack.referenceUrl} target="_blank" rel="noreferrer">공식 사이트에서 원문 확인 →</a> : null; })()}</span></div></div>
     {!pack.hasRatioLimits && packInfos.length > 0 && <div className="notice soft"><ShieldCheck /><div><strong>이 사업은 비목 간 비율 제한이 없습니다</strong><span>{packInfos.map((rule, index) => <span key={rule.id}>{index > 0 && ' · '}{rule.message} {refLink(rule)}</span>)}</span></div></div>}
+    {/* 규정이 개정돼 이 과제가 쓰던 팩이 사라지면, 화면은 적용 시점 스냅샷으로 계속 돌아가
+        새 한도·규칙이 반영되지 않는다. 사용자는 알 방법이 없으므로 여기서 알리고 바로 옮겨준다. */}
+    {packIsMissing(project) && (() => {
+      const options = replacementPacks(project.packId);
+      const movePack = (next: RulePack) => {
+        if (!confirm(`규정을 "${next.name}"으로 바꿀까요?\n비목 구성이 같으면 편성 금액은 그대로 유지되고, 새 한도·규칙이 적용됩니다.`)) return;
+        // 비목 id 가 같은 것만 편성을 옮긴다 — 없어진 비목의 금액을 엉뚱한 비목에 붙이면 안 된다.
+        const keep = new Set(next.categories.map((category) => category.id));
+        const budgets = project.budgets.filter((item) => keep.has(item.categoryId));
+        const dropped = project.budgets.length - budgets.length;
+        if (dropped > 0 && !confirm(`새 규정에 없는 비목 ${dropped}개의 편성 금액은 지워집니다. 계속할까요?`)) return;
+        // 스냅샷을 지워야 새 팩이 실제로 쓰인다 (packFor 는 규정DB 팩이 아니면 customPack 을 쓴다).
+        update({ ...project, packId: next.id, customPack: undefined, packOverlay: undefined, budgets, budgetConfirmed: false });
+      };
+      return <section className="cap-alert under">
+        <div className="cap-alert-head">
+          <span className="cap-badge">규정 개정</span>
+          <h3>이 과제가 쓰던 규정이 더 이상 제공되지 않습니다</h3>
+        </div>
+        <p className="cap-alert-basis">
+          지금은 규정을 적용하던 시점의 사본(<b>{pack.name}</b>)으로 표시하고 있어, 그 뒤에 바뀐 한도·규칙이 반영되지 않습니다.
+          {options.length > 0 ? ' 아래에서 바뀐 규정을 고르면 편성 금액을 유지한 채 옮겨드려요.' : ' 과제 설정에서 규정을 다시 선택해주세요.'}
+        </p>
+        <div className="cap-alert-actions">
+          {options.map((option) => (
+            <button type="button" key={option.id} className="primary" onClick={() => movePack(option)}>{option.name}(으)로 변경</button>
+          ))}
+          <button type="button" className="secondary" onClick={() => setScreen('settings')}>과제 설정에서 고르기</button>
+        </div>
+      </section>;
+    })()}
     {/* 사업비 한도가 정해진 사업은 입력한 금액과 대조한다 — 잘못 입력한 채로 편성을 끝내면 나중에 전부 다시 짜야 한다.
         금액이 한도와 다르면 다른 안내와 섞이지 않게 확인 카드로 띄우고, 그 자리에서 바로 고칠 수 있게 한다. */}
     {fundingCapChecks(pack, project).map((check) => {

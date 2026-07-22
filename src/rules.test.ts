@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOverlay, articlesForRef, capFor, categoryOf, fundingCapChecks, fundingRateChecks, rescaleBudgets, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories } from './rules';
+import { applyOverlay, articlesForRef, capFor, categoryOf, fundingCapChecks, fundingRateChecks, packIsMissing, replacementPacks, rescaleBudgets, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories } from './rules';
 import type { Project, RulePack } from './types';
 
 describe('규정 팩 로더', () => {
@@ -224,6 +224,35 @@ describe('사업비 한도 대조', () => {
   it('금액 한도가 없는 사업은 아무것도 반환하지 않는다', () => {
     expect(fundingCapChecks(getPack('nrd2026-forprofit'), projectWith(100_000_000, 'nrd2026-forprofit'))).toEqual([]);
     expect(fundingCapChecks(getPack('legacy-rnd'), projectWith(100_000_000, 'legacy-rnd'))).toEqual([]);
+  });
+});
+
+describe('사라진 규정 팩 감지', () => {
+  const withPack = (packId: string): Project => ({
+    id: 'p1', name: '팩 이동 테스트', totalBudget: 100_000_000,
+    startDate: '2026-01-01', endDate: '2026-12-31', settlementDeadline: '2027-01-31',
+    agency: '중소벤처기업부', companyName: '테스트랩', packId,
+    members: [], participants: [], budgets: [], expenses: [], changes: [], emailLogs: [],
+    createdAt: new Date().toISOString(),
+  });
+
+  it('갈라져 사라진 팩을 쓰는 과제를 찾아낸다', () => {
+    // tips2026 은 일반/딥테크로 갈리면서 사라졌다
+    expect(packIsMissing(withPack('tips2026'))).toBe(true);
+    expect(packIsMissing(withPack('tips2026-general'))).toBe(false);
+    expect(packIsMissing(withPack('nrd2026-forprofit'))).toBe(false);
+  });
+
+  it('갈라진 팩의 후보를 id 접두사로 찾아 제안한다', () => {
+    expect(replacementPacks('tips2026').map((pack) => pack.id).sort())
+      .toEqual(['tips2026-deeptech', 'tips2026-general']);
+  });
+
+  it('관계없는 id 에는 후보를 만들지 않는다 (엉뚱한 규정을 권하면 안 된다)', () => {
+    expect(replacementPacks('알수없는사업2026')).toEqual([]);
+    // 이름이 겹쳐 보여도 접두사 관계가 아니면 후보가 아니다
+    expect(replacementPacks('nrd2026').map((pack) => pack.id).sort())
+      .toEqual(['nrd2026-forprofit', 'nrd2026-nonprofit']);
   });
 });
 
