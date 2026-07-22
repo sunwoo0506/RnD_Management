@@ -5847,5 +5847,91 @@
   ],
   "effective_from": "2026-05-06",
   "is_active": true
+ },
+ {
+  "rule_code": "COM-EVD-001",
+  "expense_category_code": "ALL",
+  "rule_name": "연구개발비 사용 입증 증명자료 구비",
+  "rule_type": "REQUIRE",
+  "result": {
+   "status": "REQUIRED",
+   "message": "연구개발비 사용을 입증할 증명자료를 갖추어야 한다 (계약 취소·변경으로 생긴 수수료 등 부대비용 포함)"
+  },
+  "required_documents": [
+   "연구개발비 사용 증명자료"
+  ],
+  "source_article": "제22조제2항",
+  "source_quote": "연구개발기관의 장은 연구개발비 사용(재난, 재해, 그 밖에 경제적ㆍ사회적으로 중대한 사유 발생에 따라 물품 및 서비스를 위한 계약이 취소ㆍ변경되어 수수료 등 부대비용이 발생하여 사용한 것을 포함한다)을 입증할 증명자료를 갖추어야 한다.",
+  "institution_scope": "ALL",
+  "is_active": true
+ },
+ {
+  "rule_code": "EQP-EVD-001",
+  "expense_category_code": "DIRECT_EQUIPMENT",
+  "rule_name": "연구시설·장비 구매·검수 확인",
+  "rule_type": "REQUIRE",
+  "result": {
+   "status": "REQUIRED",
+   "message": "연구시설·장비를 구매하는 경우 자체규정에 따라 구매·검수하고 검수확인서를 갖추어야 한다"
+  },
+  "required_documents": [
+   "검수확인서"
+  ],
+  "source_article": "제22조제3항",
+  "source_quote": "연구개발기관의 장은 연구시설ㆍ장비와 연구재료(연구활동비 또는 간접비로 구매하는 경우를 포함한다)를 구매하는 경우 자체규정에 따라 구매ㆍ검수하여야 한다.",
+  "institution_scope": "ALL",
+  "is_active": true
+ },
+ {
+  "rule_code": "MAT-EVD-001",
+  "expense_category_code": "DIRECT_MATERIAL",
+  "rule_name": "연구재료 구매·검수 확인 (100만원 이하 간소화)",
+  "rule_type": "REQUIRE",
+  "result": {
+   "status": "REQUIRED",
+   "message": "연구재료를 구매하는 경우 자체규정에 따라 구매·검수해야 한다. 100만원 이하 연구재료는 연차별 1,000만원 이내에서 검수 절차를 간소화하고 검수확인서 외의 증명자료를 갖추지 않도록 자체규정을 마련할 수 있다(법 제2조제3호 나·라·바목 기관)"
+  },
+  "required_documents": [
+   "검수확인서"
+  ],
+  "source_article": "제22조제3항 단서",
+  "source_quote": "다만, 법 제2조제3호나목, 라목 및 바목의 연구개발기관의 장은 100만 원 이하의 연구재료를 구매하는 경우(연차별 1,000만 원 이내로 한한다) 검수 절차를 간소화하고 검수확인서 외에 추가적인 증명자료를 갖추지 않는 것으로 자체규정을 마련할 수 있다.",
+  "institution_scope": "ALL",
+  "is_active": true
+ },
+ {
+  "rule_code": "INT-EVD-001",
+  "expense_category_code": "DIRECT_INTERNATIONAL",
+  "rule_name": "국제공동연구개발비 계약서·계좌이체 증명 구비",
+  "rule_type": "REQUIRE",
+  "result": {
+   "status": "REQUIRED",
+   "message": "국제공동연구개발비 사용에 관한 연구개발기관과 국외기관 간 계약서, 계좌이체증명 등 증명자료를 갖추어야 한다"
+  },
+  "required_documents": [
+   "국외기관 간 계약서",
+   "계좌이체증명"
+  ],
+  "source_article": "제28조제4항",
+  "source_quote": "연구개발기관의 장은 국제공동연구개발비 사용에 관한 연구개발기관과 국외기관 간 계약서, 계좌이체증명 등 증명자료를 갖추어야 한다.",
+  "institution_scope": "ALL",
+  "is_active": true
+ },
+ {
+  "rule_code": "RND-EVD-001",
+  "expense_category_code": "DIRECT_RND_CONTRIBUTION",
+  "rule_name": "연구개발부담비 계좌이체 증명 구비",
+  "rule_type": "REQUIRE",
+  "result": {
+   "status": "REQUIRED",
+   "message": "정부출연기관의 장은 연구개발부담비 사용에 관한 계좌이체증명 등 증명자료를 갖추어야 한다"
+  },
+  "required_documents": [
+   "계좌이체증명"
+  ],
+  "source_article": "제42조제2항",
+  "source_quote": "정부출연기관의 장은 연구개발부담비 사용에 관한 계좌이체증명 등 증명자료를 갖추어야 한다.",
+  "institution_scope": "NON_PROFIT",
+  "is_active": true
  }
 ]

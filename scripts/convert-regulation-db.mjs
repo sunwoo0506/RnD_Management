@@ -226,10 +226,11 @@ const approvalsFor = (code, track) => {
 // category_code가 'ALL'인 증빙 규칙(10만원 이상 집행 시 전자세금계산서, 2천만원 이상 거래 시
 // 비교견적서 등)은 비목을 가리지 않는다. 예전에는 어느 비목에도 붙지 못해 화면에서 통째로
 // 사라졌다 — 증빙 규칙으로 분류돼 금지·주의 목록에서도 빠지기 때문이다.
-const evidenceFor = (code, track) => {
+const evidenceFor = (code, track, scope) => {
   const codes = descendantCodes(code);
   return evidenceRules
-    .filter((r) => (codes.has(r.category_code) || r.category_code === 'ALL') && r.is_active !== false && (r.required_documents ?? []).length && trackApplies(r.track_scope, track))
+    .filter((r) => (codes.has(r.category_code) || r.category_code === 'ALL') && r.is_active !== false && (r.required_documents ?? []).length
+      && trackApplies(r.track_scope, track) && scopeApplies(r.institution_scope, scope))
     .map((r) => ({
       name: r.rule_name,
       documents: r.required_documents.map((d) => DOC_KO[d] ?? d),
@@ -287,7 +288,7 @@ const buildCategories = (scope, track) => {
     const guide = guideByCode.get(code);
     const applicability = applicabilityFor(code, scope, track);
     const approvals = approvalsFor(code, track);
-    const evidence = evidenceFor(code, track);
+    const evidence = evidenceFor(code, track, scope);
     // 편성 화면의 "가능한 세목" 후보. 하위 비목이 있으면 그것이 곧 세목이고(연구활동비 → 출장비·회의비…),
     // 없으면 그 비목의 허용 항목을 세목 후보로 쓴다(인건비 → 참여연구자 급여·4대보험 기관부담금…).
     const children = tree.filter((n) => n.parent_code === code);
@@ -432,7 +433,7 @@ const buildReferenceCategories = (scope, track) => {
       const guide = guideByCode.get(code);
       const items = buildAllowedItems(code, scope);
       const approvals = approvalsFor(code, track);
-      const evidence = evidenceFor(code, track);
+      const evidence = evidenceFor(code, track, scope);
       const applicability = applicabilityFor(code, scope, track).map(({ rawResult, ...rest }) => rest);
       return {
         id: code,
