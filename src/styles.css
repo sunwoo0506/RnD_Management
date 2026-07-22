@@ -274,6 +274,9 @@ label { display: grid; gap: 6px; color: #4d586c; font-size: 13px; font-weight: 7
 .person-add input { flex: 1; }
 .labor-summary { border-top: 1px solid var(--line); margin-top: 10px; padding: 14px 20px 18px; display: grid; gap: 10px; }
 .labor-summary > div:not(.settings-save) { display: grid; grid-template-columns: 1fr auto auto; align-items: baseline; gap: 10px; }
+/* 인건비 합계 두 줄은 표 바로 아래에 붙인다 — 아래 설정·버튼과는 옅은 선으로 나눈다 */
+.labor-sum-row strong { color: var(--navy); }
+.labor-sum-row + .labor-sum-row { padding-bottom: 10px; border-bottom: 1px dashed #e4e9f1; }
 .labor-summary span { color: var(--muted); font-size: 12px; }
 .labor-summary strong { font-size: 14px; }
 .labor-summary small { color: var(--muted); font-size: 11px; }

@@ -879,6 +879,10 @@ function ParticipantsPanel({ project, update }: { project: Project; update: (p: 
     <form className="person-add" onSubmit={addPerson}><input value={person} onChange={(e) => setPerson(e.target.value)} placeholder="새 참여 인력 이름" /><button className="secondary" type="submit"><Plus /> 인력 추가</button></form>
     {project.participants.length === 0 && <div className="inline-warning"><AlertCircle /> 참여율 데이터가 없어 초과 경고가 작동하지 않습니다. 참여 인력을 추가해주세요.</div>}
     {project.participants.length > 0 && <div className="labor-summary">
+      {/* 합계는 표를 다 읽고 나서 바로 눈이 가는 자리(표 바로 아래)에 둔다 —
+          4대보험·퇴직금 설정 밑으로 내려가면 인력을 고칠 때마다 시선이 화면 끝까지 내려가야 한다. */}
+      <div className="labor-sum-row"><span>기존인력 인건비 합계</span><strong>{formatWon(sumExisting.total)}</strong><small>현금 {formatWon(sumExisting.cash)} · 현물 {formatWon(sumExisting.inKind)}</small></div>
+      <div className="labor-sum-row"><span>신규인력 인건비 합계</span><strong>{formatWon(sumNew.total)}</strong><small>현금 {formatWon(sumNew.cash)} · 현물 {formatWon(sumNew.inKind)}</small></div>
       <div className="labor-toggles">
         <label className="share-toggle"><input type="checkbox" checked={includeInsurance} onChange={(e) => update({ ...project, laborIncludeInsurance: e.target.checked })} /><span><strong>4대보험 포함</strong> — 사업별 계상 기준에 따라</span></label>
         {includeInsurance && <label className="labor-rate">요율(%)<input inputMode="decimal" value={String(insRate)} onChange={(e) => { const v = e.target.value.replace(/[^\d.]/g, ''); update({ ...project, insuranceRate: Math.min(30, Number(v) || 0) }); }} /></label>}
@@ -888,8 +892,6 @@ function ParticipantsPanel({ project, update }: { project: Project; update: (p: 
         const withSev = project.participants.filter((p) => severanceApplies(p, includeSeverance)).length;
         return <p className="field-hint">퇴직금 계상 인력 {withSev}명 / 전체 {project.participants.length}명 — 계속근로 1년 미만인 인력은 개인 카드에서 "퇴직금 포함"을 해제하세요.</p>;
       })()}
-      <div><span>기존인력 인건비 합계</span><strong>{formatWon(sumExisting.total)}</strong><small>현금 {formatWon(sumExisting.cash)} · 현물 {formatWon(sumExisting.inKind)}</small></div>
-      <div><span>신규인력 인건비 합계</span><strong>{formatWon(sumNew.total)}</strong><small>현금 {formatWon(sumNew.cash)} · 현물 {formatWon(sumNew.inKind)}</small></div>
       {(() => {
         // 인건비 현물이 재원 구성의 민간부담 현물 한도를 넘으면 반영 전에 미리 경고한다.
         const laborFunding = fundingBreakdown(project);
