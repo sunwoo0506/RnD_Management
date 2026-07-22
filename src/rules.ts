@@ -957,7 +957,11 @@ export const fundingBreakdown = (project: Project): FundingBreakdown => {
 // 창업성장기술개발 도약 2억원 등). 규정 팩의 fundingCap 과 사용자가 입력한 금액을 견줘,
 // 잘못 입력한 사업비를 편성 전에 잡아낸다. 안내 문구로만 두면 틀린 채로 편성이 끝난다.
 export interface FundingCapCheck {
-  cap: number;
+  cap: number;           // 이 과제에 실제로 걸리는 한도 (연 한도가 있으면 사업기간까지 반영한 값)
+  totalCap: number;      // 규정이 정한 총액 한도
+  perYear?: number;      // 연 한도 (있는 사업만)
+  years: number;         // 사업기간이 걸친 연차 수
+  annualBound: boolean;  // 총액이 아니라 연 한도 때문에 한도가 줄었는지
   target: 'subsidy' | 'total';
   targetLabel: string;   // 무엇을 견줬는지 (지원금 / 총사업비)
   basis: string;         // 한도의 기준 이름
@@ -967,6 +971,17 @@ export interface FundingCapCheck {
   rule: PackRule;
 }
 
+// 사업기간이 걸친 연차 수. 12개월당 1년차로 세고, 남는 달도 한 연차로 친다
+// (디딤돌은 최대 1년 6개월인데 2년차까지 걸쳐 총 2억을 쓴다).
+export const fundingYears = (startDate?: string, endDate?: string): number => {
+  const from = /^(\d{4})-(\d{2})-(\d{2})$/.exec((startDate ?? '').trim());
+  const to = /^(\d{4})-(\d{2})-(\d{2})$/.exec((endDate ?? '').trim());
+  if (!from || !to) return 1;
+  const months = (Number(to[1]) - Number(from[1])) * 12 + (Number(to[2]) - Number(from[2]))
+    + (Number(to[3]) >= Number(from[3]) ? 1 : 0);
+  return months > 0 ? Math.ceil(months / 12) : 1;
+};
+
 export const fundingCapChecks = (pack: RulePack, project: Project): FundingCapCheck[] =>
   pack.rules
     .filter((rule): rule is PackRule & { fundingCap: number } => rule.fundingCap != null)
@@ -975,14 +990,23 @@ export const fundingCapChecks = (pack: RulePack, project: Project): FundingCapCh
       const entered = target === 'subsidy'
         ? (project.subsidyAmount ?? project.totalBudget)
         : project.totalBudget;
+      // 총액과 연 한도가 함께 있으면 짧은 과제에는 총액을 다 쓸 수 없다 —
+      // "최대 2억원(연 1억원 이내)"인 사업의 1년짜리 과제 한도는 1억이다.
+      const years = fundingYears(project.startDate, project.endDate);
+      const byYear = rule.fundingCapPerYear != null ? rule.fundingCapPerYear * years : null;
+      const cap = byYear != null ? Math.min(rule.fundingCap, byYear) : rule.fundingCap;
       return {
-        cap: rule.fundingCap,
+        cap,
+        totalCap: rule.fundingCap,
+        ...(rule.fundingCapPerYear != null ? { perYear: rule.fundingCapPerYear } : {}),
+        years,
+        annualBound: byYear != null && byYear < rule.fundingCap,
         target,
         targetLabel: target === 'subsidy' ? '지원금' : '총사업비',
         basis: rule.fundingCapBasis ?? '사업비',
         entered,
-        over: entered > rule.fundingCap,
-        diff: entered - rule.fundingCap,
+        over: entered > cap,
+        diff: entered - cap,
         rule,
       };
     });

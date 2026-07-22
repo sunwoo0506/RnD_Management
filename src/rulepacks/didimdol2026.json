@@ -667,7 +667,8 @@
     "kind": "info",
     "fundingCap": 200000000,
     "fundingCapTarget": "subsidy",
-    "fundingCapBasis": "정부지원연구개발비 총액"
+    "fundingCapBasis": "정부지원연구개발비 총액",
+    "fundingCapPerYear": 100000000
    }
   ],
   "applicationDocs": [],

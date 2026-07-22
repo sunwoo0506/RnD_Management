@@ -1191,6 +1191,9 @@ function Budget({ project, update, setScreen }: { project: Project; update: (p: 
           <div><span>이 사업 한도</span><strong className="cap-target">{formatWon(check.cap)}</strong></div>
           <div className="cap-diff"><span>차이</span><strong>{check.over ? '+' : '−'}{formatWon(Math.abs(check.diff))}</strong></div>
         </div>
+        {/* 연 한도가 총액보다 먼저 걸리는 사업이 있다 — 왜 2억이 아니라 1억인지 밝히지 않으면
+            사용자는 화면이 규정을 잘못 읽은 줄 안다. */}
+        {check.annualBound && <p className="cap-alert-annual"><CircleDollarSign /> 이 사업은 연 {formatWon(check.perYear!)} 한도가 함께 걸려 있어, 사업기간 {check.years}년차 기준으로 <strong>{formatWon(check.cap)}</strong>까지만 쓸 수 있습니다 (총액 한도는 {formatWon(check.totalCap)}). 기간을 늘리면 한도도 함께 올라갑니다.</p>}
         <p className="cap-alert-basis">{check.basis} · {check.rule.message} {refLink(check.rule)}</p>
         <div className="cap-alert-actions">
           <button type="button" className="primary" onClick={applyCap}><Check /> {formatWon(check.cap)}으로 수정</button>

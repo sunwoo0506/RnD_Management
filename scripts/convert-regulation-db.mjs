@@ -355,7 +355,10 @@ const buildRules = (scope, track) => {
       const role = r.limit_unit === 'PERCENT' && r.limit_value != null ? fundingRoleOf(r) : null;
       return {
         ...base, kind: 'info',
+        // 연 한도가 함께 정해진 사업(디딤돌 "최대 2억원 이내(연 1억원 이내)")은 그 값도 싣는다 —
+        // 사업기간이 짧으면 총액을 다 쓸 수 없어서, 총액만 보면 1년짜리 과제에 2억을 허용한다.
         ...(isAmountCap ? { fundingCap: r.limit_value, fundingCapTarget: target, fundingCapBasis: r.basis_ko ?? '사업비' } : {}),
+        ...(isAmountCap && r.limit_value_per_year != null ? { fundingCapPerYear: r.limit_value_per_year } : {}),
         ...(role ? { fundingRole: role, fundingPct: r.limit_value } : {}),
         _order: 3,
       };

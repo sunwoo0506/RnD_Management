@@ -71,6 +71,9 @@ export interface PackRule {
   fundingCap?: number;
   fundingCapTarget?: 'subsidy' | 'total'; // 지원금과 견줄지, 총사업비와 견줄지
   fundingCapBasis?: string;               // 한도의 기준 이름 (정부지원연구개발비 총액 등)
+  // 총액과 함께 연 한도를 둔 사업이 있다 (디딤돌 "최대 2억원 이내(연 1억원 이내)").
+  // 사업기간이 짧으면 총액을 다 쓸 수 없으므로 연차 수를 곱해 실제 한도를 정한다.
+  fundingCapPerYear?: number;
   // 재원 구성 비율 규정 (정부지원 75% 이내, 기관부담 현금 10% 이상 …) — 과제 설정의 비율 입력과 대조한다.
   fundingRole?: 'subsidy_max' | 'matching_min' | 'matching_cash_min';
   fundingPct?: number;

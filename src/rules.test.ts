@@ -688,11 +688,34 @@ describe('사업비 한도 대조', () => {
     expect(under[0].diff).toBe(-15_000_000);
   });
 
-  it('창업성장기술개발(디딤돌)은 정부지원 2억 한도를 쓴다', () => {
-    const checks = fundingCapChecks(getPack('didimdol2026'), projectWith(250_000_000, 'didimdol2026'));
-    expect(checks).toHaveLength(1);
-    expect(checks[0].cap).toBe(200_000_000);
-    expect(checks[0].over).toBe(true);
+  // 디딤돌 관리지침은 "정부지원연구개발비 최대 2억원 이내 (최대 年 1억원 이내)"로 총액과 연 한도를
+  // 함께 정한다. 총액만 보면 1년짜리 과제에도 2억을 허용하게 된다.
+  it('창업성장기술개발(디딤돌)은 연 1억 한도를 사업기간에 곱해 실제 한도를 정한다', () => {
+    const pack = getPack('didimdol2026');
+    const oneYear = fundingCapChecks(pack, projectWith(150_000_000, 'didimdol2026'));   // 2026-01-01 ~ 2026-12-31
+    expect(oneYear).toHaveLength(1);
+    expect(oneYear[0].years).toBe(1);
+    expect(oneYear[0].cap).toBe(100_000_000);      // 연 1억 × 1년차
+    expect(oneYear[0].totalCap).toBe(200_000_000); // 규정의 총액 한도는 그대로 들고 있는다
+    expect(oneYear[0].perYear).toBe(100_000_000);
+    expect(oneYear[0].annualBound).toBe(true);
+    expect(oneYear[0].over).toBe(true);
+    expect(oneYear[0].diff).toBe(50_000_000);
+
+    // 지원기간 상한인 1년 6개월이면 2년차에 걸쳐 총액 2억을 다 쓸 수 있다
+    const halfMore = fundingCapChecks(pack, { ...projectWith(200_000_000, 'didimdol2026'), endDate: '2027-06-30' });
+    expect(halfMore[0].years).toBe(2);
+    expect(halfMore[0].cap).toBe(200_000_000);
+    expect(halfMore[0].annualBound).toBe(false);   // 이때는 총액이 먼저 걸린다
+    expect(halfMore[0].over).toBe(false);
+  });
+
+  it('연 한도가 없는 사업은 총액 한도를 그대로 쓴다', () => {
+    // 사업기간을 짧게 잡아도 한도가 줄면 안 된다 (예비창업패키지는 연 한도가 없다)
+    const checks = fundingCapChecks(getPack('prestartup2026'), { ...projectWith(20_000_000, 'prestartup2026'), endDate: '2026-03-31' });
+    expect(checks[0].cap).toBe(20_000_000);
+    expect(checks[0].perYear).toBeUndefined();
+    expect(checks[0].annualBound).toBe(false);
   });
 
   it('TIPS는 트랙별 지원 한도를 쓰고, 운영사 투자금은 한도로 쓰지 않는다', () => {

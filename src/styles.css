@@ -567,6 +567,10 @@ mark.hl.current { background: #e5473c; color: white; box-shadow: 0 0 0 2px #b336
 .cap-diff strong { color: #d6453d; }
 .cap-alert.under .cap-diff strong { color: #b57116; }
 .cap-alert-basis { margin: 0 0 14px; font-size: 12px; color: #5b667b; line-height: 1.6; }
+/* 총액이 아니라 연 한도 때문에 줄어든 한도 — 왜 그런지 밝혀야 화면을 의심하지 않는다. */
+.cap-alert-annual { display: flex; gap: 7px; align-items: flex-start; margin: 0 0 10px; padding: 9px 11px; background: #fff7f0; border: 1px solid #f0d3ae; border-radius: 8px; font-size: 12px; color: #5b667b; line-height: 1.6; }
+.cap-alert-annual svg { width: 15px; flex: none; color: #cf8a2e; margin-top: 2px; }
+.cap-alert-annual strong { color: #1f2a3d; }
 .cap-alert-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cap-alert-actions small { color: var(--muted); font-size: 11px; margin-left: 4px; }
 @media (max-width: 900px) {
