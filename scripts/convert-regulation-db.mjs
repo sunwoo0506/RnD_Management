@@ -223,10 +223,13 @@ const approvalsFor = (code, track) => {
 };
 
 // 조건부로 추가 요구되는 증빙 (evidence_rules) — 비목 기본 증빙과 달리 금액·상황 조건이 붙는다.
+// category_code가 'ALL'인 증빙 규칙(10만원 이상 집행 시 전자세금계산서, 2천만원 이상 거래 시
+// 비교견적서 등)은 비목을 가리지 않는다. 예전에는 어느 비목에도 붙지 못해 화면에서 통째로
+// 사라졌다 — 증빙 규칙으로 분류돼 금지·주의 목록에서도 빠지기 때문이다.
 const evidenceFor = (code, track) => {
   const codes = descendantCodes(code);
   return evidenceRules
-    .filter((r) => codes.has(r.category_code) && r.is_active !== false && (r.required_documents ?? []).length && trackApplies(r.track_scope, track))
+    .filter((r) => (codes.has(r.category_code) || r.category_code === 'ALL') && r.is_active !== false && (r.required_documents ?? []).length && trackApplies(r.track_scope, track))
     .map((r) => ({
       name: r.rule_name,
       documents: r.required_documents.map((d) => DOC_KO[d] ?? d),

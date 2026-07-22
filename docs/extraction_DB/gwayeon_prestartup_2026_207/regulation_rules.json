@@ -642,5 +642,21 @@
   "source_article": "세부관리기준 제21조제2항",
   "effective_from": "2025-07-02",
   "is_active": true
+ },
+ {
+  "rule_code": "PRE_EVIDENCE_COMPARE_QUOTE_20M",
+  "expense_category_code": "ALL",
+  "rule_name": "2천만원 이상 거래 시 비교견적서",
+  "rule_type": "REQUIRE",
+  "result": {
+   "status": "REQUIRED",
+   "message": "2천만원 이상으로 거래하는 경우 비교견적서를 제출해야 한다"
+  },
+  "required_documents": [
+   "비교견적서"
+  ],
+  "source_article": "제36조 <표-10> 창업기업등 사업비 비목",
+  "institution_scope": "ALL",
+  "is_active": true
  }
 ]

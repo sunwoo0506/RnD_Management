@@ -269,6 +269,30 @@ describe('집행 증빙 안내', () => {
   });
 });
 
+describe('예비창업패키지 증빙', () => {
+  it('통합관리지침 제36조 표의 비목별 증빙이 인정 항목마다 실린다', () => {
+    const pack = getPack('prestartup2026');
+    const fee = evidenceGuide(pack, categoryOf(pack, 'PRE_FEE'), 'card');
+    // 지급수수료는 표가 세부 항목별로 나눠 적었다 — 공통 증빙 + 항목별 증빙
+    expect(fee.items.find((item) => item.name === '멘토링비')?.evidence).toContain('회차별 멘토링 보고서');
+    expect(fee.items.find((item) => item.name === '기술이전비')?.evidence).toContain('기술이전 완료보고서');
+    expect(fee.items.every((item) => item.evidence.includes('세금계산서'))).toBe(true);
+    expect(evidenceGuide(pack, categoryOf(pack, 'PRE_LABOR'), 'card').items[0].evidence).toContain('4대사회보험가입확인서');
+  });
+
+  it('비목을 가리지 않는 증빙 규칙(ALL)은 모든 비목에 붙는다', () => {
+    // 예전에는 어느 비목에도 못 붙어 화면에서 통째로 사라졌다 — 증빙 규칙이라 금지·주의에서도 빠진다.
+    const pack = getPack('prestartup2026');
+    for (const category of pack.categories.filter((c) => c.allowed)) {
+      const names = evidenceGuide(pack, category, 'card').rules.map((rule) => rule.name);
+      expect(names, category.name).toContain('2천만원 이상 거래 시 비교견적서');
+    }
+    const tips = getPack('tips2026-general');
+    const names = evidenceGuide(tips, categoryOf(tips, 'DIRECT_LABOR'), 'card').rules.map((rule) => rule.name);
+    expect(names).toContain('10만원 이상 집행 시 전자세금계산서·카드영수증 원칙');
+  });
+});
+
 describe('계상 가능 세목 후보', () => {
   it('디딤돌 팩은 공고가 정한 세목에 국가연구개발사업 연구개발비 사용 기준의 세목을 이어 붙인다', () => {
     // 디딤돌 공고·지침은 주요 비목만 적고 나머지는 "국가연구개발사업 연구개발비 사용 기준에 따른다"고만 한다.
