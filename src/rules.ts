@@ -244,7 +244,7 @@ export const transferLimitError = (pack: RulePack, budgets: BudgetItem[], totalB
 // 이름으로 규정 DB 팩의 기준을 찾아 "공통 규정 기준"으로 함께 보여준다.
 // 국가연구개발사업 연구개발비 사용 기준은 국가 R&D 공통 기준이고, TIPS 지침도 이를 따르되
 // 별도로 정한 것만 우선한다(지침 11.가) — 그래서 공고 기준을 대체하지 않고 참고로만 붙인다.
-const REFERENCE_PACK_IDS = ['nrd2026-forprofit', 'tips2026'];
+const REFERENCE_PACK_IDS = ['nrd2026-forprofit', 'tips2026-general'];
 
 export interface ReferenceStandard { pack: RulePack; category: PackCategory }
 
@@ -353,6 +353,113 @@ export const fundingBreakdown = (project: Project): FundingBreakdown => {
   const matchingCashRate = matchingCashRateKnown ? (project.matchingCashRate ?? 100) : 0;
   const { matchingCash, matchingInKind } = matchingCashRateKnown ? splitMatching(matching, matchingCashRate) : { matchingCash: 0, matchingInKind: 0 };
   return { subsidy, matching, matchingCash, matchingInKind, matchingCashRate, matchingCashRateKnown };
+};
+
+// ---- 사업비 한도 대조 ----
+// 사업마다 지원금 총액이 정해져 있는 경우가 있다 (예비창업패키지 1단계 2천만원,
+// 창업성장기술개발 도약 2억원 등). 규정 팩의 fundingCap 과 사용자가 입력한 금액을 견줘,
+// 잘못 입력한 사업비를 편성 전에 잡아낸다. 안내 문구로만 두면 틀린 채로 편성이 끝난다.
+export interface FundingCapCheck {
+  cap: number;
+  target: 'subsidy' | 'total';
+  targetLabel: string;   // 무엇을 견줬는지 (지원금 / 총사업비)
+  basis: string;         // 한도의 기준 이름
+  entered: number;       // 사용자가 입력한 금액
+  over: boolean;         // 한도를 넘었는지
+  diff: number;          // 한도와의 차이 (초과면 양수, 미달이면 음수)
+  rule: PackRule;
+}
+
+export const fundingCapChecks = (pack: RulePack, project: Project): FundingCapCheck[] =>
+  pack.rules
+    .filter((rule): rule is PackRule & { fundingCap: number } => rule.fundingCap != null)
+    .map((rule) => {
+      const target = rule.fundingCapTarget ?? 'subsidy';
+      const entered = target === 'subsidy'
+        ? (project.subsidyAmount ?? project.totalBudget)
+        : project.totalBudget;
+      return {
+        cap: rule.fundingCap,
+        target,
+        targetLabel: target === 'subsidy' ? '지원금' : '총사업비',
+        basis: rule.fundingCapBasis ?? '사업비',
+        entered,
+        over: entered > rule.fundingCap,
+        diff: entered - rule.fundingCap,
+        rule,
+      };
+    });
+
+// ---- 재원 구성 비율 대조 ----
+// 사업마다 정부지원 비율 상한(75% 이내)과 민간부담 현금 최소비율(10% 이상)이 정해져 있다.
+// 금액 한도(fundingCap)가 없는 사업도 이 비율은 거의 항상 있으므로, 입력한 비율이 규정을
+// 벗어나면 편성 전에 알려준다. 현금 비율을 아직 모르는 상태(미입력)는 위반이 아니라 "확인 필요"다.
+export interface FundingRateCheck {
+  role: 'subsidy_max' | 'matching_min' | 'matching_cash_min';
+  label: string;      // 무엇에 대한 비율인지
+  pct: number;        // 규정 비율
+  entered: number | null; // 입력값 (모르면 null)
+  ok: boolean;        // 규정을 지키는지 (모르면 false 가 아니라 unknown 으로 구분)
+  unknown: boolean;   // 아직 입력하지 않아 판정할 수 없음
+  rule: PackRule;
+}
+
+export const fundingRateChecks = (pack: RulePack, project: Project): FundingRateCheck[] => {
+  const subsidyRate = project.subsidyRate ?? 100;
+  const matchingRate = 100 - subsidyRate;
+  return pack.rules
+    .filter((rule): rule is PackRule & { fundingRole: NonNullable<PackRule['fundingRole']>; fundingPct: number } =>
+      rule.fundingRole != null && rule.fundingPct != null)
+    .map((rule) => {
+      if (rule.fundingRole === 'subsidy_max') {
+        return { role: rule.fundingRole, label: '정부지원 비율', pct: rule.fundingPct, entered: subsidyRate, ok: subsidyRate <= rule.fundingPct, unknown: false, rule };
+      }
+      if (rule.fundingRole === 'matching_min') {
+        return { role: rule.fundingRole, label: '기관부담 비율', pct: rule.fundingPct, entered: matchingRate, ok: matchingRate >= rule.fundingPct, unknown: false, rule };
+      }
+      // 민간부담이 아예 없는 사업(전액 지원)이면 현금 비율 규정은 적용할 것이 없다.
+      const cashKnown = project.matchingCashRate != null;
+      const entered = project.matchingCashRate ?? null;
+      return {
+        role: rule.fundingRole, label: '민간부담 중 현금 비율', pct: rule.fundingPct, entered,
+        ok: matchingRate === 0 || (cashKnown && (entered ?? 0) >= rule.fundingPct),
+        unknown: matchingRate > 0 && !cashKnown,
+        rule,
+      };
+    });
+};
+
+// 총사업비가 바뀌었을 때 이미 편성한 비목 금액을 같은 비율로 옮긴다.
+// 초안으로 되돌리지 않고 비율을 지키는 이유: 사용자가 직접 조정한 배분이 사라지면 안 된다.
+// 반올림 오차는 가장 큰 비목이 흡수해 합계가 정확히 newTotal 이 되게 맞춘다.
+export const rescaleBudgets = (budgets: BudgetItem[], oldTotal: number, newTotal: number): BudgetItem[] => {
+  const current = budgets.reduce((sum, item) => sum + item.amount, 0);
+  // 기준이 될 합계가 없으면(총액 0 또는 미편성) 비율을 구할 수 없어 그대로 둔다.
+  if (current <= 0 || oldTotal <= 0 || newTotal < 0) return budgets;
+  const ratio = newTotal / current;
+  const scaled = budgets.map((item) => ({
+    ...item,
+    amount: Math.round(item.amount * ratio),
+    ...(item.inKindAmount != null ? { inKindAmount: Math.round(item.inKindAmount * ratio) } : {}),
+    ...(item.subItems ? { subItems: item.subItems.map((sub) => ({ ...sub, amount: Math.round(sub.amount * ratio) })) } : {}),
+  }));
+  const diff = newTotal - scaled.reduce((sum, item) => sum + item.amount, 0);
+  if (diff === 0) return scaled;
+  // 가장 큰 비목에 오차를 얹는다 (작은 비목에 얹으면 음수가 될 수 있다).
+  let biggest = 0;
+  scaled.forEach((item, index) => { if (item.amount > scaled[biggest].amount) biggest = index; });
+  const target = scaled[biggest];
+  const adjusted = Math.max(0, target.amount + diff);
+  scaled[biggest] = {
+    ...target,
+    amount: adjusted,
+    ...(target.inKindAmount != null ? { inKindAmount: Math.min(target.inKindAmount, adjusted) } : {}),
+    // 세목이 있으면 비목 금액은 세목 합계로 유지돼야 하므로 마지막 세목에서 같이 맞춘다.
+    ...(target.subItems?.length
+      ? { subItems: target.subItems.map((sub, index) => index === target.subItems!.length - 1 ? { ...sub, amount: Math.max(0, sub.amount + diff) } : sub) }
+      : {}),
+  };
+  return scaled;
 };
 
 // 과제 등록·설정 화면에서 저장 전 입력값으로 같은 계산을 미리보기할 때 쓴다.

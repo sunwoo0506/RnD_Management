@@ -6,7 +6,7 @@ import {
   Pencil, Plus, RefreshCw, ScanLine, Settings as SettingsIcon, ShieldCheck, Sparkles, Trash2, Upload, UserPlus, Users, WalletCards,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
-import { capFor, categoryOf, DEFAULT_INSURANCE_RATE, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
+import { capFor, categoryOf, DEFAULT_INSURANCE_RATE, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
 import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, getEvidence, getProjectDocument, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
 import { isCloudEnabled, supabase } from './supabase';
@@ -34,6 +34,11 @@ const daysUntil = (date: string) => Math.ceil((new Date(`${date}T23:59:59`).getT
 
 const SYNC_LABEL = { local: '이 브라우저에만 저장', saving: '클라우드 저장 중…', synced: '클라우드 동기화됨', error: '동기화 오류 — 재시도 예정' } as const;
 
+// 규정 팩이 "언제 기준"인지. 규정DB 팩은 규정 자체의 시행일을 쓰고, 그게 없는 내장 예시 팩만
+// 앱이 데이터를 정리한 날(RULES_EFFECTIVE_DATE)로 떨어진다.
+const packBasisDate = (pack: RulePack): string =>
+  pack.effectiveFrom ? `${pack.effectiveFrom} 시행 기준` : `${RULES_EFFECTIVE_DATE} 업데이트`;
+
 function Sidebar({ screen, setScreen, project, projects, onSelect, onAdd, onReset, account, sync, onLogout }: { screen: Screen; setScreen: (s: Screen) => void; project: Project; projects: Project[]; onSelect: (id: string) => void; onAdd: () => void; onReset: () => void; account: string | null; sync: 'local' | 'saving' | 'synced' | 'error'; onLogout: () => void }) {
   const nav = [
     { id: 'overview' as Screen, label: '한눈에 보기', icon: LayoutDashboard },
@@ -53,7 +58,8 @@ function Sidebar({ screen, setScreen, project, projects, onSelect, onAdd, onRese
       <button type="button" className="add" onClick={() => { setMenuOpen(false); onAdd(); }}><Plus /> 새 과제 등록</button>
     </div>}
     <nav>{nav.map(({ id, label, icon: Icon }) => <button key={id} className={screen === id ? 'active' : ''} onClick={() => setScreen(id)}><Icon />{label}</button>)}</nav>
-    <div className="sidebar-bottom"><div className="policy"><BookOpenCheck /><div><strong>{pack.name} · 예시 기준 (검증 전)</strong><span>{RULES_EFFECTIVE_DATE} 업데이트</span></div></div>{isCloudEnabled && <div className="cloud-chip"><span className={`sync-dot ${sync}`} /><div>{account ? <small>{account}</small> : null}<span>{SYNC_LABEL[sync]}</span></div>{account && <button onClick={onLogout}>로그아웃</button>}</div>}<button className="reset-button" onClick={onReset}><Trash2 /> 과제 삭제</button></div>
+    {/* 검증 여부·기준일은 팩에서 읽는다 — 규정DB 팩은 근거 조문까지 검토를 마쳤고 사업마다 시행일이 다르다. */}
+    <div className="sidebar-bottom"><div className={`policy ${pack.verified ? 'verified' : ''}`}><BookOpenCheck /><div><strong>{pack.name}{pack.verified ? ' · 규정DB' : ' · 예시 기준 (검증 전)'}</strong><span>{packBasisDate(pack)}</span></div></div>{isCloudEnabled && <div className="cloud-chip"><span className={`sync-dot ${sync}`} /><div>{account ? <small>{account}</small> : null}<span>{SYNC_LABEL[sync]}</span></div>{account && <button onClick={onLogout}>로그아웃</button>}</div>}<button className="reset-button" onClick={onReset}><Trash2 /> 과제 삭제</button></div>
   </aside>;
 }
 
@@ -811,7 +817,7 @@ function ParticipantsPanel({ project, update }: { project: Project; update: (p: 
   </section>;
 }
 
-function Budget({ project, update }: { project: Project; update: (p: Project) => void }) {
+function Budget({ project, update, setScreen }: { project: Project; update: (p: Project) => void; setScreen: (s: Screen) => void }) {
   const pack = packFor(project);
   const cats = visibleCategories(pack, project);
   const confirmed = !!project.budgetConfirmed;
@@ -888,8 +894,93 @@ function Budget({ project, update }: { project: Project; update: (p: Project) =>
   };
   const packInfos = globalRules(pack, 'info');
   return <div className="page-content"><div className="page-title"><div><span className="eyebrow">모듈 1</span><h2>예산 편성 도우미</h2><p>{pack.name} 규정 체계 기준 초안입니다. 협약서의 개별 조건이 항상 우선합니다.</p></div><div className="title-actions"><button className="secondary" onClick={() => withExporters((m) => m.exportBudgetXlsx(project))}><Download /> 엑셀 내보내기</button><button className={confirmed ? 'secondary' : 'primary'} onClick={toggleConfirm}>{confirmed ? <><Pencil /> 편성 수정</> : <><Check /> 편성 확정</>}</button></div></div>
-    <div className="notice"><BookOpenCheck /><div><strong>예시 기준 (검증 전) · {pack.guideline}</strong><span>{pack.agency} 기준으로 정리한 데이터입니다 ({RULES_EFFECTIVE_DATE} 업데이트). 실제 협약 및 최신 공고 원문이 항상 우선합니다. {(() => { const doc = docForSource({ doc: pack.guideline, matchLevel: 'guideline' }); return doc ? <button type="button" className="ref-link" onClick={() => viewDoc(doc)}>저장된 원문 보기 ({doc.fileName}) →</button> : pack.referenceUrl ? <a href={pack.referenceUrl} target="_blank" rel="noreferrer">공식 사이트에서 원문 확인 →</a> : null; })()}</span></div></div>
+    <div className={`notice ${pack.verified ? 'soft' : ''}`}><BookOpenCheck /><div><strong>{pack.verified ? '규정DB 검증본' : '예시 기준 (검증 전)'} · {pack.guideline}</strong><span>{pack.agency} 기준으로 정리한 데이터입니다 ({packBasisDate(pack)}). 실제 협약 및 최신 공고 원문이 항상 우선합니다. {(() => { const doc = docForSource({ doc: pack.guideline, matchLevel: 'guideline' }); return doc ? <button type="button" className="ref-link" onClick={() => viewDoc(doc)}>저장된 원문 보기 ({doc.fileName}) →</button> : pack.referenceUrl ? <a href={pack.referenceUrl} target="_blank" rel="noreferrer">공식 사이트에서 원문 확인 →</a> : null; })()}</span></div></div>
     {!pack.hasRatioLimits && packInfos.length > 0 && <div className="notice soft"><ShieldCheck /><div><strong>이 사업은 비목 간 비율 제한이 없습니다</strong><span>{packInfos.map((rule, index) => <span key={rule.id}>{index > 0 && ' · '}{rule.message} {refLink(rule)}</span>)}</span></div></div>}
+    {/* 사업비 한도가 정해진 사업은 입력한 금액과 대조한다 — 잘못 입력한 채로 편성을 끝내면 나중에 전부 다시 짜야 한다.
+        금액이 한도와 다르면 다른 안내와 섞이지 않게 확인 카드로 띄우고, 그 자리에서 바로 고칠 수 있게 한다. */}
+    {fundingCapChecks(pack, project).map((check) => {
+      const matches = check.entered === check.cap;
+      const acknowledged = (project.fundingCapAck ?? []).includes(check.rule.id);
+      if (matches) return <div key={check.rule.id} className="notice soft"><CheckCircle2 /><div>
+        <strong>{check.targetLabel}이 이 사업의 한도와 일치합니다</strong>
+        <span>{formatWon(check.cap)} · {check.basis} {refLink(check.rule)}</span>
+      </div></div>;
+      // 한도에 맞추면 총사업비와 비목 편성을 함께 옮긴다 — 금액만 바꾸고 편성을 두면 합계가 어긋난다.
+      const applyCap = () => {
+        const subsidyRate = project.subsidyRate ?? 100;
+        const nextSubsidy = check.target === 'subsidy' ? check.cap : Math.round(check.cap * subsidyRate / 100);
+        const nextTotal = check.target === 'total' ? check.cap : deriveTotalBudget(nextSubsidy, subsidyRate);
+        if (!confirm(`${check.targetLabel}을 ${formatWon(check.cap)}으로 맞출까요?\n총사업비 ${formatWon(project.totalBudget)} → ${formatWon(nextTotal)}\n비목별 편성 금액도 지금 비율 그대로 새 총액에 맞춰 조정됩니다.`)) return;
+        update({
+          ...project,
+          subsidyAmount: nextSubsidy,
+          totalBudget: nextTotal,
+          budgets: rescaleBudgets(project.budgets, project.totalBudget, nextTotal),
+          budgetConfirmed: false,
+          fundingCapAck: (project.fundingCapAck ?? []).filter((id) => id !== check.rule.id),
+        });
+      };
+      const keep = () => update({ ...project, fundingCapAck: [...(project.fundingCapAck ?? []), check.rule.id] });
+      const undoKeep = () => update({ ...project, fundingCapAck: (project.fundingCapAck ?? []).filter((id) => id !== check.rule.id) });
+
+      if (acknowledged) return <div key={check.rule.id} className="notice"><CircleDollarSign /><div>
+        <strong>이 사업의 {check.basis} 한도는 {formatWon(check.cap)}입니다 — 현재 금액을 유지 중</strong>
+        <span>입력한 {check.targetLabel} {formatWon(check.entered)} · 확인함 {refLink(check.rule)} <button type="button" className="ref-link" onClick={undoKeep}>다시 확인하기</button></span>
+      </div></div>;
+
+      return <section key={check.rule.id} className={`cap-alert ${check.over ? 'over' : 'under'}`}>
+        <div className="cap-alert-head">
+          <span className="cap-badge">{check.over ? '확인 필요' : '금액 확인'}</span>
+          <h3>{check.over
+            ? `입력한 ${check.targetLabel}이 이 사업 한도를 넘습니다`
+            : `입력한 ${check.targetLabel}이 이 사업 한도보다 적습니다`}</h3>
+        </div>
+        <div className="cap-alert-figures">
+          <div><span>입력한 {check.targetLabel}</span><strong>{formatWon(check.entered)}</strong></div>
+          <div className="cap-arrow"><ArrowRight /></div>
+          <div><span>이 사업 한도</span><strong className="cap-target">{formatWon(check.cap)}</strong></div>
+          <div className="cap-diff"><span>차이</span><strong>{check.over ? '+' : '−'}{formatWon(Math.abs(check.diff))}</strong></div>
+        </div>
+        <p className="cap-alert-basis">{check.basis} · {check.rule.message} {refLink(check.rule)}</p>
+        <div className="cap-alert-actions">
+          <button type="button" className="primary" onClick={applyCap}><Check /> {formatWon(check.cap)}으로 수정</button>
+          <button type="button" className="secondary" onClick={keep}>현재 금액 유지</button>
+          <small>수정하면 비목별 편성 금액도 지금 비율 그대로 새 총액에 맞춰집니다.</small>
+        </div>
+      </section>;
+    })}
+    {/* 재원 구성 비율 규정 — 금액 한도가 없는 사업도 이 비율은 거의 항상 있다. */}
+    {(() => {
+      const rates = fundingRateChecks(pack, project).filter((check) => !check.ok);
+      if (!rates.length) return null;
+      const broken = rates.filter((check) => !check.unknown);
+      const fixRate = (check: typeof rates[number]) => {
+        if (check.role === 'matching_cash_min') { update({ ...project, matchingCashRate: check.pct }); return; }
+        // 지원 비율이 바뀌면 총사업비가 달라지고, 편성해둔 비목도 새 총액에 맞춰야 한다.
+        const nextRate = check.role === 'subsidy_max' ? check.pct : 100 - check.pct;
+        const subsidy = project.subsidyAmount ?? project.totalBudget;
+        const nextTotal = deriveTotalBudget(subsidy, nextRate);
+        if (!confirm(`지원비율을 ${nextRate}%로 맞출까요?\n총사업비 ${formatWon(project.totalBudget)} → ${formatWon(nextTotal)}\n비목별 편성 금액도 지금 비율 그대로 새 총액에 맞춰 조정됩니다.`)) return;
+        update({ ...project, subsidyRate: nextRate, totalBudget: nextTotal, budgets: rescaleBudgets(project.budgets, project.totalBudget, nextTotal), budgetConfirmed: false });
+      };
+      return <section className={`cap-alert ${broken.length ? 'over' : 'under'}`}>
+        <div className="cap-alert-head">
+          <span className="cap-badge">{broken.length ? '규정 위반' : '입력 필요'}</span>
+          <h3>{broken.length ? '재원 구성이 이 사업 규정과 맞지 않습니다' : '재원 구성을 확인해주세요'}</h3>
+        </div>
+        <div className="cap-rate-list">{rates.map((check) => (
+          <div key={check.rule.id} className={check.unknown ? 'cap-rate unknown' : 'cap-rate'}>
+            <div><span>{check.label}</span><strong>{check.unknown ? '미입력' : `${check.entered}%`}</strong></div>
+            <div className="cap-arrow"><ArrowRight /></div>
+            <div><span>규정</span><strong className="cap-target">{check.role === 'subsidy_max' ? `${check.pct}% 이하` : `${check.pct}% 이상`}</strong></div>
+            <button type="button" className="secondary" onClick={() => fixRate(check)}>
+              {check.role === 'matching_cash_min' ? `현금 ${check.pct}%로 설정` : `${check.role === 'subsidy_max' ? check.pct : 100 - check.pct}%로 수정`}
+            </button>
+          </div>
+        ))}</div>
+        <p className="cap-alert-basis">{rates.map((check, index) => <span key={check.rule.id}>{index > 0 && ' · '}{check.rule.message} {refLink(check.rule)}</span>)}</p>
+      </section>;
+    })()}
     <ParticipantsPanel project={project} update={update} />
     <section className="panel budget-editor"><div className="editor-head"><div><span className="section-kicker">STEP 2 · 비목별 편성</span><span>전체 사용 가능 예산</span><strong>{formatWon(project.totalBudget)}</strong>{funding.matching > 0 && funding.matchingCashRateKnown && <small className="funding-split-note">현금 {formatWon(funding.subsidy + funding.matchingCash)} (지원금+민간 현금) · 현물 {formatWon(funding.matchingInKind)}</small>}</div><div className="editor-head-sums">{funding.matching > 0 && funding.matchingCashRateKnown
         ? (() => {
@@ -1447,10 +1538,7 @@ function DocUpdatePanel({ project, update, source }: { project: Project; update:
           <div className="settings-save">
             {!onRegulationDb && <button type="button" className="primary" onClick={apply} disabled={(acceptedRules.size === 0 && acceptedItems.size === 0 && !useDocCats) || applying}><Check /> {applying ? '반영 중…' : `선택한 규정 적용 (규칙 ${acceptedRules.size}건${acceptedItems.size ? ` · 인정항목 ${acceptedItems.size}건` : ''}${useDocCats ? ' + 비목 구성' : ''})`}</button>}
             {/* 엑셀로 받아 사람이 검토·보강한 뒤 관리자가 공유 DB에 올리는 흐름 */}
-            <button type="button" className="secondary" onClick={() => withExporters((m) => m.exportExtractionReview(ai.extraction!, {
-              documentTitle: ai.extraction!.programName || undefined,
-              sourceFiles: docs.filter((link) => checkedIds.has(link.id)).map((link) => link.fileName),
-            }))}><Download /> 검토본 엑셀</button>{applied && !onRegulationDb && <span className="save-ok"><CheckCircle2 /> 반영됐어요</span>}</div>
+            <button type="button" className="secondary" disabled={!regulationPackage} onClick={() => regulationPackage && withExporters((m) => m.exportExtractionReview(regulationPackage))}><Download /> 검토본 엑셀</button>{applied && !onRegulationDb && <span className="save-ok"><CheckCircle2 /> 반영됐어요</span>}</div>
           {ai.extraction.referencedRegulations && ai.extraction.referencedRegulations.length > 0 && <div className="ref-regs">
             <h4>이 공고가 참고하라고 명시한 규정</h4>
             <p className="wiz-hint">예산 편성 기준은 대개 공고문·사업계획서에 있지만, 증빙 서류는 아래 규정도 함께 확인해야 할 수 있어요. 정부 사이트에 원문이 흩어져 있어 자동으로 가져오지는 못하니, 직접 찾아 "공유 규정 DB"에 올려두면 다음부터 검색으로 바로 쓸 수 있어요.</p>
@@ -1752,5 +1840,5 @@ export default function App() {
     setProjects((list) => list.filter((p) => p.id !== project.id));
     setActiveId(null);
   };
-  return <div className="app-shell"><Sidebar screen={screen} setScreen={setScreen} project={project} projects={projects} onSelect={(id) => { setActiveId(id); setScreen('overview'); }} onAdd={() => setAdding(true)} onReset={reset} account={session?.user.email ?? null} sync={syncState} onLogout={logout} /><main className="main"><Header project={project} />{screen === 'overview' && <Overview project={project} setScreen={setScreen} />}{screen === 'budget' && <Budget project={project} update={update} />}{screen === 'spending' && <Spending project={project} update={update} />}{screen === 'change' && <ChangeManagement project={project} update={update} />}{screen === 'team' && <Team project={project} update={update} setScreen={setScreen} />}{screen === 'settings' && <Settings project={project} update={update} onReset={reset} />}</main></div>;
+  return <div className="app-shell"><Sidebar screen={screen} setScreen={setScreen} project={project} projects={projects} onSelect={(id) => { setActiveId(id); setScreen('overview'); }} onAdd={() => setAdding(true)} onReset={reset} account={session?.user.email ?? null} sync={syncState} onLogout={logout} /><main className="main"><Header project={project} />{screen === 'overview' && <Overview project={project} setScreen={setScreen} />}{screen === 'budget' && <Budget project={project} update={update} setScreen={setScreen} />}{screen === 'spending' && <Spending project={project} update={update} />}{screen === 'change' && <ChangeManagement project={project} update={update} />}{screen === 'team' && <Team project={project} update={update} setScreen={setScreen} />}{screen === 'settings' && <Settings project={project} update={update} onReset={reset} />}</main></div>;
 }

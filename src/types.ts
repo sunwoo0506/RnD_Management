@@ -65,6 +65,14 @@ export interface PackRule {
   message: string;
   limitPct?: number;        // ratio: 상한 %
   minAmount?: number;       // minimum: 비목에 반드시 편성해야 하는 최소 고정 금액(원) — 공고문에서 온 정액 필수 계상 요구사항
+  // 사업 전체의 금액 한도 (예비창업패키지 1단계 2천만원 등). 사용자가 입력한 지원금·총사업비와
+  // 대조해 잘못 입력한 금액을 잡아낸다. 투자금·기관부담처럼 사업비가 아닌 기준에는 붙이지 않는다.
+  fundingCap?: number;
+  fundingCapTarget?: 'subsidy' | 'total'; // 지원금과 견줄지, 총사업비와 견줄지
+  fundingCapBasis?: string;               // 한도의 기준 이름 (정부지원연구개발비 총액 등)
+  // 재원 구성 비율 규정 (정부지원 75% 이내, 기관부담 현금 10% 이상 …) — 과제 설정의 비율 입력과 대조한다.
+  fundingRole?: 'subsidy_max' | 'matching_min' | 'matching_cash_min';
+  fundingPct?: number;
   basis?: string;           // ratio: 상한의 기준 (총액, 직접비, 수정인건비, 구입가...)
   formula?: string;
   trigger?: string;         // warning: 발동 조건 설명
@@ -114,6 +122,8 @@ export interface RulePack {
   origin?: PackOrigin;      // 미지정이면 legacy로 취급
   packageName?: string;     // origin='regulation_db' — 출처 규정DB 패키지 폴더명
   hasRatioLimits: boolean;  // false면 상한 UI 대신 금지 경고 중심으로 표시
+  effectiveFrom?: string | null; // 규정 자체의 시행일 (규정DB 팩) — 화면의 "언제 기준" 표시에 쓴다
+  generatedAt?: string | null;   // 이 팩을 만든 날
   verified: boolean;        // 원문 대조 검증 여부
   referenceUrl?: string;    // 규정 원문을 확인할 수 있는 공식 사이트
   categories: PackCategory[];
@@ -269,6 +279,8 @@ export interface Project {
   laborIncludeInsurance?: boolean; // 인건비에 4대보험 포함 여부 — 사업별로 다름 (기본 true)
   laborIncludeSeverance?: boolean; // 인건비에 퇴직금 포함 여부 — 사업별로 다름 (기본 true)
   budgetConfirmed?: boolean;    // 편성 확정 시 미사용(0원) 비목을 화면에서 숨긴다
+  // 사업비 한도 경고 중 사용자가 "현재 금액 유지"를 고른 규칙 id — 판단을 기억해 매번 다시 묻지 않는다.
+  fundingCapAck?: string[];
   members: Member[];
   participants: Participant[];
   budgets: BudgetItem[];

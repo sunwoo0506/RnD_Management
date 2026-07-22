@@ -345,6 +345,33 @@ mark.hl.current { background: #e5473c; color: white; box-shadow: 0 0 0 2px #b336
 .title-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .notice.soft { background: #f4fbf7; border-color: #cfe9db; }
 .notice.soft svg { color: #1d8a5f; }
+/* ---- 사업비 한도 확인 카드 ----
+   다른 안내(.notice)와 같은 모양이면 그냥 지나친다. 편성을 시작하기 전에 반드시 짚어야 하는
+   금액이라, 배지·굵은 좌측 띠·큰 숫자로 다른 블록과 확실히 구분한다. */
+.cap-alert { background: white; border: 1px solid #f0d3d0; border-left: 5px solid #d6453d; border-radius: 12px; padding: 18px 20px; margin-bottom: 14px; box-shadow: 0 6px 20px #d6453d1a; }
+.cap-alert.under { border-color: #f2e0c4; border-left-color: #d99a2b; box-shadow: 0 6px 20px #d99a2b1a; }
+.cap-alert-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cap-badge { font-size: 11px; font-weight: 800; letter-spacing: .3px; color: white; background: #d6453d; padding: 4px 9px; border-radius: 6px; flex: none; }
+.cap-alert.under .cap-badge { background: #d99a2b; }
+.cap-alert-head h3 { margin: 0; font-size: 16px; letter-spacing: -.3px; color: var(--navy); }
+.cap-alert-figures { display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap; margin: 14px 0 12px; padding: 14px 16px; background: #fbfcfd; border: 1px solid var(--line); border-radius: 10px; }
+.cap-alert-figures > div { display: grid; gap: 3px; }
+.cap-alert-figures span { font-size: 11px; color: var(--muted); font-weight: 600; }
+.cap-alert-figures strong { font-size: 21px; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+.cap-alert-figures .cap-target { color: #1d8a5f; }
+.cap-arrow { align-self: center; color: #b9c1cf; }
+.cap-arrow svg { width: 18px; }
+.cap-diff { margin-left: auto; text-align: right; }
+.cap-diff strong { color: #d6453d; }
+.cap-alert.under .cap-diff strong { color: #b57116; }
+.cap-alert-basis { margin: 0 0 14px; font-size: 12px; color: #5b667b; line-height: 1.6; }
+.cap-alert-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cap-alert-actions small { color: var(--muted); font-size: 11px; margin-left: 4px; }
+@media (max-width: 900px) {
+  .cap-alert-figures { gap: 12px; }
+  .cap-diff { margin-left: 0; text-align: left; }
+  .cap-alert-actions small { margin-left: 0; flex: 1 1 100%; }
+}
 .cap-cell { display: grid; gap: 2px; font-size: 11px; color: #667087; line-height: 1.5; }
 .cap-cell strong { font-size: 13px; color: var(--navy); font-weight: 700; }
 .cap-cell small { display: block; }
@@ -552,3 +579,11 @@ input[readonly] { background: #f7f8fa; color: #667087; pointer-events: none; }
 .pkg-counts span { font-size: 12px; color: var(--muted); border: 1px solid var(--line); background: white; border-radius: 8px; padding: 4px 10px; }
 .pkg-counts b { color: #172033; margin-left: 3px; }
 .pack-verified { display: inline-block; font-size: 11px; font-weight: 700; font-style: normal; color: #1f7a4d; background: #e8f6ef; border-radius: 5px; padding: 2px 6px; margin-left: 6px; }
+.cap-rate-list { display: grid; gap: 8px; margin: 14px 0 12px; }
+.cap-rate { display: flex; align-items: center; gap: 14px; padding: 10px 14px; background: #fbfcfd; border: 1px solid var(--line); border-radius: 9px; flex-wrap: wrap; }
+.cap-rate > div { display: grid; gap: 2px; }
+.cap-rate span { font-size: 11px; color: var(--muted); font-weight: 600; }
+.cap-rate strong { font-size: 16px; font-variant-numeric: tabular-nums; }
+.cap-rate .cap-target { color: #1d8a5f; }
+.cap-rate.unknown strong { color: #b57116; }
+.cap-rate button { margin-left: auto; flex: none; }

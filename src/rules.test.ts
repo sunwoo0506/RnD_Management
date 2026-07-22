@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { applyOverlay, articlesForRef, capFor, categoryOf, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories } from './rules';
+import { applyOverlay, articlesForRef, capFor, categoryOf, fundingCapChecks, fundingRateChecks, rescaleBudgets, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories } from './rules';
 import type { Project, RulePack } from './types';
 
 describe('규정 팩 로더', () => {
   it('규정 DB 팩(국가연구개발비·팁스·예비창업패키지)과 예시 팩을 함께 제공한다', () => {
-    expect(PACKS.map((pack) => pack.id).sort()).toEqual(['didimdol2026', 'legacy-rnd', 'nrd2026-forprofit', 'nrd2026-nonprofit', 'prestartup', 'prestartup2026', 'rnd-forprofit', 'rnd-govt', 'tips2026']);
+    expect(PACKS.map((pack) => pack.id).sort()).toEqual(['didimdol2026', 'legacy-rnd', 'nrd2026-forprofit', 'nrd2026-nonprofit', 'prestartup', 'prestartup2026', 'rnd-forprofit', 'rnd-govt', 'tips2026-deeptech', 'tips2026-general']);
   });
 
   it('규정 DB로 대체된 예시 팩은 새 과제 선택 목록에서 빠진다', () => {
@@ -148,7 +148,7 @@ describe('상한 계산과 배분', () => {
   });
 
   it('TIPS 지침 팩: 연구수당·간접비·위탁 상한이 계산되고 현물 포함 기준은 현물을 차감하지 않는다', () => {
-    const pack = getPack('tips2026');
+    const pack = getPack('tips2026-general');
     expect(pack.categories.filter((c) => c.allowed)).toHaveLength(7); // 직접비 6 + 간접비
     const budgets = makeDraftBudgets(pack, 70_000_000); // 균등 배분: 인건비 16% (11.2M), 나머지 14% (9.8M)
     // 연구수당 = 수정인건비(인건비 편성액) 11,200,000의 20%
@@ -170,6 +170,147 @@ describe('상한 계산과 배분', () => {
     const prestartup = getPack('prestartup');
     const preBudgets = makeDraftBudgets(prestartup, 100_000_000);
     expect(transferLimitError(prestartup, preBudgets, 100_000_000, 'cat_personnel', 50_000_000)).toBeNull();
+  });
+});
+
+describe('사업비 한도 대조', () => {
+  const projectWith = (subsidyAmount: number, packId: string): Project => ({
+    id: 'p1', name: '한도 테스트', totalBudget: subsidyAmount, subsidyAmount,
+    startDate: '2026-01-01', endDate: '2026-12-31', settlementDeadline: '2027-01-31',
+    agency: '중소벤처기업부', companyName: '테스트랩', packId,
+    members: [], participants: [], budgets: [], expenses: [], changes: [], emailLogs: [],
+    createdAt: new Date().toISOString(),
+  });
+
+  it('예비창업패키지 1단계 2천만원 한도를 입력 지원금과 견준다', () => {
+    const pack = getPack('prestartup2026');
+    const over = fundingCapChecks(pack, projectWith(30_000_000, 'prestartup2026'));
+    expect(over).toHaveLength(1);
+    expect(over[0].cap).toBe(20_000_000);
+    expect(over[0].over).toBe(true);
+    expect(over[0].diff).toBe(10_000_000);
+    expect(over[0].targetLabel).toBe('지원금');
+
+    const exact = fundingCapChecks(pack, projectWith(20_000_000, 'prestartup2026'));
+    expect(exact[0].over).toBe(false);
+    expect(exact[0].diff).toBe(0);
+
+    // 적게 입력한 것도 알려줘야 한다 (공고 금액을 잘못 옮겨적은 경우)
+    const under = fundingCapChecks(pack, projectWith(5_000_000, 'prestartup2026'));
+    expect(under[0].over).toBe(false);
+    expect(under[0].diff).toBe(-15_000_000);
+  });
+
+  it('창업성장기술개발(디딤돌)은 정부지원 2억 한도를 쓴다', () => {
+    const checks = fundingCapChecks(getPack('didimdol2026'), projectWith(250_000_000, 'didimdol2026'));
+    expect(checks).toHaveLength(1);
+    expect(checks[0].cap).toBe(200_000_000);
+    expect(checks[0].over).toBe(true);
+  });
+
+  it('TIPS는 트랙별 지원 한도를 쓰고, 운영사 투자금은 한도로 쓰지 않는다', () => {
+    // 운영사 의무투자금 2억은 지원금 한도가 아니다 — 이걸 대조하면 오경고가 난다.
+    const general = fundingCapChecks(getPack('tips2026-general'), projectWith(1_000_000_000, 'tips2026-general'));
+    expect(general).toHaveLength(1);
+    expect(general[0].cap).toBe(800_000_000);   // 일반트랙 8억
+    expect(general[0].over).toBe(true);
+
+    const deeptech = fundingCapChecks(getPack('tips2026-deeptech'), projectWith(1_000_000_000, 'tips2026-deeptech'));
+    expect(deeptech).toHaveLength(1);
+    expect(deeptech[0].cap).toBe(1_500_000_000); // 딥테크트랙 15억
+    expect(deeptech[0].over).toBe(false);
+  });
+
+  it('금액 한도가 없는 사업은 아무것도 반환하지 않는다', () => {
+    expect(fundingCapChecks(getPack('nrd2026-forprofit'), projectWith(100_000_000, 'nrd2026-forprofit'))).toEqual([]);
+    expect(fundingCapChecks(getPack('legacy-rnd'), projectWith(100_000_000, 'legacy-rnd'))).toEqual([]);
+  });
+});
+
+describe('재원 구성 비율 대조', () => {
+  const proj = (over: Partial<Project>): Project => ({
+    id: 'p1', name: '비율 테스트', totalBudget: 100_000_000, subsidyAmount: 100_000_000,
+    startDate: '2026-01-01', endDate: '2026-12-31', settlementDeadline: '2027-01-31',
+    agency: '중소벤처기업부', companyName: '테스트랩', packId: 'tips2026-general',
+    members: [], participants: [], budgets: [], expenses: [], changes: [], emailLogs: [],
+    createdAt: new Date().toISOString(), ...over,
+  });
+
+  it('TIPS 정부지원 75% 상한을 넘으면 잡아낸다', () => {
+    const checks = fundingRateChecks(getPack('tips2026-general'), proj({ subsidyRate: 90, matchingCashRate: 10 }));
+    const subsidy = checks.find((c) => c.role === 'subsidy_max')!;
+    expect(subsidy.pct).toBe(75);
+    expect(subsidy.entered).toBe(90);
+    expect(subsidy.ok).toBe(false);
+    // 기관부담 25% 이상도 함께 깨진다 (90% 지원이면 기관부담은 10%)
+    expect(checks.find((c) => c.role === 'matching_min')!.ok).toBe(false);
+  });
+
+  it('규정을 지키는 입력은 모두 통과한다', () => {
+    const checks = fundingRateChecks(getPack('tips2026-general'), proj({ subsidyRate: 75, matchingCashRate: 10 }));
+    expect(checks.every((c) => c.ok)).toBe(true);
+  });
+
+  it('민간부담 현금 비율을 아직 모르면 위반이 아니라 "확인 필요"로 둔다', () => {
+    const checks = fundingRateChecks(getPack('tips2026-general'), proj({ subsidyRate: 75 }));
+    const cash = checks.find((c) => c.role === 'matching_cash_min')!;
+    expect(cash.unknown).toBe(true);
+    expect(cash.ok).toBe(false);
+    expect(cash.entered).toBeNull();
+  });
+
+  it('전액 지원(민간부담 0)이면 현금 비율 규정은 적용할 것이 없다', () => {
+    const checks = fundingRateChecks(getPack('tips2026-general'), proj({ subsidyRate: 100 }));
+    const cash = checks.find((c) => c.role === 'matching_cash_min')!;
+    expect(cash.ok).toBe(true);
+    expect(cash.unknown).toBe(false);
+  });
+
+  it('운영사 투자금처럼 앱이 입력받지 않는 재원은 대조 대상이 아니다', () => {
+    const roles = fundingRateChecks(getPack('tips2026-general'), proj({ subsidyRate: 75, matchingCashRate: 10 })).map((c) => c.role);
+    expect(roles).toEqual(['subsidy_max', 'matching_cash_min', 'matching_min']);
+  });
+});
+
+describe('총사업비 변경 시 비목 재배분', () => {
+  it('비율을 유지하고 합계를 새 총액에 정확히 맞춘다', () => {
+    const budgets = [
+      { categoryId: 'a', amount: 50_000_000 },
+      { categoryId: 'b', amount: 30_000_000 },
+      { categoryId: 'c', amount: 20_000_000 },
+    ];
+    const scaled = rescaleBudgets(budgets, 100_000_000, 20_000_000);
+    expect(scaled.reduce((sum, item) => sum + item.amount, 0)).toBe(20_000_000);
+    expect(scaled[0].amount).toBe(10_000_000); // 50% 유지
+    expect(scaled[1].amount).toBe(6_000_000);  // 30% 유지
+  });
+
+  it('반올림 오차는 가장 큰 비목이 흡수해 합계가 어긋나지 않는다', () => {
+    const budgets = [
+      { categoryId: 'a', amount: 3_333_333 },
+      { categoryId: 'b', amount: 3_333_333 },
+      { categoryId: 'c', amount: 3_333_334 },
+    ];
+    const scaled = rescaleBudgets(budgets, 10_000_000, 7_000_000);
+    expect(scaled.reduce((sum, item) => sum + item.amount, 0)).toBe(7_000_000);
+    expect(scaled.every((item) => item.amount >= 0)).toBe(true);
+  });
+
+  it('현물·세목도 함께 옮기고 세목 합계가 비목 금액과 맞는다', () => {
+    const budgets = [{
+      categoryId: 'a', amount: 10_000_000, inKindAmount: 4_000_000,
+      subItems: [{ id: 's1', name: '기술도입비', amount: 6_000_000 }, { id: 's2', name: '자문료', amount: 4_000_000 }],
+    }];
+    const [scaled] = rescaleBudgets(budgets, 10_000_000, 5_000_000);
+    expect(scaled.amount).toBe(5_000_000);
+    expect(scaled.inKindAmount).toBe(2_000_000);
+    expect(scaled.subItems!.reduce((sum, sub) => sum + sub.amount, 0)).toBe(5_000_000);
+  });
+
+  it('편성이 없거나 기준 총액이 0이면 그대로 둔다 (비율을 구할 수 없다)', () => {
+    expect(rescaleBudgets([], 100, 50)).toEqual([]);
+    const zero = [{ categoryId: 'a', amount: 0 }];
+    expect(rescaleBudgets(zero, 100_000_000, 20_000_000)).toEqual(zero);
   });
 });
 
@@ -220,7 +361,7 @@ describe('근거 조문 원문 찾기', () => {
   });
 
   it('조문 번호 체계가 아닌 지침은 앞부분이 겹치는 조항으로 찾는다', () => {
-    const pack = getPack('tips2026');
+    const pack = getPack('tips2026-general');
     const found = articlesForRef(pack, '지침 11.다.1) 인건비 가)');
     expect(found).toHaveLength(1);
     expect(found[0].ref).toBe('지침 11.다.1) 인건비');
