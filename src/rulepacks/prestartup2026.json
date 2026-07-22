@@ -9,6 +9,8 @@
   "packageName": "gwayeon_prestartup_2026_207",
   "hasRatioLimits": false,
   "verified": true,
+  "effectiveFrom": "2026-03-24",
+  "generatedAt": "2026-07-22",
   "referenceUrl": "https://www.k-startup.go.kr",
   "categories": [
    {
@@ -1072,7 +1074,9 @@
      "ref": "공고 2. 세부 지원내용·QnA 사업비 9번",
      "matchLevel": "guideline"
     },
-    "kind": "info"
+    "kind": "info",
+    "fundingRole": "subsidy_max",
+    "fundingPct": 100
    },
    {
     "id": "prestartup2026_pre_stage1_20m",
@@ -1083,7 +1087,10 @@
      "ref": "공고 2. 세부 지원내용 《단계별 차등 지원》·QnA 사업화 자금 1번",
      "matchLevel": "guideline"
     },
-    "kind": "info"
+    "kind": "info",
+    "fundingCap": 20000000,
+    "fundingCapTarget": "subsidy",
+    "fundingCapBasis": "1단계 사업화 준비 자금"
    }
   ],
   "applicationDocs": [],

@@ -15,7 +15,8 @@
   "source_article": "지침 11.나.1) 나)",
   "effective_from": "2026-03-03",
   "priority": 900,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_ORG_CASH_10",
@@ -33,7 +34,8 @@
   "source_article": "지침 11.나.1) 다)",
   "effective_from": "2026-03-03",
   "priority": 900,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_ORG_FUND_25",
@@ -51,7 +53,8 @@
   "source_article": "별지 제1-③호 부록2 연차별 연구개발비 총괄표",
   "effective_from": "2026-03-03",
   "priority": 890,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_INVESTOR_FUND_25",
@@ -69,7 +72,8 @@
   "source_article": "지침 11.나.1) 가)⑥",
   "effective_from": "2026-03-03",
   "priority": 900,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_INVESTOR_MIN_200M",
@@ -87,7 +91,8 @@
   "source_article": "지침 11.나.1) 가)①·35.",
   "effective_from": "2026-03-03",
   "priority": 880,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_EQUIP_APPROVAL_30M",
@@ -105,7 +110,8 @@
   "source_article": "지침 11.다.1) 연구시설·장비비 다)",
   "effective_from": "2026-03-03",
   "priority": 700,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_EQUIP_REVIEW_100M",
@@ -123,7 +129,8 @@
   "source_article": "지침 11.다.1) 연구시설·장비비 라)",
   "effective_from": "2026-03-03",
   "priority": 700,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_EQUIP_INKIND_20",
@@ -141,7 +148,8 @@
   "source_article": "지침 11.다.1) 연구시설·장비비 마)",
   "effective_from": "2026-03-03",
   "priority": 700,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_EQUIP_INKIND_INSTALL_20",
@@ -159,7 +167,8 @@
   "source_article": "지침 11.나.1) 라)⑤",
   "effective_from": "2026-03-03",
   "priority": 700,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_SW_INKIND_20",
@@ -177,7 +186,8 @@
   "source_article": "지침 11.나.1) 라)⑦",
   "effective_from": "2026-03-03",
   "priority": 700,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_TECH_INTRO_INKIND_50",
@@ -195,7 +205,8 @@
   "source_article": "지침 11.나.1) 라)④",
   "effective_from": "2026-03-03",
   "priority": 700,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_EXTERNAL_TECH_40",
@@ -213,7 +224,8 @@
   "source_article": "지침 11.다.1) 연구활동비 나)②",
   "effective_from": "2026-03-03",
   "priority": 700,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_MEETING_MEAL_50K",
@@ -232,7 +244,8 @@
   "source_article": "지침 11.다.1) 연구활동비 마)②",
   "effective_from": "2026-03-03",
   "priority": 700,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_OVERTIME_MEAL_10K",
@@ -251,7 +264,8 @@
   "source_article": "지침 11.다.1) 연구활동비 사)②",
   "effective_from": "2026-03-03",
   "priority": 700,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_LAB_OPERATION_PLAN",
@@ -269,7 +283,8 @@
   "source_article": "지침 11.다.1) 연구활동비 라)",
   "effective_from": "2026-03-03",
   "priority": 700,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_INCENTIVE_20",
@@ -287,7 +302,8 @@
   "source_article": "지침 11.다.1) 연구수당 가)",
   "effective_from": "2026-03-03",
   "priority": 700,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_SUBCONTRACT_40",
@@ -305,7 +321,8 @@
   "source_article": "지침 11.다.1) 위탁연구개발비 나)",
   "effective_from": "2026-03-03",
   "priority": 700,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_INDIRECT_10",
@@ -323,7 +340,8 @@
   "source_article": "지침 11.다.2) 가)",
   "effective_from": "2026-03-03",
   "priority": 700,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_INDIRECT_RATE_NONPROFIT",
@@ -341,7 +359,8 @@
   "source_article": "지침 11.다.2) 나)",
   "effective_from": "2026-03-03",
   "priority": 700,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_RND_BONUS_10",
@@ -359,7 +378,8 @@
   "source_article": "지침 11.다.2) 다)",
   "effective_from": "2026-03-03",
   "priority": 700,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_STARTUP_FUND_10",
@@ -377,7 +397,8 @@
   "source_article": "지침 11.다.2) 라)",
   "effective_from": "2026-03-03",
   "priority": 700,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_MATERIAL_NONE",
@@ -395,7 +416,8 @@
   "source_article": "지침 11.다.1) 연구재료비 가)",
   "effective_from": "2026-03-03",
   "priority": 600,
-  "is_active": true
+  "is_active": true,
+  "track_scope": "ALL"
  },
  {
   "limit_code": "TIPS_TRAVEL_INTERNAL_RULE",
@@ -413,6 +435,45 @@
   "source_article": "지침 11.다.1) 연구활동비 가)",
   "effective_from": "2026-03-03",
   "priority": 600,
+  "is_active": true,
+  "track_scope": "ALL"
+ },
+ {
+  "limit_code": "TIPS_GENERAL_GOV_FUND_800M",
+  "category_code": "ALL",
+  "track_scope": "GENERAL",
+  "limit_name": "일반트랙 정부지원연구개발비 최대 8억원",
+  "limit_type": "FIXED_AMOUNT",
+  "limit_value": 800000000,
+  "limit_unit": "KRW",
+  "basis_code": "gov_funded_cost",
+  "basis_ko": "정부지원연구개발비 총액",
+  "ui_summary": "팁스 일반트랙의 정부지원연구개발비는 최대 8억원(사업기간 최대 2년)",
+  "source_quote": "최대 8 억원 … 최대 2 년 … 총 연구개발비의 75% 이내",
+  "over_limit_action": "NOT_ALLOWED",
+  "institution_scope": "ALL",
+  "source_article": "공고 1. 팁스(TIPS) 지원 개요·2026년 팁스 R&D 일반트랙 창업기업 지원 내용",
+  "effective_from": "2026-03-03",
+  "priority": 950,
+  "is_active": true
+ },
+ {
+  "limit_code": "TIPS_DEEPTECH_GOV_FUND_1500M",
+  "category_code": "ALL",
+  "track_scope": "DEEPTECH",
+  "limit_name": "딥테크트랙 정부지원연구개발비 최대 15억원",
+  "limit_type": "FIXED_AMOUNT",
+  "limit_value": 1500000000,
+  "limit_unit": "KRW",
+  "basis_code": "gov_funded_cost",
+  "basis_ko": "정부지원연구개발비 총액",
+  "ui_summary": "팁스 딥테크트랙의 정부지원연구개발비는 최대 15억원(사업기간 최대 3년)",
+  "source_quote": "최대 15 억원 … 최대 3 년 … 총 연구개발비의 75% 이내",
+  "over_limit_action": "NOT_ALLOWED",
+  "institution_scope": "ALL",
+  "source_article": "공고 3. 팁스 R&D 딥테크트랙·2026년 팁스 R&D 딥테크트랙 창업기업 지원 내용",
+  "effective_from": "2026-03-03",
+  "priority": 950,
   "is_active": true
  }
 ]

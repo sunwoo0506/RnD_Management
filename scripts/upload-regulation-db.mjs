@@ -75,6 +75,8 @@ const yearOf = (manifest) => {
 };
 
 let failed = 0;
+// 이번 실행에서 올린 팩 id — 마지막에 DB 에만 남은 옛 팩을 찾아내는 데 쓴다.
+const uploadedPackIds = new Set();
 
 for (const dir of packageDirs) {
   const manifestPath = join(dir, 'manifest.json');
@@ -150,7 +152,13 @@ for (const dir of packageDirs) {
   // ---- 3) program_registry (팩 하나당 1행) ----
   for (const pack of packs) {
     const scope = meta.scopes.find((s) => s.id === pack.id);
-    const programName = scope?.program_name ?? meta.program_name ?? manifest.title;
+    // 같은 문서에서 팩이 갈리면(영리/비영리, 일반/딥테크) 이름이 같아 사업 검색에서 구분되지 않는다.
+    // scope.program_name 을 적어뒀으면 그 이름이 이미 구분을 담고 있으니 그대로 쓰고,
+    // 없을 때만 기관 유형을 뒤에 붙인다.
+    const explicitName = scope?.program_name;
+    const baseName = meta.program_name ?? manifest.title;
+    const programName = explicitName
+      ?? (meta.scopes.length > 1 && scope?.org_type ? `${baseName} (${scope.org_type})` : baseName);
     console.log(`  · ${pack.id.padEnd(20)} 비목 ${String(pack.categories.length).padStart(2)} · 규칙 ${String(pack.rules.length).padStart(3)} · 조문 ${String(pack.articles?.length ?? 0).padStart(3)}  ${programName}`);
     if (dryRun) continue;
 
@@ -166,6 +174,27 @@ for (const dir of packageDirs) {
       updated_at: new Date().toISOString(),
     }, { onConflict: 'pack_id' });
     if (error) { console.error(`  ✗ program_registry ${pack.id}: ${error.message}`); failed++; }
+    else uploadedPackIds.add(pack.id);
+  }
+}
+
+// ---- 4) 사라진 팩 정리 ----
+// 팩이 갈리거나(tips2026 → 일반/딥테크) 이름이 바뀌면 옛 pack_id 행이 DB에 그대로 남는다.
+// upsert 는 지우지 않기 때문에, 사업 검색에 폐기된 팩이 계속 나온다.
+// 전체 폴더를 올렸을 때만(=지금 있는 팩 목록이 완전할 때만) 정리한다.
+if (!dryRun && !targets.length) {
+  const { data: rows, error } = await db.from('program_registry')
+    .select('pack_id, program_name').eq('origin', 'regulation_db').eq('is_active', true);
+  if (error) { console.error(`  ✗ 정리 확인 실패: ${error.message}`); }
+  else {
+    const stale = (rows ?? []).filter((row) => !uploadedPackIds.has(row.pack_id));
+    for (const row of stale) {
+      // 과제가 이 팩을 쓰고 있을 수 있어 지우지 않고 비활성화만 한다 — 검색에서만 빠진다.
+      const { error: offError } = await db.from('program_registry')
+        .update({ is_active: false, updated_at: new Date().toISOString() }).eq('pack_id', row.pack_id);
+      if (offError) { console.error(`  ✗ ${row.pack_id} 비활성화 실패: ${offError.message}`); failed++; }
+      else console.log(`  · ${row.pack_id.padEnd(20)} 비활성화 (더 이상 패키지에 없음: ${row.program_name})`);
+    }
   }
 }
 

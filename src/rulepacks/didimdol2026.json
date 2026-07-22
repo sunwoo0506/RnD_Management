@@ -9,6 +9,8 @@
   "packageName": "gwayeon_startup_growth_2026_214",
   "hasRatioLimits": true,
   "verified": true,
+  "effectiveFrom": "2026-06-01",
+  "generatedAt": "2026-07-22",
   "referenceUrl": "https://www.smtech.go.kr",
   "categories": [
    {
@@ -622,7 +624,9 @@
      "ref": "붙임2-5 지원규모",
      "matchLevel": "guideline"
     },
-    "kind": "info"
+    "kind": "info",
+    "fundingRole": "subsidy_max",
+    "fundingPct": 75
    },
    {
     "id": "didimdol2026_dd_org_fund_25",
@@ -633,7 +637,9 @@
      "ref": "붙임2-5 지원규모",
      "matchLevel": "guideline"
     },
-    "kind": "info"
+    "kind": "info",
+    "fundingRole": "matching_min",
+    "fundingPct": 25
    },
    {
     "id": "didimdol2026_dd_org_cash_10",
@@ -644,7 +650,9 @@
      "ref": "붙임2-5 지원규모",
      "matchLevel": "guideline"
     },
-    "kind": "info"
+    "kind": "info",
+    "fundingRole": "matching_cash_min",
+    "fundingPct": 10
    },
    {
     "id": "didimdol2026_dd_gov_fund_max_200m",
@@ -655,7 +663,10 @@
      "ref": "관리지침 바.1) 지원한도",
      "matchLevel": "guideline"
     },
-    "kind": "info"
+    "kind": "info",
+    "fundingCap": 200000000,
+    "fundingCapTarget": "subsidy",
+    "fundingCapBasis": "정부지원연구개발비 총액"
    }
   ],
   "applicationDocs": [],

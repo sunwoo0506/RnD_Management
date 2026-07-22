@@ -53,13 +53,13 @@ const legacyApplicability = readFirst('expense_applicability_rules.json');
 const approvalRules = legacyApprovals.length ? legacyApprovals
   // approval_status는 "이 규칙이 사전승인·인정 절차"라는 표시다 (심사 유형은 LIMIT 등으로 따로 분류된다).
   : allRules.filter((r) => r.approval_status || r.rule_type === 'APPROVAL_REQUIRED' || r.rule_type === 'APPROVAL' || ['PRIOR_APPROVAL_REQUIRED', 'RECOGNITION_REQUIRED'].includes(r.result?.status))
-    .map((r) => ({ approval_code: r.rule_code, category_code: r.expense_category_code, rule_name: r.rule_name, result_status: r.approval_status ?? r.result?.status ?? 'PRIOR_APPROVAL_REQUIRED', source_article: r.source_article, is_active: r.is_active }));
+    .map((r) => ({ approval_code: r.rule_code, track_scope: r.track_scope, category_code: r.expense_category_code, rule_name: r.rule_name, result_status: r.approval_status ?? r.result?.status ?? 'PRIOR_APPROVAL_REQUIRED', source_article: r.source_article, is_active: r.is_active }));
 const evidenceRules = legacyEvidence.length ? legacyEvidence
   : allRules.filter((r) => (r.required_documents ?? []).length)
-    .map((r) => ({ evidence_code: r.rule_code, category_code: r.expense_category_code, rule_name: r.rule_name, required_documents: r.required_documents, source_article: r.source_article, is_active: r.is_active }));
+    .map((r) => ({ evidence_code: r.rule_code, track_scope: r.track_scope, category_code: r.expense_category_code, rule_name: r.rule_name, required_documents: r.required_documents, source_article: r.source_article, is_active: r.is_active }));
 const applicabilityRules = legacyApplicability.length ? legacyApplicability
   : allRules.filter((r) => r.rule_type === 'APPLICABILITY')
-    .map((r) => ({ applicability_code: r.rule_code, category_code: r.expense_category_code, institution_scope: r.institution_scope, condition_summary: r.result?.message, result: r.result?.status, source_article: r.source_article, is_active: r.is_active }));
+    .map((r) => ({ applicability_code: r.rule_code, track_scope: r.track_scope, category_code: r.expense_category_code, institution_scope: r.institution_scope, condition_summary: r.result?.message, result: r.result?.status, source_article: r.source_article, is_active: r.is_active }));
 // 금지·자격·기한 규칙은 편성 화면의 경고로 싣는다 (상한이 아니라 판정 규칙).
 // 승인·증빙·적용조건으로 이미 실린 규칙은 빼서 같은 내용이 두 번 나오지 않게 한다.
 const shownElsewhere = new Set([...approvalRules.map((r) => r.approval_code), ...evidenceRules.map((r) => r.evidence_code), ...applicabilityRules.map((r) => r.applicability_code)]);
@@ -85,6 +85,10 @@ const DOC_KO = {
   OVERSEAS_TRAVEL_RESULT_REPORT: '국외출장 결과보고서', BANK_TRANSFER_EVIDENCE: '계좌이체 증명',
   TAX_INVOICE: '세금계산서', CARD_RECEIPT: '카드 영수증', CONTRACT: '계약서', QUOTATION: '견적서',
 };
+
+// 사업 안에 트랙이 나뉘는 경우(팁스 일반/딥테크처럼 지원 한도·기간이 다르다) 그 트랙 규칙만 싣는다.
+// track_scope 가 없거나 'ALL' 이면 트랙 공통 규칙이다.
+const trackApplies = (ruleTrack, track) => !ruleTrack || ruleTrack === 'ALL' || !track || ruleTrack === track;
 
 // 이 팩(기관 유형)에 그 규칙·항목이 적용되는지. 상대 유형 전용만 걸러내고 나머지는 남겨 화면에서 조건으로 안내한다.
 const scopeApplies = (itemScope, scope) => {
@@ -128,6 +132,31 @@ const FUNDING_BASIS = new Set([
   'total_rnd_cost', 'total_project_cost', 'org_funded_cost', 'gov_funded_cost', 'investor_fund', 'stage_funding',
 ]);
 
+// 금액으로 정해진 한도를 화면의 어느 입력값과 대조할지. 여기 없는 기준(투자금·기관부담)은
+// 사업비가 아니므로 대조하지 않고 안내 문구로만 둔다.
+const FUNDING_CAP_TARGET = {
+  gov_funded_cost: 'subsidy',      // 정부지원연구개발비 한도 → 지원금 입력값
+  stage_funding: 'subsidy',        // 단계별 지원 자금 → 지원금 입력값
+  total_project_cost: 'total',     // 총사업비 한도 → 총사업비
+  total_rnd_cost: 'total',
+};
+
+// 재원 구성 비율(정부지원 75% 이내, 기관부담 현금 10% 이상 …)을 과제 설정의 입력값과 대조하려면
+// "무엇에 대한 비율인지"를 알아야 한다. basis_code 만으로는 같은 total_rnd_cost 안에서
+// 정부지원 상한과 기관부담 하한이 구분되지 않아, 규칙 이름의 주어로 갈라낸다.
+// 판정을 여기 한 곳에 모아두고 결과를 팩에 명시적으로 실어, 화면은 문자열을 다시 해석하지 않는다.
+// 판정은 규칙 이름(limit_name)만 본다. 요약문(ui_summary)까지 넣으면 "연구개발비(투자금 제외)의
+// 75% 이내" 같은 괄호 부연 때문에 정부지원 규칙이 투자금 규칙으로 오판된다.
+const fundingRoleOf = (rule) => {
+  const name = rule.limit_name ?? '';
+  // 운영사 투자금은 앱이 입력받지 않는 재원이라 대조하지 않는다 (안내 문구로만 남는다).
+  if (/투자금/.test(name) || rule.basis_code === 'investor_fund') return null;
+  if (/현금/.test(name)) return 'matching_cash_min';
+  if (/정부지원/.test(name)) return 'subsidy_max';
+  if (/기관부담|민간부담|기업부담/.test(name)) return 'matching_min';
+  return null;
+};
+
 const LABEL_ONLY_BASIS = {
   equipment_purchase_price: '구입가',
   software_purchase_price: '구입가',
@@ -162,8 +191,8 @@ const itemInScope = (itemScope, scope) => {
 };
 
 // 비목별 적용 조건 (expense_applicability_rules) — 패키지에 따라 필드명이 다르다(condition_summary vs condition).
-const applicabilityFor = (code, scope) => applicabilityRules
-  .filter((r) => r.category_code === code && r.is_active !== false)
+const applicabilityFor = (code, scope, track) => applicabilityRules
+  .filter((r) => r.category_code === code && r.is_active !== false && trackApplies(r.track_scope, track))
   .map((r) => ({
     scopeKo: SCOPE_KO[r.institution_scope] ?? r.institution_scope,
     applies: scopeApplies(r.institution_scope, scope),
@@ -174,10 +203,10 @@ const applicabilityFor = (code, scope) => applicabilityRules
   }));
 
 // 사전승인·인정이 필요한 절차 (approval_rules)
-const approvalsFor = (code) => {
+const approvalsFor = (code, track) => {
   const codes = descendantCodes(code);
   return approvalRules
-    .filter((r) => codes.has(r.category_code) && r.is_active !== false)
+    .filter((r) => codes.has(r.category_code) && r.is_active !== false && trackApplies(r.track_scope, track))
     .map((r) => ({
       name: r.rule_name,
       status: APPROVAL_KO[r.result_status] ?? r.result_status,
@@ -186,10 +215,10 @@ const approvalsFor = (code) => {
 };
 
 // 조건부로 추가 요구되는 증빙 (evidence_rules) — 비목 기본 증빙과 달리 금액·상황 조건이 붙는다.
-const evidenceFor = (code) => {
+const evidenceFor = (code, track) => {
   const codes = descendantCodes(code);
   return evidenceRules
-    .filter((r) => codes.has(r.category_code) && r.is_active !== false && (r.required_documents ?? []).length)
+    .filter((r) => codes.has(r.category_code) && r.is_active !== false && (r.required_documents ?? []).length && trackApplies(r.track_scope, track))
     .map((r) => ({
       name: r.rule_name,
       documents: r.required_documents.map((d) => DOC_KO[d] ?? d),
@@ -225,7 +254,7 @@ const buildAllowedItems = (code, scope) => {
     }));
 };
 
-const buildCategories = (scope) => {
+const buildCategories = (scope, track) => {
   // 편성 비목 = DIRECT의 2레벨 자식 + 간접비(있는 사업만 — 창업지원사업처럼 간접비가 없는 체계도 있다)
   const codes = tree.filter((n) => n.parent_code === 'DIRECT' && n.level === 2).map((n) => n.category_code);
   if (nodeByCode.has('INDIRECT')) codes.push('INDIRECT');
@@ -243,9 +272,9 @@ const buildCategories = (scope) => {
   const categories = codes.map((code) => {
     const node = nodeByCode.get(code);
     const guide = guideByCode.get(code);
-    const applicability = applicabilityFor(code, scope);
-    const approvals = approvalsFor(code);
-    const evidence = evidenceFor(code);
+    const applicability = applicabilityFor(code, scope, track);
+    const approvals = approvalsFor(code, track);
+    const evidence = evidenceFor(code, track);
     // 편성 화면의 "가능한 세목" 후보. 하위 비목이 있으면 그것이 곧 세목이고(연구활동비 → 출장비·회의비…),
     // 없으면 그 비목의 허용 항목을 세목 후보로 쓴다(인건비 → 참여연구자 급여·4대보험 기관부담금…).
     const children = tree.filter((n) => n.parent_code === code);
@@ -283,8 +312,8 @@ const buildCategories = (scope) => {
   return categories;
 };
 
-const buildRules = (scope) => {
-  const included = limitRules.filter((r) => ['ALL', 'ALL_OR_RULE_SPECIFIC', scope].includes(r.institution_scope));
+const buildRules = (scope, track) => {
+  const included = limitRules.filter((r) => ['ALL', 'ALL_OR_RULE_SPECIFIC', scope].includes(r.institution_scope) && trackApplies(r.track_scope, track));
   const idPrefix = meta ? (meta.scopes?.[0]?.id ?? 'pack') : 'nrd';
   const rules = included.map((r) => {
     const global = r.category_code === 'ALL';
@@ -300,8 +329,23 @@ const buildRules = (scope) => {
       ...(global ? {} : { categoryIds: [categoryCode] }),
       source: { doc: DOC, ref: r.source_article, matchLevel: 'guideline' },
     };
-    // 재원 구성 규칙(정부지원 비율 등)은 비목 상한이 아니라 과제 공통 참고 정보
-    if (r.limit_type === 'FUNDING' || FUNDING_BASIS.has(r.basis_code)) return { ...base, kind: 'info', _order: 3 };
+    // 재원 구성 규칙(정부지원 비율 등)은 비목 상한이 아니라 과제 공통 참고 정보.
+    // 다만 금액이 정해진 총액 한도(예비창업패키지 1단계 2천만원 등)는 사용자가 입력한 사업비와
+    // 대조해야 하므로 fundingCap 으로 금액을 함께 싣는다 — 안내 문구로만 두면 잘못 입력해도 모른다.
+    // 어느 금액과 견줄지는 기준(basis_code)에 따라 다르고, 투자금·기관부담처럼 사업비가 아닌
+    // 기준은 대조 대상이 아니다 (TIPS 운영사 의무투자금 2억을 지원금 한도로 오인하면 안 된다).
+    if (r.limit_type === 'FUNDING' || FUNDING_BASIS.has(r.basis_code)) {
+      const target = FUNDING_CAP_TARGET[r.basis_code];
+      const isAmountCap = target && r.limit_unit === 'KRW' && r.limit_value != null;
+      // 비율로 정해진 재원 규정(정부지원 75% 이내 등)도 과제 설정의 입력값과 대조한다.
+      const role = r.limit_unit === 'PERCENT' && r.limit_value != null ? fundingRoleOf(r) : null;
+      return {
+        ...base, kind: 'info',
+        ...(isAmountCap ? { fundingCap: r.limit_value, fundingCapTarget: target, fundingCapBasis: r.basis_ko ?? '사업비' } : {}),
+        ...(role ? { fundingRole: role, fundingPct: r.limit_value } : {}),
+        _order: 3,
+      };
+    }
     const computable = COMPUTABLE_BASIS[r.basis_code];
     const isPct = (r.limit_type === 'PERCENT' || r.limit_type === 'FORMULA') && r.limit_value != null;
     if (isPct && computable) return { ...base, kind: 'ratio', limitPct: r.limit_value, basis: r.basis_ko ?? computable, _order: 0 };
@@ -319,7 +363,7 @@ const buildRules = (scope) => {
     });
   }
   // regulation_rules의 금지·자격·기한 규칙을 편성 화면 경고로 싣는다 (MVP 규격 패키지에만 있다).
-  for (const rule of denyRules) {
+  for (const rule of denyRules.filter((r) => trackApplies(r.track_scope, track))) {
     if (!scopeApplies(rule.institution_scope, scope)) continue;
     const categoryCode = toCategoryCode(rule.expense_category_code ?? 'ALL');
     const global = (rule.expense_category_code ?? 'ALL') === 'ALL';
@@ -366,7 +410,7 @@ const buildReviewIssues = () => reviewIssues
 // 편성 비목이 아닌 세부 비목(연구활동비 아래 출장비·회의비·외부 전문기술 활용비 …)도 기준은 있다.
 // 공고문에서 AI로 추출한 팩은 이런 세부 항목을 그대로 비목으로 쓰는 경우가 많아서,
 // 어떤 팩을 쓰든 비목 이름으로 규정 기준을 찾을 수 있도록 참조용 목록으로 함께 싣는다.
-const buildReferenceCategories = (scope) => {
+const buildReferenceCategories = (scope, track) => {
   const budgetCodes = new Set(tree.filter((n) => n.parent_code === 'DIRECT' && n.level === 2).map((n) => n.category_code).concat(['INDIRECT']));
   return tree
     .filter((n) => n.level >= 2 && !budgetCodes.has(n.category_code))
@@ -374,9 +418,9 @@ const buildReferenceCategories = (scope) => {
       const code = n.category_code;
       const guide = guideByCode.get(code);
       const items = buildAllowedItems(code, scope);
-      const approvals = approvalsFor(code);
-      const evidence = evidenceFor(code);
-      const applicability = applicabilityFor(code, scope).map(({ rawResult, ...rest }) => rest);
+      const approvals = approvalsFor(code, track);
+      const evidence = evidenceFor(code, track);
+      const applicability = applicabilityFor(code, scope, track).map(({ rawResult, ...rest }) => rest);
       return {
         id: code,
         name: n.category_name,
@@ -398,11 +442,11 @@ const buildReferenceCategories = (scope) => {
     .filter((c) => c.definition || c.allowedItems || c.limitText || c.approvals || c.evidenceRules);
 };
 
-const buildPack = (scope, id, name, orgType) => {
+const buildPack = (scope, id, name, orgType, track) => {
   const packArticles = buildArticles();
   const issues = buildReviewIssues();
-  const reference = buildReferenceCategories(scope);
-  const rules = buildRules(scope);
+  const reference = buildReferenceCategories(scope, track);
+  const rules = buildRules(scope, track);
   return {
     id, name, orgType,
     guideline: DOC,
@@ -414,8 +458,12 @@ const buildPack = (scope, id, name, orgType) => {
     hasRatioLimits: rules.some((r) => r.kind === 'ratio'),
     // 근거 조문까지 붙여 검토를 마친 패키지에서 왔다
     verified: true,
+    // 규정 자체의 시행일과 이 팩을 만든 날. 화면이 "언제 기준인지"를 고정 문구가 아니라
+    // 팩에서 읽어 보여준다 — 사업마다 시행일이 다른데 한 날짜로 뭉뚱그리면 틀린 안내가 된다.
+    effectiveFrom: manifest.effective_from ?? null,
+    generatedAt: manifest.generated_at ?? null,
     referenceUrl: REFERENCE_URL,
-    categories: buildCategories(scope),
+    categories: buildCategories(scope, track),
     rules,
     applicationDocs: [],
     ...(packArticles.length ? { articles: packArticles } : {}),
@@ -425,7 +473,7 @@ const buildPack = (scope, id, name, orgType) => {
 };
 
 const packs = meta
-  ? meta.scopes.map((s) => buildPack(s.scope, s.id, s.name, s.org_type))
+  ? meta.scopes.map((s) => buildPack(s.scope, s.id, s.name, s.org_type, s.track))
   : [
     buildPack('FOR_PROFIT', 'nrd2026-forprofit', 'R&D 사용기준 2026 (영리기관)', '영리기관'),
     buildPack('NON_PROFIT', 'nrd2026-nonprofit', 'R&D 사용기준 2026 (비영리기관)', '비영리기관'),
