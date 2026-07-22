@@ -71,11 +71,19 @@ export const isRegulationDbPack = (pack: RulePack): boolean => pack.origin === '
 export const packIsMissing = (project: Project): boolean =>
   !allPacks().some((pack) => pack.id === project.packId);
 
-// 사라진 팩을 대신할 후보 — 같은 팩이 갈린 것이라면 id 가 접두사를 공유한다
-// (tips2026 → tips2026-general / tips2026-deeptech). 없으면 빈 배열이고 사용자가 직접 고른다.
-export const replacementPacks = (packId: string): RulePack[] =>
-  allPacks().filter((pack) => pack.id !== packId
-    && (pack.id.startsWith(`${packId}-`) || packId.startsWith(`${pack.id}-`)));
+// 사라진 팩을 대신할 후보를 찾는다.
+//
+// 1) id 접두사 — 같은 팩이 갈린 것이라면 id 를 공유한다 (tips2026 → tips2026-general 등).
+// 2) 지침명 — 규정DB에서 사업을 골라 만든 과제는 packId 가 'registry:<uuid>' 라서 접두사가
+//    통하지 않는다. 이때는 적용 시점 스냅샷의 지침명으로 같은 규정에서 나온 팩을 찾는다.
+export const replacementPacksFor = (project: Project): RulePack[] => {
+  const byPrefix = allPacks().filter((pack) => pack.id !== project.packId
+    && (pack.id.startsWith(`${project.packId}-`) || project.packId.startsWith(`${pack.id}-`)));
+  if (byPrefix.length) return byPrefix;
+  const guideline = project.customPack?.guideline;
+  if (!guideline) return [];
+  return allPacks().filter((pack) => pack.guideline === guideline && pack.id !== project.packId);
+};
 
 export const getPack = (packId: string): RulePack =>
   remotePacks.find((pack) => pack.id === packId) ?? PACKS.find((pack) => pack.id === packId) ?? LEGACY_PACK;

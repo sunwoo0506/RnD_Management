@@ -6,7 +6,7 @@ import {
   Pencil, Plus, RefreshCw, ScanLine, Settings as SettingsIcon, ShieldCheck, Sparkles, Trash2, Upload, UserPlus, Users, WalletCards,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
-import { capFor, categoryOf, DEFAULT_INSURANCE_RATE, packIsMissing, replacementPacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
+import { capFor, categoryOf, DEFAULT_INSURANCE_RATE, packIsMissing, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
 import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, getEvidence, getProjectDocument, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
 import { isCloudEnabled, supabase } from './supabase';
@@ -899,7 +899,7 @@ function Budget({ project, update, setScreen }: { project: Project; update: (p: 
     {/* 규정이 개정돼 이 과제가 쓰던 팩이 사라지면, 화면은 적용 시점 스냅샷으로 계속 돌아가
         새 한도·규칙이 반영되지 않는다. 사용자는 알 방법이 없으므로 여기서 알리고 바로 옮겨준다. */}
     {packIsMissing(project) && (() => {
-      const options = replacementPacks(project.packId);
+      const options = replacementPacksFor(project);
       const movePack = (next: RulePack) => {
         if (!confirm(`규정을 "${next.name}"으로 바꿀까요?\n비목 구성이 같으면 편성 금액은 그대로 유지되고, 새 한도·규칙이 적용됩니다.`)) return;
         // 비목 id 가 같은 것만 편성을 옮긴다 — 없어진 비목의 금액을 엉뚱한 비목에 붙이면 안 된다.
@@ -1648,6 +1648,76 @@ function SavedPackModal({ entry, project, update, source, onClose }: { entry: Sa
   </div>;
 }
 
+// 과제에 적용된 규정을 바꾼다. 지금까지는 새 과제를 만들 때(SetupWizard)만 고를 수 있어,
+// 규정이 개정되거나 처음에 잘못 골랐을 때 되돌릴 방법이 없었다.
+function RulePackPanel({ project, update }: { project: Project; update: (p: Project) => void }) {
+  const current = packFor(project);
+  const missing = packIsMissing(project);
+  const suggested = replacementPacksFor(project);
+  const suggestedIds = new Set(suggested.map((pack) => pack.id));
+  // 권장 후보(같은 규정에서 갈린 팩)를 앞에 두고, 나머지 선택 가능한 팩을 뒤에 붙인다.
+  const options = [...suggested, ...selectablePacks().filter((pack) => !suggestedIds.has(pack.id) && pack.id !== current.id)];
+  const [choice, setChoice] = useState('');
+  const [changed, setChanged] = useState(false);
+
+  const apply = () => {
+    const next = options.find((pack) => pack.id === choice);
+    if (!next) return;
+    // 비목 id 가 같은 편성만 옮긴다 — 없어진 비목의 금액을 엉뚱한 곳에 붙이면 안 된다.
+    const keep = new Set(next.categories.map((category) => category.id));
+    const budgets = project.budgets.filter((item) => keep.has(item.categoryId));
+    const dropped = project.budgets.filter((item) => !keep.has(item.categoryId));
+    const droppedSum = dropped.reduce((sum, item) => sum + item.amount, 0);
+    const message = [
+      `적용 규정을 "${next.name}"으로 바꿀까요?`,
+      dropped.length
+        ? `새 규정에 없는 비목 ${dropped.length}개의 편성 금액 ${formatWon(droppedSum)}은 지워집니다.`
+        : '비목 구성이 같아 편성 금액은 그대로 유지됩니다.',
+      '편성 확정은 해제되고, 새 규정의 한도·규칙이 적용됩니다.',
+    ].join('\n');
+    if (!confirm(message)) return;
+    // 스냅샷(customPack)과 오버레이를 지워야 새 팩이 실제로 쓰인다.
+    update({ ...project, packId: next.id, customPack: undefined, packOverlay: undefined, budgets, budgetConfirmed: false });
+    setChoice('');
+    setChanged(true);
+    setTimeout(() => setChanged(false), 3000);
+  };
+
+  return <section className={`panel settings-panel ${missing ? 'pack-missing' : ''}`}>
+    <div className="panel-head"><div>
+      <h3>적용 규정</h3>
+      <p>예산 편성의 비목·상한·주의사항이 여기서 고른 규정에서 옵니다.</p>
+    </div></div>
+    <div className="settings-form">
+      <div className="pack-current">
+        <div>
+          <span>{missing ? '적용 시점 사본 (규정이 개정돼 원본이 없어졌어요)' : '현재 적용 중'}</span>
+          <strong>{current.name}</strong>
+          <small>{current.guideline}{current.effectiveFrom ? ` · ${current.effectiveFrom} 시행 기준` : ''}</small>
+        </div>
+        {isRegulationDbPack(current) && !missing && <em className="pack-verified">근거 검증됨</em>}
+      </div>
+      {missing && <p className="field-error"><AlertCircle /> 이 규정은 더 이상 제공되지 않아 개정 내용이 반영되지 않습니다. 아래에서 바꿔주세요.</p>}
+      <label>바꿀 규정
+        <select value={choice} onChange={(e) => setChoice(e.target.value)}>
+          <option value="">규정을 선택하세요</option>
+          {suggested.length > 0 && <optgroup label="이 과제의 규정이 갈린 것">
+            {suggested.map((pack) => <option key={pack.id} value={pack.id}>{pack.name}</option>)}
+          </optgroup>}
+          <optgroup label="그 밖의 규정">
+            {options.filter((pack) => !suggestedIds.has(pack.id)).map((pack) => <option key={pack.id} value={pack.id}>{pack.name}</option>)}
+          </optgroup>
+        </select>
+      </label>
+      <p className="field-hint">비목 이름이 같으면 편성 금액이 유지됩니다. 새 규정에 없는 비목의 금액은 지워지며, 바꾸기 전에 무엇이 지워지는지 알려드려요.</p>
+      <div className="settings-save">
+        <button type="button" className={missing ? 'primary' : 'secondary'} disabled={!choice} onClick={apply}>규정 변경</button>
+        {changed && <span className="save-ok"><CheckCircle2 /> 바뀌었어요 — 예산 편성에서 확인하세요</span>}
+      </div>
+    </div>
+  </section>;
+}
+
 function Settings({ project, update, onReset }: { project: Project; update: (p: Project) => void; onReset: () => void }) {
   const initialForm = (p: Project) => ({ name: p.name, company: p.companyName, subsidy: String(p.subsidyAmount ?? p.totalBudget), subsidyRate: String(p.subsidyRate ?? 100), matchingCashRate: p.matchingCashRate != null ? String(p.matchingCashRate) : '', start: p.startDate, end: p.endDate, deadline: p.settlementDeadline, programName: p.programName ?? '' });
   const [form, setForm] = useState(initialForm(project));
@@ -1690,8 +1760,9 @@ function Settings({ project, update, onReset }: { project: Project; update: (p: 
     if (!confirm(`변경 이력 ${project.changes.length}건을 삭제할까요? 현재 예산 편성 금액은 그대로 유지됩니다.`)) return;
     update({ ...project, changes: [] });
   };
-  return <div className="page-content"><div className="page-title"><div><span className="eyebrow">운영 설정</span><h2>과제 설정</h2><p>과제 기본 정보를 수정하고, 백업·복원과 초기화를 관리합니다.</p></div></div>
-    <section className="panel settings-panel"><div className="panel-head"><div><h3>과제 기본 정보</h3><p>적용 규정: <strong>{packFor(project).name}</strong> ({packFor(project).guideline}) · 수정 후 저장을 누르면 모든 화면에 바로 반영됩니다.</p></div></div>
+  return <div className="page-content"><div className="page-title"><div><span className="eyebrow">운영 설정</span><h2>과제 설정</h2><p>적용 규정과 과제 기본 정보를 수정하고, 백업·복원과 초기화를 관리합니다.</p></div></div>
+    <RulePackPanel project={project} update={update} />
+    <section className="panel settings-panel"><div className="panel-head"><div><h3>과제 기본 정보</h3><p>수정 후 저장을 누르면 모든 화면에 바로 반영됩니다.</p></div></div>
       <form className="settings-form" onSubmit={save}>
         <div className="field-grid"><label>과제명<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label><label>기업명<input required value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} /></label></div>
         <div className="field-grid"><label>지원금(정부지원금)<input required inputMode="numeric" value={withCommas(form.subsidy)} onChange={(e) => setForm({ ...form, subsidy: digitsOnly(e.target.value) })} /></label><label><span className="label-line">지원비율(%) <b>공고문 기준</b></span><input required inputMode="numeric" value={form.subsidyRate} onChange={(e) => setForm({ ...form, subsidyRate: digitsOnly(e.target.value).slice(0, 3) })} placeholder="자기부담 없으면 100" /></label></div>

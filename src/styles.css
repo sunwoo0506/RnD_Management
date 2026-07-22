@@ -587,3 +587,11 @@ input[readonly] { background: #f7f8fa; color: #667087; pointer-events: none; }
 .cap-rate .cap-target { color: #1d8a5f; }
 .cap-rate.unknown strong { color: #b57116; }
 .cap-rate button { margin-left: auto; flex: none; }
+/* 과제 설정의 "적용 규정" — 규정이 사라진 상태를 먼저 알아채야 해서 테두리로 구분한다 */
+.settings-panel.pack-missing { border-color: #f2e0c4; border-left: 5px solid #d99a2b; }
+.pack-current { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #fbfcfd; border: 1px solid var(--line); border-radius: 10px; }
+.pack-current > div { display: grid; gap: 2px; min-width: 0; }
+.pack-current span { font-size: 11px; color: var(--muted); font-weight: 600; }
+.pack-current strong { font-size: 15px; }
+.pack-current small { font-size: 11px; color: var(--muted); }
+.pack-current .pack-verified { margin-left: auto; flex: none; }
