@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, BookOpenCheck, Check, CheckCircle2, CloudUpload, FileSearch, Search, ShieldCheck, Sparkles, Trash2, Upload, Wand2 } from 'lucide-react';
-import { deriveTotalBudget, formatWon, getPack, isRegulationDbPack, makeDraftBudgets, previewFunding, selectablePacks } from './rules';
+import { deriveTotalBudget, formatWon, getPack, isRegulationDbPack, makeDraftBudgets, previewFunding, selectablePacks, settlementDeadlineFor } from './rules';
 import { classifyProgram, guessProgramName, guessYear, type MatchResult } from './matching';
 import { DOCUMENT_TYPE_LABEL, type DocumentType, guessDocumentType, registryEnabled, searchRegistry, submitRegistryShare, type RegistryEntry } from './registry';
 import { annotateVerification, buildCustomPack, fundingScheduleAmountWon, runExtraction, suggestedFundingRates, type Extraction } from './llmExtract';
@@ -24,7 +24,7 @@ interface DocItem {
 
 export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project: Project) => void; onCancel?: () => void }) {
   const [step, setStep] = useState<1 | 2>(1);
-  const [form, setForm] = useState({ name: '', subsidy: '100000000', subsidyRate: '', matchingCashRate: '', start: today(), end: '', deadline: '', company: '', owner: '', email: '' });
+  const [form, setForm] = useState({ name: '', subsidy: '100000000', subsidyRate: '', matchingCashRate: '', start: today(), end: '', company: '', owner: '', email: '' });
   const [participant, setParticipant] = useState('');
   // ---- 2단계: 규정 선택 ----
   // 기본값을 고정 id로 두면 그 팩이 폐기됐을 때(SUPERSEDED_PACK_IDS) 목록에 없는 팩이 선택된 채로 시작한다.
@@ -52,7 +52,7 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
 
   const next = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!form.name || !form.company || !form.owner || !form.email || !Number(form.subsidy) || !form.end || !form.deadline) return;
+    if (!form.name || !form.company || !form.owner || !form.email || !Number(form.subsidy) || !form.end) return;
     setStep(2);
   };
 
@@ -104,11 +104,23 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
 
   const docsText = () => docs.filter((item) => item.status === 'done').map((item) => item.text).join('\n');
 
+  // 추출 결과는 그때 읽혀 있던 문서로 만든 것이다. 파일을 더하거나 지우면 결과가 문서와 어긋나는데,
+  // 화면은 그대로라 사용자는 새 문서까지 반영된 줄 안다 — 무엇으로 뽑은 것인지 기억해 두고 알려준다.
+  const docsKey = (items: DocItem[]) => items.filter((item) => item.status === 'done').map((item) => item.id).sort().join(',');
+  const [aiDocsKey, setAiDocsKey] = useState<string | null>(null);
+  const aiStale = ai.status === 'done' && aiDocsKey !== null && aiDocsKey !== docsKey(docs);
+
   const runAi = async () => {
+    const key = docsKey(docs);
     setAi({ status: 'working' });
+    // 앞선 추출로 만든 팩은 이제 근거가 다른 문서다 — 남겨두면 옛 규칙이 조용히 과제에 적용된다.
+    setExtractedPack(null);
+    setRateSuggestion(null);
+    setRateFilled(false);
     try {
       const { extraction, cached } = await runExtraction(docsText(), match?.packId ?? null,
         (done, total) => setAi((prev) => prev.status === 'working' ? { ...prev, progress: { done, total } } : prev));
+      setAiDocsKey(key);
       const verified = annotateVerification(extraction, docsText());
       setAi({ status: 'done', extraction: verified, cached });
       // DB에 없는 사업을 추출했으면 공유 신청을 기본으로 켠다 — 승인되면 DB에 등록돼 다음부터 검색으로 쓴다.
@@ -176,7 +188,7 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
       const totalBudget = deriveTotalBudget(subsidyAmount, subsidyRate ?? 100);
       onCreate({
         id: uid(), name: form.name, totalBudget, subsidyAmount, subsidyRate, matchingCashRate, startDate: form.start, endDate: form.end,
-        settlementDeadline: form.deadline, agency: chosenPack.agency.split(' (')[0], companyName: form.company,
+        settlementDeadline: settlementDeadlineFor(form.end), agency: chosenPack.agency.split(' (')[0], companyName: form.company,
         packId: extractedIsBase ? extractedPack!.id : registryPick ? `registry:${registryPick.id}` : packId,
         customPack: extractedIsBase ? extractedPack! : registryPick?.pack,
         // AI로 추출·적용한 팩은 보관함에도 담아 과제 설정 > AI 규정 추출에서 언제든 다시 열람할 수 있게 한다.
@@ -220,7 +232,9 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
                 ? `자기부담 없이 전액 지원 — 총사업비 ${formatWon(totalBudget)}`
                 : `총사업비 ${formatWon(totalBudget)} = 지원금 ${formatWon(Number(form.subsidy) || 0)} + 민간부담금 ${formatWon(matching)} (현금 ${formatWon(matchingCash)} · 현물 ${formatWon(matchingInKind)})`;
             })()}</p>
-        <div className="field-grid three"><label>시작일<input required type="date" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} /></label><label>종료일<input required type="date" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} /></label><label>정산 마감일<input required type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} /></label></div>
+        {/* 정산 마감일은 따로 받지 않는다 — 종료일에서 셈해야 사업기간을 고쳤을 때 함께 따라온다. */}
+        <div className="field-grid"><label>시작일<input required type="date" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} /></label><label>종료일<input required type="date" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} /></label></div>
+        {form.end && <p className="wiz-hint">정산 마감일은 <strong>{settlementDeadlineFor(form.end)}</strong>로 잡습니다 (사업 종료 후 1개월). 증빙 누락 알림이 이 날짜의 D-30 · D-14 · D-7에 뜹니다.</p>}
         <div className="field-grid"><label>대표자 이름<input required value={form.owner} onChange={(e) => setForm({ ...form, owner: e.target.value })} /></label><label>알림 이메일<input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label></div>
         <label><span className="label-line">참여 인력 <b>선택</b></span><input value={participant} onChange={(e) => setParticipant(e.target.value)} placeholder="첫 참여 인력 이름" /></label>
         <button className="primary large" type="submit">다음 — 적용 규정 정하기 <ArrowRight /></button>
@@ -268,7 +282,17 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
             : '문서를 분석하는 중… (문서 크기에 따라 최대 1~2분 걸릴 수 있어요)'}</p>}
           {ai.status === 'error' && <><p className="field-error"><AlertCircle /> {ai.message}</p><button type="button" className="secondary" onClick={runAi}>다시 시도</button></>}
           {ai.status === 'done' && ai.extraction && <div className="ai-review">
-            {ai.cached && <p className="wiz-hint">이 문서는 이전에 분석된 적이 있어 캐시된 결과를 불러왔어요.</p>}
+            {/* 파일을 더하거나 지우면 아래 결과는 옛 문서의 것이다 — 그대로 승인하면 문서에 없는 규칙이 적용된다. */}
+            {aiStale
+              ? <div className="ai-stale">
+                <AlertCircle />
+                <div><strong>업로드한 문서가 바뀌었어요</strong><span>아래 결과는 바뀌기 전 문서에서 뽑은 것이라 지금 문서와 맞지 않을 수 있어요. 다시 추출한 뒤 검토해주세요.</span></div>
+                <button type="button" className="secondary" onClick={runAi}><Sparkles /> 문서에서 다시 추출하기</button>
+              </div>
+              : <div className="ai-rerun">
+                {ai.cached && <span className="wiz-hint">이 문서는 이전에 분석된 적이 있어 캐시된 결과를 불러왔어요.</span>}
+                <button type="button" className="text-button" onClick={runAi}><Sparkles /> 다시 추출하기</button>
+              </div>}
             {rateSuggestion && (rateSuggestion.subsidyRate || rateSuggestion.matchingCashRate) && <div className="rate-suggestion">
               <h4><Sparkles /> AI가 문서에서 찾은 재원 비율 <b>확인 후 수정 가능</b></h4>
               {rateSuggestion.subsidyRate && <p className="wiz-hint">지원비율 {rateSuggestion.subsidyRate.pct}% — "{rateSuggestion.subsidyRate.rule.quote.slice(0, 80)}{rateSuggestion.subsidyRate.rule.quote.length > 80 ? '…' : ''}" ({rateSuggestion.subsidyRate.rule.ref})</p>}
@@ -311,7 +335,9 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
         <div className="wiz-block">
           <h4><BookOpenCheck /> ④ 적용 규정 확정</h4>
           {extractedPack
-            ? <div className="registry-picked"><Wand2 /><div><strong>{extractedPack.name}</strong><span>추출·승인한 규정을 사용합니다 · {extractedPack.guideline} · 비목 {extractedPack.categories.length}개, 규칙 {extractedPack.rules.length}건</span></div><button type="button" className="text-button" onClick={() => setExtractedPack(null)}>해제</button></div>
+            ? <div className={`registry-picked ${aiStale ? 'stale' : ''}`}><Wand2 /><div><strong>{extractedPack.name}</strong><span>{aiStale
+              ? '업로드한 문서가 바뀐 뒤라 이 규정은 지금 문서와 다를 수 있어요 — ③에서 다시 추출해주세요.'
+              : `추출·승인한 규정을 사용합니다 · ${extractedPack.guideline} · 비목 ${extractedPack.categories.length}개, 규칙 ${extractedPack.rules.length}건`}</span></div><button type="button" className="text-button" onClick={() => setExtractedPack(null)}>해제</button></div>
             : registryPick
             ? <div className="registry-picked"><CheckCircle2 /><div><strong>{registryPick.programName}</strong><span>공유 DB의 규정 팩을 사용합니다 · {registryPick.pack.guideline}</span></div><button type="button" className="text-button" onClick={() => setRegistryPick(null)}>해제</button></div>
             : <div className="pack-select" role="radiogroup" aria-label="사업 유형">{selectablePacks().map((pack) => <button type="button" key={pack.id} role="radio" aria-checked={packId === pack.id} className={packId === pack.id ? 'active' : ''} onClick={() => setPackId(pack.id)}><strong>{pack.name}{isRegulationDbPack(pack) && <em className="pack-verified">근거 검증됨</em>}</strong><span>{pack.guideline}</span></button>)}</div>}

@@ -903,6 +903,19 @@ export const articlesForRef = (pack: RulePack, ref: string): PackArticle[] => {
 // ---- 공용 유틸 ----
 export const formatWon = (value: number) => `${Math.round(value).toLocaleString('ko-KR')}원`;
 
+// 정산 마감일은 따로 입력받지 않고 사업 종료일에서 셈한다 (종료 후 1개월).
+// 두 날짜를 각각 받으면 종료일만 고쳤을 때 정산일이 옛 값으로 남아, 증빙 누락 알림(D-30·D-14·D-7)이
+// 엉뚱한 날 뜬다. 사업기간이 바뀌면 정산일도 따라가는 것이 맞다.
+export const settlementDeadlineFor = (endDate?: string): string => {
+  const found = /^(\d{4})-(\d{2})-(\d{2})$/.exec((endDate ?? '').trim());
+  if (!found) return '';
+  const [year, month, day] = [Number(found[1]), Number(found[2]), Number(found[3])];
+  // month가 1부터라 Date.UTC(0부터)에 그대로 넣으면 이미 다음 달이다.
+  // 다음 달에 그 날짜가 없으면(1/31 → 2월) 그 달 마지막 날로 당긴다.
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month, Math.min(day, lastDay))).toISOString().slice(0, 10);
+};
+
 // ---- 재원 구성 (지원금 / 민간부담금 현금·현물) ----
 // 정산 관행상 금액은 천 원 단위에서 올림 처리한다.
 const ceilThousand = (value: number) => Math.ceil(value / 1000) * 1000;

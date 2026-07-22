@@ -451,6 +451,18 @@ label { display: grid; gap: 6px; color: #4d586c; font-size: 13px; font-weight: 7
 .registry-picked div { display: grid; gap: 2px; flex: 1; }
 .registry-picked strong { font-size: 12px; }
 .registry-picked span { font-size: 11px; color: var(--muted); }
+/* 문서가 바뀐 뒤의 추출 결과 — 그대로 쓰면 문서에 없는 규칙이 적용되므로 경고색으로 바꾼다. */
+.registry-picked.stale { background: #fff7f0; border-color: #f0d3ae; }
+.registry-picked.stale svg { color: #cf8a2e; }
+.ai-stale { display: flex; gap: 9px; align-items: center; background: #fff7f0; border: 1px solid #f0d3ae; border-radius: 9px; padding: 10px 12px; }
+.ai-stale > svg { color: #cf8a2e; width: 16px; flex: none; }
+.ai-stale div { display: grid; gap: 2px; flex: 1; }
+.ai-stale strong { font-size: 12px; }
+.ai-stale span { font-size: 11px; color: #4d586c; line-height: 1.5; }
+.ai-stale button { flex: none; }
+.ai-rerun { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+.ai-rerun .wiz-hint { margin: 0; }
+.ai-rerun button { flex: none; margin-left: auto; }
 .share-block { background: #fbfcfe; }
 .share-toggle { display: flex; gap: 8px; align-items: flex-start; font-weight: 600; font-size: 12px; color: #4d586c; }
 .share-toggle input { width: auto; margin-top: 2px; }

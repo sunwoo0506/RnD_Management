@@ -6,7 +6,7 @@ import {
   Pencil, Plus, RefreshCw, ScanLine, Settings as SettingsIcon, ShieldCheck, Sparkles, Trash2, Upload, UserPlus, Users, WalletCards,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
-import { baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, evidenceGuide, evidenceChecklistFor, commonEvidenceRuleNames, primaryEvidence, withAlwaysRequired, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, spendingCautions, subItemStandardFor, transferLimitError, visibleCategories } from './rules';
+import { baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, settlementDeadlineFor, evidenceGuide, evidenceChecklistFor, commonEvidenceRuleNames, primaryEvidence, withAlwaysRequired, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, spendingCautions, subItemStandardFor, transferLimitError, visibleCategories } from './rules';
 import { evidenceReadiness, monthSequence, setMonthlyPlan, spendingMatrix } from './spending';
 import { detailFieldsFor } from './spendingForms';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
@@ -2198,7 +2198,7 @@ function RulePackPanel({ project, update }: { project: Project; update: (p: Proj
 }
 
 function Settings({ project, update, onReset }: { project: Project; update: (p: Project) => void; onReset: () => void }) {
-  const initialForm = (p: Project) => ({ name: p.name, company: p.companyName, subsidy: String(p.subsidyAmount ?? p.totalBudget), subsidyRate: String(p.subsidyRate ?? 100), matchingCashRate: p.matchingCashRate != null ? String(p.matchingCashRate) : '', start: p.startDate, end: p.endDate, deadline: p.settlementDeadline, programName: p.programName ?? '' });
+  const initialForm = (p: Project) => ({ name: p.name, company: p.companyName, subsidy: String(p.subsidyAmount ?? p.totalBudget), subsidyRate: String(p.subsidyRate ?? 100), matchingCashRate: p.matchingCashRate != null ? String(p.matchingCashRate) : '', start: p.startDate, end: p.endDate, programName: p.programName ?? '' });
   const [form, setForm] = useState(initialForm(project));
   const [saved, setSaved] = useState(false);
   const sourceDocs = useSourceDocs(project, update);
@@ -2213,7 +2213,7 @@ function Settings({ project, update, onReset }: { project: Project; update: (p: 
     if (form.end < form.start) { alert('종료일이 시작일보다 빠릅니다. 날짜를 확인해주세요.'); return; }
     // 비워두면 "확인됨(0 등)"으로 단정해 저장하지 않고 비워둔다 — 한눈에 보기에서 "확인 필요"로 표시된다.
     const storedMatchingCashRate = form.matchingCashRate === '' ? undefined : matchingCashRate;
-    update({ ...project, name: form.name.trim(), companyName: form.company.trim(), totalBudget: previewTotal, subsidyAmount, subsidyRate, matchingCashRate: storedMatchingCashRate, startDate: form.start, endDate: form.end, settlementDeadline: form.deadline, programName: form.programName.trim() || undefined });
+    update({ ...project, name: form.name.trim(), companyName: form.company.trim(), totalBudget: previewTotal, subsidyAmount, subsidyRate, matchingCashRate: storedMatchingCashRate, startDate: form.start, endDate: form.end, settlementDeadline: settlementDeadlineFor(form.end), programName: form.programName.trim() || undefined });
     setSaved(true); setTimeout(() => setSaved(false), 2500);
   };
   const importBackup = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2246,8 +2246,10 @@ function Settings({ project, update, onReset }: { project: Project; update: (p: 
         <div className="field-grid"><label>과제명<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label><label>기업명<input required value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} /></label></div>
         <div className="field-grid"><label>지원금(정부지원금)<input required inputMode="numeric" value={withCommas(form.subsidy)} onChange={(e) => setForm({ ...form, subsidy: digitsOnly(e.target.value) })} /></label><label><span className="label-line">지원비율(%) <b>공고문 기준</b></span><input required inputMode="numeric" value={form.subsidyRate} onChange={(e) => setForm({ ...form, subsidyRate: digitsOnly(e.target.value).slice(0, 3) })} placeholder="자기부담 없으면 100" /></label></div>
         {subsidyRate < 100 && <div className="field-grid"><label><span className="label-line">민간부담금 중 현금 비율(%) <b>선택 · 아래 문서 업로드 시 AI가 자동 입력</b></span><input inputMode="numeric" value={form.matchingCashRate} onChange={(e) => setForm({ ...form, matchingCashRate: digitsOnly(e.target.value).slice(0, 3) })} placeholder="공고문 확인 후 알면 직접 입력 (예: 10)" /></label><div /></div>}
-        <div className="field-grid"><label>정산 마감일<input required type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} /></label><label>사업명 <input value={form.programName} onChange={(e) => setForm({ ...form, programName: e.target.value })} placeholder={`비워두면 규정 팩 이름(${packFor(project).name}) 사용`} /></label></div>
+        <div className="field-grid"><label>사업명 <input value={form.programName} onChange={(e) => setForm({ ...form, programName: e.target.value })} placeholder={`비워두면 규정 팩 이름(${packFor(project).name}) 사용`} /></label><div /></div>
         <div className="field-grid"><label>시작일<input required type="date" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} /></label><label>종료일<input required type="date" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} /></label></div>
+        {/* 정산 마감일은 따로 받지 않는다 — 종료일에서 셈해야 사업기간을 고쳤을 때 함께 따라온다. */}
+        <p className="field-hint">정산 마감일은 <strong>{settlementDeadlineFor(form.end) || '종료일을 정하면 계산됩니다'}</strong>{settlementDeadlineFor(form.end) ? ' (사업 종료 후 1개월)' : ''} — 증빙 누락 알림이 이 날짜의 D-30 · D-14 · D-7에 뜹니다.</p>
         <p className="field-hint">{subsidyRate >= 100
           ? `자기부담 없이 전액 지원 — 총사업비 ${formatWon(previewTotal)}`
           : form.matchingCashRate === ''

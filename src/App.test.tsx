@@ -24,7 +24,9 @@ describe('과제온 핵심 사용자 흐름', () => {
     await user.type(screen.getByLabelText('기업명'), '테스트랩');
     await user.type(screen.getByLabelText(/지원비율/), '100');
     await user.type(screen.getByLabelText('종료일'), '2027-06-30');
-    await user.type(screen.getByLabelText('정산 마감일'), '2027-07-30');
+    // 정산 마감일은 입력받지 않고 종료일에서 셈한다 (종료 후 1개월)
+    expect(screen.queryByLabelText('정산 마감일')).toBeNull();
+    expect(screen.getByText('2027-07-30')).toBeInTheDocument();
     await user.type(screen.getByLabelText('대표자 이름'), '김대표');
     await user.type(screen.getByLabelText('알림 이메일'), 'owner@example.com');
     await user.click(screen.getByRole('button', { name: /다음 — 적용 규정 정하기/ }));
