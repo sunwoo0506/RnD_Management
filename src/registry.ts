@@ -56,6 +56,9 @@ export const searchRegistry = async (query: string): Promise<RegistryEntry[]> =>
     .from('program_registry')
     .select('id, program_name, year, verified, pack')
     .ilike('program_name', `%${query.trim()}%`)
+    // 팩이 갈리거나 이름이 바뀌면 옛 행은 is_active=false 로 남는다 (과제가 쓰고 있을 수 있어
+    // 지우지 않는다). 검색 결과에까지 나오면 폐기된 사업을 새로 고르게 된다.
+    .eq('is_active', true)
     .order('year', { ascending: false, nullsFirst: false })
     .limit(10);
   if (error) throw new Error(error.message);
