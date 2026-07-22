@@ -22,6 +22,16 @@ interface DocItem {
   error?: string;
 }
 
+// 공유 신청에 담을 팩. AI로 추출했으면 추출 팩을 올린다 — 편성이 쓰는 팩(chosenPack)은
+// "비목은 검증된 규정DB에서만" 원칙 때문에 기준 팩으로 남는 일이 많아서, 그걸 올리면
+// 문서에서 뽑은 규칙이 빠진 채 기존 팩의 복제본만 대기열에 들어간다
+// (디딤돌_글로벌 신청이 도약 팩과 똑같았던 원인). 추출 없이 공유 DB의 팩을 골랐다면
+// 새 팩을 다시 신청하지 않고 문서만 신청한다.
+export const sharePackOf = (extractedPack: RulePack | null, registryPick: RegistryEntry | null, chosenPack: RulePack) =>
+  extractedPack ? { pack: extractedPack, origin: 'extracted' as const, programRegistryId: registryPick?.id ?? null }
+  : registryPick ? {}
+  : { pack: chosenPack, origin: 'pack' as const };
+
 export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project: Project) => void; onCancel?: () => void }) {
   const [step, setStep] = useState<1 | 2>(1);
   const [form, setForm] = useState({ name: '', subsidy: '100000000', subsidyRate: '', matchingCashRate: '', start: today(), end: '', company: '', owner: '', email: '' });
@@ -172,10 +182,9 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
           const name = programName.trim() || form.name;
           const year = Number(programYear) || null;
           const shareDocs = docs.map((doc) => ({ file: doc.file, documentType: doc.role }));
-          // 이미 공유 DB에 있는 규정 팩을 골랐다면(registryPick) 새 팩을 다시 신청하지 않고 문서만 신청한다.
           await submitRegistryShare({
             programName: name, year, docs: shareDocs,
-            ...(registryPick ? {} : { pack: chosenPack, origin: extractedPack ? 'extracted' : 'pack' }),
+            ...sharePackOf(extractedPack, registryPick, chosenPack),
           });
         } catch (error) {
           alert(`공유 신청에 실패했습니다 (${error instanceof Error ? error.message : ''}). 과제는 정상 생성됩니다.`);
