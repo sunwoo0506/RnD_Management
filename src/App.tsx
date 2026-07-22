@@ -6,7 +6,9 @@ import {
   Pencil, Plus, RefreshCw, ScanLine, Settings as SettingsIcon, ShieldCheck, Sparkles, Trash2, Upload, UserPlus, Users, WalletCards,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
-import { baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, documentsFor, evidenceGuide, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
+import { baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, evidenceGuide, evidenceChecklistFor, commonEvidenceRuleNames, primaryEvidence, withAlwaysRequired, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, spendingCautions, subItemStandardFor, transferLimitError, visibleCategories } from './rules';
+import { evidenceReadiness, monthSequence, setMonthlyPlan, spendingMatrix } from './spending';
+import { detailFieldsFor } from './spendingForms';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
 import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, getEvidence, getProjectDocument, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
 import { isCloudEnabled, supabase } from './supabase';
@@ -16,7 +18,7 @@ import { initRegulationPacks, type RegulationPackStatus } from './regulationDb';
 import { buildRegulationPackage } from './regulationPackage';
 import { diffExtraction, overlayRulesFrom, summarizeDiff, type PackDiff } from './packDiff';
 import SetupWizard from './SetupWizard';
-import type { BudgetBasis, CategoryCap, CategoryMin, ReferenceStandard, SubItemChoice, SubItemChoices } from './rules';
+import type { BudgetBasis, CautionItem, CategoryCap, CategoryMin, ReferenceStandard, SubItemChoice, SubItemChoices } from './rules';
 import type { BudgetCategoryId, BudgetItem, BudgetSubItem, Evidence, Expense, PackAllowedItem, PackArticle, PackCategory, PackRule, Participant, PaymentMethod, Project, ProjectDocumentLink, RulePack, SavedRulePack, Screen } from './types';
 
 // 문서 생성 라이브러리(docx·excel)는 무거워서 첫 화면 번들에서 제외하고 버튼 클릭 시에만 불러온다.
@@ -76,6 +78,7 @@ function Overview({ project, setScreen }: { project: Project; setScreen: (s: Scr
   const dday = daysUntil(project.settlementDeadline);
   const alerts = project.participants.filter((p) => p.projectRate + p.externalRate > 100).length;
   const funding = fundingBreakdown(project);
+  const readiness = evidenceReadiness(pack, project);
   const pct = (value: number) => project.totalBudget ? value / project.totalBudget * 100 : 0;
   return <div className="page-content">
     <section className="welcome"><div><span>{new Date().getHours() < 12 ? '좋은 아침이에요' : '오늘도 수고 많으셨어요'}, {project.members[0]?.name}님</span><h2>과제 상태를 확인해보세요.</h2></div><div className="deadline"><CalendarDays /><div><small>정산 마감까지</small><strong>{dday >= 0 ? `D-${dday}` : `D+${Math.abs(dday)}`}</strong></div></div></section>
@@ -108,11 +111,35 @@ function Overview({ project, setScreen }: { project: Project; setScreen: (s: Scr
         <div className="budget-bars">{cats.map((category) => { const amount = project.budgets.find((b) => b.categoryId === category.id)?.amount ?? 0; const used = project.expenses.filter((e) => e.categoryId === category.id).reduce((s, e) => s + e.amount, 0); const rate = amount ? Math.min(used / amount * 100, 100) : 0; return <div className="budget-row" key={category.id}><div><strong>{category.name}</strong><span>{formatWon(used)} / {formatWon(amount)}</span></div><div className="progress"><i style={{ width: `${rate}%` }} className={rate >= 90 ? 'danger' : ''} /></div><b>{rate.toFixed(0)}%</b></div>; })}</div>
       </section>
       <section className="panel next-actions"><div className="panel-head"><div><span className="section-kicker">NEXT ACTION</span><h3>지금 확인할 일</h3></div></div>
-        {incomplete > 0 ? <button onClick={() => setScreen('spending')} className="action-item warning"><AlertCircle /><div><strong>증빙 {incomplete}개가 비어 있어요</strong><span>파일을 올리면 자동으로 완료 처리돼요</span></div><ChevronRight /></button> : <div className="empty-action"><CheckCircle2 /><strong>증빙이 모두 준비됐어요</strong><span>새 집행건을 등록하면 필요한 서류를 안내해드려요.</span></div>}
+        {incomplete > 0 ? <button onClick={() => setScreen('spending')} className="action-item warning"><AlertCircle /><div><strong>증빙 {incomplete}개가 비어 있어요</strong><span>아래에서 무엇이 빠졌는지 확인하세요</span></div><ChevronRight /></button> : <div className="empty-action"><CheckCircle2 /><strong>증빙이 모두 준비됐어요</strong><span>새 집행건을 등록하면 필요한 서류를 안내해드려요.</span></div>}
         {alerts > 0 && <button onClick={() => setScreen('budget')} className="action-item danger"><AlertCircle /><div><strong>참여율 100% 초과</strong><span>예산 편성의 인건비 산정에서 비율을 조정해주세요</span></div><ChevronRight /></button>}
         <button onClick={() => setScreen('spending')} className="quick-add"><Plus /> 새 집행건 등록</button>
       </section>
     </div>
+    {/* 숫자 하나("증빙 12개가 비어 있어요")로는 무엇을 준비해야 하는지 알 수 없다.
+        서류 종류별로 얼마나 밀렸는지, 집행건별로 무엇이 빠졌는지 나눠서 체크리스트로 보여준다. */}
+    {readiness.total > 0 && <section className="panel evidence-readiness">
+      <div className="panel-head">
+        <div><span className="section-kicker">EVIDENCE</span><h3>증빙 준비 현황</h3>
+          <p>집행건 {project.expenses.length}건 중 {readiness.readyExpenses}건 완료 · 서류 {readiness.done}/{readiness.total}건 준비됨</p></div>
+        <button className="text-button" onClick={() => setScreen('spending')}>집행·증빙으로 <ArrowRight /></button>
+      </div>
+      <div className="readiness-bar"><i style={{ width: `${readiness.rate}%` }} className={readiness.rate >= 100 ? 'done' : ''} /></div>
+      {/* 같은 서류를 몰아서 만들 수 있게 종류별로도 센다 */}
+      <div className="doc-tally">{readiness.byDocument.map((entry) => <span key={entry.label} className={entry.done === entry.total ? 'ok' : ''}>
+        {entry.done === entry.total ? <CheckCircle2 /> : <FileText />}{entry.label} <b>{entry.done}/{entry.total}</b>
+      </span>)}</div>
+      {readiness.todos.length > 0
+        ? <div className="todo-list">{readiness.todos.map((todo) => <button type="button" key={todo.expenseId} onClick={() => setScreen('spending')}>
+          <div className="todo-head">
+            <strong>{todo.purpose}</strong>
+            <em>{todo.categoryName}{todo.subItemName ? ` · ${todo.subItemName}` : ''} · {todo.date}</em>
+            <b className={todo.done ? '' : 'none'}>{todo.done}/{todo.total}</b>
+          </div>
+          <div className="todo-missing">{todo.missing.map((label) => <span key={label}><FileClock />{label}</span>)}</div>
+        </button>)}</div>
+        : <p className="field-hint">모든 집행건의 증빙이 준비됐습니다.</p>}
+    </section>}
     <section className="guide-banner"><div className="guide-icon"><ShieldCheck /></div><div><span>과제온 가이드</span><strong>집행 전에 인정 기준을 먼저 확인하세요.</strong><p>비목을 선택하면 중기부 기준 증빙 목록과 주의사항을 바로 보여드려요.</p></div><button onClick={() => setScreen('spending')}>집행 등록하기 <ArrowRight /></button></section>
   </div>;
 }
@@ -141,6 +168,57 @@ const keywordTokens = (text: string): string[] =>
   [...new Set(text.split(/[^\p{L}\p{N}]+/u).filter((token) => token.length >= 3 && !COMMON_WORDS.has(token)))]
     .sort((a, b) => b.length - a.length)
     .slice(0, 5);
+
+// 조문 원문은 조 전체라 다른 세목 내용까지 함께 실려 있다 (제25조가 회의비·출장비를 모두 다룬다).
+// 유의사항 제목·설명의 특징 단어가 여러 개 겹치는 문단을 짚어, 어디를 읽어야 하는지 알려준다.
+// 한국어는 같은 말이라도 조사·어미가 달라붙는다 ("규정에" ↔ "규정을", "계상해야" ↔ "계상한다").
+// 꼬리를 떼고 비교해야 같은 조항을 가리키는 문단을 놓치지 않는다.
+const PARTICLE_TAIL = /(으로써|으로서|에서는|에게서|합니다|한다면|으로|에게|에서|까지|부터|이나|한다|해야|하여|이란|은|는|이|가|을|를|에|의|도|만|과|와|나|로)$/;
+const stemOf = (token: string): string => {
+  const stem = token.replace(PARTICLE_TAIL, '');
+  return stem.length >= 2 ? stem : token;
+};
+
+// 두 글자짜리 한국어 낱말(현금·현물·대체·채용)이 뜻을 가르는 일이 많아 길이 2까지 받는다.
+// 대신 어느 조문에나 나오는 뼈대 낱말은 제외해야 아무 문단이나 걸리지 않는다.
+const STRUCTURE_WORDS = new Set(['등', '및', '또는', '다음', '각호', '이내', '이상', '이하', '미만', '따라', '위해', '통해', '대해', '관해', '경우', '때는', '한다', '있다', '없다', '한다면', '제외', '포함']);
+
+const termsOf = (text: string, minLength: number): string[] => {
+  const words = text.split(/[^\p{L}\p{N}]+/u).map(stemOf)
+    .filter((token) => token.length >= minLength && !COMMON_WORDS.has(token) && !STRUCTURE_WORDS.has(token));
+  return [...new Set([...numberTokens(text), ...words])].sort((a, b) => b.length - a.length).slice(0, 24);
+};
+
+// '초과채용'이 조문에는 '초과로 채용한'으로 풀려 있어 통째로는 안 맞는다. 낱말을 쪼개 검색어로
+// 쓰면 '참여연구자'에서 '구자' 같은 조각이 나와 엉뚱한 문단이 걸리므로, 낱말은 그대로 두고
+// 두 글자 조각이 얼마나 겹치는지로 판단한다 (초과채용 → 초과·과채·채용 중 둘이 있으면 같은 말).
+const bigramsOf = (text: string): string[] =>
+  Array.from({ length: Math.max(0, text.length - 1) }, (_, index) => text.slice(index, index + 2));
+
+const termMatches = (paragraph: string, term: string): boolean => {
+  if (paragraph.includes(term)) return true;
+  if (term.length < 4) return false;   // 짧은 말은 통째로 맞아야 한다 — 조각으로 풀면 아무 데나 걸린다
+  const grams = bigramsOf(term);
+  return grams.filter((gram) => paragraph.includes(gram)).length / grams.length >= 2 / 3;
+};
+
+// 문단을 찾을 때는 잘게 쪼갠 낱말까지 쓰고, 실제로 색칠할 때는 뜻이 뚜렷한 세 글자 이상만 쓴다
+// (두 글자 낱말까지 칠하면 문단이 온통 노랗게 된다).
+export const articleTerms = (text: string): string[] => termsOf(text, 3);
+
+export const markArticleParagraphs = (articleText: string, phrase: string, minHits = 2): { paragraphs: string[]; marked: Set<number>; terms: string[] } => {
+  const paragraphs = articleText.split('\n');
+  const scoreTerms = termsOf(phrase, 2);
+  const terms = articleTerms(phrase);
+  const hits = paragraphs.map((paragraph) => scoreTerms.filter((term) => termMatches(paragraph, term)).length);
+  // 가장 잘 맞는 문단만 짚는다. 비목별 증빙서류 표처럼 한 조문이 수백 줄이고 '카드매출전표…'가
+  // 반복되는 곳에서는 "N개 이상"으로 자르면 표 절반이 칠해진다.
+  // 최고 점수와 같은 문단만 남기고, 그 최고 점수가 minHits에 못 미치면 아무 데도 짚지 않는다.
+  const best = Math.max(0, ...hits);
+  const threshold = best >= minHits ? best : Infinity;
+  const marked = new Set(hits.flatMap((hit, index) => hit >= threshold ? [index] : []));
+  return { paragraphs, marked, terms };
+};
 
 // 원문 인용(quote)을 길이가 다른 여러 검색어로 쪼갠다. 인용 전체가 문서와 한 글자도 안 틀리는
 // 경우는 드물어서(추출 과정에서 표·머리글이 끼어들거나 줄이 갈린다) 긴 조각부터 짧은 조각까지
@@ -459,24 +537,16 @@ function DocViewerModal({ source }: { source: ReturnType<typeof useSourceDocs> }
 
 type RefLink = (rule: { quote?: string; message?: string; item?: string; source: { doc: string; ref: string; matchLevel: string } }) => React.ReactNode;
 
-// 인정 항목은 비목에 따라 70건이 넘어(연구활동비) 패널을 덮는다 — 처음에는 6건만 보이고 나머지는 펼쳐서 본다.
-const ALLOWED_ITEM_PREVIEW = 6;
-function AllowedItemList({ items, refLink }: { items: PackAllowedItem[]; refLink: RefLink }) {
-  const [expanded, setExpanded] = useState(false);
-  const shown = expanded ? items : items.slice(0, ALLOWED_ITEM_PREVIEW);
-  return <>
-    {shown.map((item, index) => <p key={index} className={`allowed-item ${item.status ? 'conditional' : ''}`}>
-      {item.status ? <AlertCircle /> : <Check />}
-      <span><b>{item.name}</b>{item.status === 'CONDITIONAL' ? <em className="tag">조건부</em> : item.status === 'INSTITUTION_SPECIFIC' ? <em className="tag">기관 한정</em> : null}{item.requiresApproval && <em className="tag warn">사전승인</em>}
-        {item.description ? ` ${item.description}` : ''}
-        {' '}{refLink({ item: item.name, message: item.description ?? item.name, source: item.source })}
-        {/* 규정DB에 항목별 증빙이 있으면 여기서 보여준다 — 예전에는 실려 있어도 화면에 나오지 않았다. */}
-        {item.evidence && <em className="item-evidence"><FileCheck2 /> 증빙 {item.evidence} {item.evidenceSource && refLink({ item: item.name, message: item.evidence, source: item.evidenceSource })}</em>}</span>
-    </p>)}
-    {items.length > ALLOWED_ITEM_PREVIEW && <button type="button" className="text-button more-items" onClick={() => setExpanded(!expanded)}>
-      {expanded ? '접기' : `${items.length - ALLOWED_ITEM_PREVIEW}건 더 보기`}
-    </button>}
-  </>;
+// 계상 가능 세목 — 이름만 나열하면 "그 밖의 비용"처럼 무엇을 담는 세목인지 알 수 없다.
+// 세목이 자기 인정 항목을 갖고 있으면 그것을 설명으로 함께 적는다.
+// 증빙은 여기서 다루지 않는다 — 편성은 얼마를 잡을지 정하는 자리이고, 증빙은 집행 화면에서 챙긴다.
+function SubItemChoiceList({ choices, canAddSub, onAddSub }: { choices: SubItemChoice[]; canAddSub: boolean; onAddSub: (name: string) => void }) {
+  return <div className="sub-choices">{choices.map((choice) => <div className="sub-choice" key={choice.name}>
+    <button type="button" disabled={!canAddSub} onClick={() => onAddSub(choice.name)}><Plus />{choice.name}</button>
+    {choice.items?.length
+      ? <span>{choice.items.join(' · ')}</span>
+      : choice.note ? <span>{choice.note}</span> : null}
+  </div>)}</div>;
 }
 
 // 비목 기준 사이드 패널 — 편성표 행의 "기준" 버튼으로 연다.
@@ -495,6 +565,43 @@ const capHint = (cap: CategoryCap, inKindAmount: number, hasMatching: boolean): 
   return '편성표 밖 기준(구입가 등)이라 금액은 직접 확인하세요';
 };
 
+// 집행 시 유의사항 한 건. "인정 필요"라고만 적혀 있으면 무엇을 인정받아야 하는지 알 수 없어서,
+// 같은 조항의 설명 문구를 함께 싣고 근거 조문 원문은 토글로 펼쳐 보게 한다.
+// 근거 조문 원문을 접어서 보여주고, 그 안에서 이 항목이 가리키는 문단을 짚는다.
+// 유의사항과 증빙이 같은 방식으로 근거를 펼쳐 보게 한다.
+// 근거 번호가 조문 표에 없으면 아무것도 내놓지 않는다. 번호가 비슷한 조문을 대신 붙이면
+// 간접비 증빙에 연구활동비 조문이 달린다 — 엉뚱한 근거는 없는 것만 못하다.
+function ArticleToggle({ pack, refText, phrase, label = '근거 조문 보기' }: { pack: RulePack; refText: string; phrase: string; label?: string }) {
+  const articles = findArticles(pack, refText)?.articles ?? [];
+  const located = articles.map((article) => ({ article, ...markArticleParagraphs(article.text, phrase) }));
+  // 규정DB에 원문이 안 실린 근거가 있다 (팁스 '비목별 증빙서류' 표 등) — 근거 번호만 밝힌다.
+  if (!located.length) return <span className="caution-ref">근거 {refText} <em>원문 미수록</em></span>;
+  const markedCount = located.reduce((total, entry) => total + entry.marked.size, 0);
+  return <details className="caution-article">
+    <summary>{label} <em>{refText}{markedCount ? ' · 해당 문단 표시' : ''}</em></summary>
+    {located.map(({ article, paragraphs, marked, terms }) => <div key={article.key}>
+      <b>{article.ref}{article.title ? ` ${article.title}` : ''}</b>
+      <pre>{paragraphs.map((paragraph, index) => <span key={index} className={marked.has(index) ? 'hit' : undefined}>
+        {marked.has(index) ? renderHighlighted(paragraph, terms) : paragraph}{index < paragraphs.length - 1 ? '\n' : ''}
+      </span>)}</pre>
+    </div>)}
+  </details>;
+}
+
+function CautionCard({ item, pack }: { item: CautionItem; pack: RulePack }) {
+  return <div className={`caution ${item.kind}`}>
+    <div className="caution-head">
+      {item.kind === 'approval' ? <ShieldCheck /> : <AlertCircle />}
+      <div>
+        <strong>{item.title}</strong>
+        {item.status && <em className="tag warn">{item.status}</em>}
+        {item.detail && <p>{item.detail}</p>}
+      </div>
+    </div>
+    <ArticleToggle pack={pack} refText={item.ref} phrase={`${item.title} ${item.detail ?? ''}`} />
+  </div>;
+}
+
 interface StandardPanelProps {
   category: PackCategory;
   reference: PackCategory | null;   // 공고 팩에 기준이 없을 때 이름으로 찾은 공통 규정 비목
@@ -505,6 +612,7 @@ interface StandardPanelProps {
   hasMatching: boolean;   // 민간부담금이 있어 현물 계상이 가능한 과제인지
   choices: SubItemChoices;              // 계상 가능 세목 (이 사업 기준 + 상위 규정 기준)
   baseStandard: ReferenceStandard | null; // 이 사업이 따르는 상위 규정의 같은 비목 기준
+  baseRules: PackRule[];                  // 그 상위 규정 팩의 이 비목 규칙 (주의사항 상속용)
   min: CategoryMin | null;
   rules: PackRule[];
   refLink: RefLink;
@@ -513,7 +621,7 @@ interface StandardPanelProps {
   onClose: () => void;
 }
 
-function StandardPanel({ category, reference, referenceDoc, cap, amount, inKindAmount, hasMatching, choices, baseStandard, min, rules, refLink, onAddSub, canAddSub, onClose }: StandardPanelProps) {
+function StandardPanel({ category, reference, referenceDoc, cap, amount, inKindAmount, hasMatching, choices, baseStandard, baseRules, min, rules, refLink, onAddSub, canAddSub, onClose }: StandardPanelProps) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -528,7 +636,6 @@ function StandardPanel({ category, reference, referenceDoc, cap, amount, inKindA
   const approvals = category.approvals ?? std.approvals ?? [];
   const evidenceRules = category.evidenceRules ?? std.evidenceRules ?? [];
   const applicability = category.applicability ?? std.applicability ?? [];
-  const allowedItems = category.allowedItems ?? std.allowedItems ?? [];
   const cautions = warnings.length + approvals.length + evidenceRules.length;
   return <aside className="standard-panel" role="dialog" aria-label={`${category.name} 기준`}>
     <header>
@@ -564,32 +671,17 @@ function StandardPanel({ category, reference, referenceDoc, cap, amount, inKindA
         <p className="panel-ref">근거 {refLink({ item: category.name, message: limitDetail ?? limitText ?? category.name, source: category.limitSource ?? std.limitSource ?? category.source })}</p>
       </section>
 
+      {/* 세목마다 무엇을 쓸 수 있는지 함께 적는다. 예전에는 이 아래에 "인정 항목"을 따로 나열했는데,
+          비목의 인정 항목은 세목별 항목을 평평하게 합친 것이라(연구활동비 71건) 회의비와
+          "회의장 임차료"가 같은 층에 놓여 읽을 수 없었다. 세목 아래로 접어 넣는다. */}
       {subOptions.length > 0 && <section className="panel-block">
         <h4>계상 가능 세목 <b>{subOptions.length}</b></h4>
-        <div className="panel-chips">{choices.own.map((choice) => <button type="button" key={choice.name} title={choice.note ?? choice.name} disabled={!canAddSub} onClick={() => onAddSub(choice.name)}><Plus />{choice.name}</button>)}</div>
+        <SubItemChoiceList choices={choices.own} canAddSub={canAddSub} onAddSub={onAddSub} />
         {choices.base.length > 0 && <>
           <p className="panel-note sub"><BookOpenCheck /><span>공고가 따로 정하지 않은 항목은 <b>{choices.basePack!.guideline}</b>을 따릅니다.</span></p>
-          <div className="panel-chips">{choices.base.map((choice) => <button type="button" key={choice.name} title={choice.note ?? choice.name} disabled={!canAddSub} onClick={() => onAddSub(choice.name)}><Plus />{choice.name}</button>)}</div>
+          <SubItemChoiceList choices={choices.base} canAddSub={canAddSub} onAddSub={onAddSub} />
         </>}
       </section>}
-
-      {allowedItems.length > 0 && <section className="panel-block">
-        <h4>인정 항목 <b>{allowedItems.length}</b></h4>
-        <AllowedItemList items={allowedItems} refLink={refLink} />
-      </section>}
-
-      {/* 공고에 적힌 인정 항목은 주요 비목뿐이고 나머지는 상위 규정을 따른다 — 그 규정의 인정 항목도 함께 본다. */}
-      {(() => {
-        if (!baseStandard) return null;
-        const own = new Set(allowedItems.map((item) => item.name.replace(/\s/g, '')));
-        const items = (baseStandard.category.allowedItems ?? []).filter((item) => !own.has(item.name.replace(/\s/g, '')));
-        if (!items.length) return null;
-        return <section className="panel-block">
-          <h4>{baseStandard.pack.guideline} 인정 항목 <b>{items.length}</b></h4>
-          <p className="panel-note sub"><BookOpenCheck /><span>이 사업 공고·지침이 따로 정하지 않은 부분은 이 기준을 따릅니다.</span></p>
-          <AllowedItemList items={items} refLink={refLink} />
-        </section>;
-      })()}
 
       {cautions > 0 && <section className="panel-block caution">
         <h4>주의 · 절차 <b>{cautions}</b></h4>
@@ -598,12 +690,38 @@ function StandardPanel({ category, reference, referenceDoc, cap, amount, inKindA
         {warnings.map((rule) => <p key={rule.id} className="allowed-item conditional"><AlertCircle /><span>{rule.message} {refLink(rule)}</span></p>)}
       </section>}
 
-      {applicability.length > 0 && <section className="panel-block">
-        <h4>기관 적용 조건</h4>
-        {applicability.map((rule, index) => <p key={`ap${index}`} className={`allowed-item ${rule.applies ? '' : 'other-scope'}`}>
-          <Building2 /><span><b>{rule.scopeKo}</b>{rule.applies ? '' : ' (이 과제 유형은 해당 없음)'} {rule.condition} — <b>{rule.result}</b> {refLink({ item: category.name, message: rule.condition, source: rule.source })}</span>
-        </p>)}
-      </section>}
+      {/* 공고·지침은 자기가 따로 정한 것만 담는다 — 디딤돌처럼 주의·절차를 아예 안 적은 팩은
+          이 블록이 통째로 비어 버린다. 인정 항목과 똑같이 상위 규정에서 마저 가져와 출처를 밝혀 보여준다. */}
+      {(() => {
+        if (!baseStandard) return null;
+        const ownNames = new Set([...approvals.map((item) => item.name), ...evidenceRules.map((item) => item.name)]);
+        const ownMessages = new Set(warnings.map((rule) => rule.message));
+        const baseApprovals = (baseStandard.category.approvals ?? []).filter((item) => !ownNames.has(item.name));
+        const baseEvidence = (baseStandard.category.evidenceRules ?? []).filter((item) => !ownNames.has(item.name));
+        const baseWarnings = baseRules.filter((rule) => rule.kind === 'warning' && !ownMessages.has(rule.message));
+        const total = baseApprovals.length + baseEvidence.length + baseWarnings.length;
+        if (!total) return null;
+        return <section className="panel-block caution">
+          <h4>{baseStandard.pack.guideline} 주의 · 절차 <b>{total}</b></h4>
+          <p className="panel-note sub"><BookOpenCheck /><span>이 사업 공고·지침이 따로 정하지 않은 부분은 이 기준을 따릅니다.</span></p>
+          {baseApprovals.map((item, index) => <p key={`bav${index}`} className="allowed-item conditional"><ShieldCheck /><span><b>{item.name}</b><em className="tag warn">{item.status}</em> {refLink({ item: category.name, message: item.name, source: item.source })}</span></p>)}
+          {baseEvidence.map((item, index) => <p key={`bev${index}`} className="allowed-item"><FileCheck2 /><span><b>{item.name}</b> {item.documents.join(' · ')} {refLink({ item: category.name, message: item.name, source: item.source })}</span></p>)}
+          {baseWarnings.map((rule) => <p key={`bw${rule.id}`} className="allowed-item conditional"><AlertCircle /><span>{rule.message} {refLink(rule)}</span></p>)}
+        </section>;
+      })()}
+
+      {(() => {
+        // 기관 적용 조건도 마찬가지 — 이 사업이 안 적었으면 상위 규정 것을 쓴다.
+        const inherited = !applicability.length && !!baseStandard?.category.applicability?.length;
+        const shown = inherited ? baseStandard!.category.applicability! : applicability;
+        if (!shown.length) return null;
+        return <section className="panel-block">
+          <h4>기관 적용 조건{inherited ? ` — ${baseStandard!.pack.guideline}` : ''}</h4>
+          {shown.map((rule, index) => <p key={`ap${index}`} className={`allowed-item ${rule.applies ? '' : 'other-scope'}`}>
+            <Building2 /><span><b>{rule.scopeKo}</b>{rule.applies ? '' : ' (이 과제 유형은 해당 없음)'} {rule.condition} — <b>{rule.result}</b> {refLink({ item: category.name, message: rule.condition, source: rule.source })}</span>
+          </p>)}
+        </section>;
+      })()}
     </div>
   </aside>;
 }
@@ -1206,6 +1324,7 @@ function Budget({ project, update, setScreen }: { project: Project; update: (p: 
       const category = cats.find((c) => c.id === standardId);
       if (!category) return null;
       const reference = referenceByCategory.get(category.id) ?? null;
+      const base = baseStandardFor(pack, category.id);
       return <StandardPanel
         category={category}
         reference={reference?.category ?? null}
@@ -1215,7 +1334,8 @@ function Budget({ project, update, setScreen }: { project: Project; update: (p: 
         inKindAmount={(() => { const item = project.budgets.find((b) => b.categoryId === category.id); return Math.min(item?.inKindAmount ?? 0, item?.amount ?? 0); })()}
         hasMatching={funding.matching > 0}
         choices={subItemChoicesFor(pack, category.id)}
-        baseStandard={baseStandardFor(pack, category.id)}
+        baseStandard={base}
+        baseRules={base ? rulesFor(base.pack, base.category.id) : []}
         min={minFor(pack, category.id)}
         rules={rulesFor(pack, category.id)}
         refLink={refLink}
@@ -1240,16 +1360,82 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
   const pack = packFor(project);
   const cats = visibleCategories(pack, project);
   const defaultCategoryId = cats[0]?.id ?? pack.categories[0]?.id ?? '';
-  const emptyExpenseForm = () => ({ date: today(), categoryId: defaultCategoryId, payment: 'card' as PaymentMethod, supply: '', vat: '', purpose: '', vendor: '' });
-  const [showForm, setShowForm] = useState(project.expenses.length === 0);
+  const emptyExpenseForm = () => ({ date: today(), categoryId: defaultCategoryId, subItemId: '', payment: 'card' as PaymentMethod, supply: '', vat: '', purpose: '', vendor: '', details: {} as Record<string, string> });
+  // 등록 폼은 집행 현황 표 바로 아래에 늘 펼쳐 둔다 — 따로 여는 버튼이 없다.
   const [form, setForm] = useState(emptyExpenseForm());
   const [receipt, setReceipt] = useState<File | null>(null);
   const [ocr, setOcr] = useState<{ status: 'idle' | 'working' | 'done' | 'error'; message?: string; text?: string }>({ status: 'idle' });
   const [editingId, setEditingId] = useState<string | null>(null);
-  // 규정 증빙 중 이 집행건에 해당한다고 고른 것 — 등록할 때 체크리스트에 함께 넣는다.
+  // 규정 증빙 중 이 집행건에는 해당하지 않아 꺼둔 것 (체크리스트는 모두 켠 채로 시작한다).
   const [extraDocs, setExtraDocs] = useState<Set<string>>(new Set());
+  // 규정에 없지만 실무에서 요구받는 서류 — 사용자가 직접 넣은 것.
+  const [customDocs, setCustomDocs] = useState<string[]>([]);
+  const [newDoc, setNewDoc] = useState('');
+  // ---- 예산 집행 현황 (비목·세목 × 월) ----
+  // 월 열은 숨길 수 있고, 다 숨겨도 예산·집행·잔액 열은 남는다.
+  const allMonths = monthSequence(project.startDate, project.endDate);
+  const [hiddenMonths, setHiddenMonths] = useState<Set<string>>(new Set());
+  const [monthsHidden, setMonthsHidden] = useState(false);
+  const shownMonths = monthsHidden ? [] : allMonths.filter((month) => !hiddenMonths.has(month));
+  const matrix = spendingMatrix(pack, project, shownMonths);
+  const toggleMonth = (month: string) => setHiddenMonths((prev) => { const next = new Set(prev); if (next.has(month)) next.delete(month); else next.add(month); return next; });
+  const editPlan = (categoryId: string, subItemId: string | undefined, month: string, raw: string) =>
+    update(setMonthlyPlan(project, { categoryId, subItemId }, month, Number(digitsOnly(raw)) || 0));
+  const [openRows, setOpenRows] = useState<Set<string>>(new Set());
+  const toggleRow = (id: string) => setOpenRows((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  // 대시보드에서 비목을 누르면 등록 폼을 그 비목으로 맞춘다. 수정 중일 때는 비목을 바꿀 수 없으므로 건드리지 않는다.
+  const pickCategory = (categoryId: string, subItemId?: string) => {
+    if (editingId) return;   // 수정 중에는 비목을 바꿀 수 없다
+    if (subItemId) { setForm((prev) => ({ ...prev, categoryId, subItemId, details: {} })); setExtraDocs(new Set()); setCustomDocs([]); }
+    else pickCategoryId(categoryId);
+
+  };
+  // 비목 행과 펼친 세목 행을 한 줄짜리 목록으로 편다 — 표를 그릴 때 조각(Fragment) 없이 쓰기 위해서다.
+  const matrixRows = matrix.rows.flatMap((row) => [
+    { key: row.categoryId, row, sub: undefined },
+    ...(openRows.has(row.categoryId) ? row.subRows.map((sub) => ({ key: `${row.categoryId}:${sub.subItemId ?? 'none'}`, row, sub })) : []),
+  ]);
   const selectedCategory = categoryOf(pack, form.categoryId);
-  const categoryWarnings = rulesFor(pack, form.categoryId, 'warning');
+  // 유의사항은 세목까지 골랐으면 그 세목 것만 (subStandard는 아래에서 정해진다).
+  // ---- 비목 → 세목 (편성 화면에서 나눠둔 것만 고르게 한다) ----
+  const subItems = project.budgets.find((b) => b.categoryId === form.categoryId)?.subItems ?? [];
+  const selectedSub = subItems.find((sub) => sub.id === form.subItemId);
+  const subRequired = subItems.length > 0;   // 세목을 나눈 비목만 세목을 요구한다 (안 나눴으면 칸 자체를 숨긴다)
+  // 세목이 있으면 그 세목의 규정 기준(회의비·출장비의 증빙 규칙)을 쓰고, 없으면 비목 기준을 쓴다.
+  const subStandard = selectedSub ? subItemStandardFor(pack, selectedSub.name) : null;
+  const subGuide = subStandard ? evidenceGuide(subStandard.pack, subStandard.category, form.payment) : null;
+  // 세목 기준을 쓸지 판단할 때 '모든 비목 공통' 규칙은 세지 않는다 — 그것만 갖고 있는 세목(팁스
+  // 인건비 세목)은 사실상 비어 있는 것이라, 비목 기준으로 내려가야 증빙과 근거 조문이 나온다.
+  const commonRuleNames = commonEvidenceRuleNames(subStandard?.pack ?? pack);
+  const subHasOwn = !!subGuide && (subGuide.items.length > 0 || !!subGuide.base
+    || subGuide.rules.some((rule) => !commonRuleNames.has(rule.name)));
+  const guide = subHasOwn ? subGuide! : evidenceGuide(pack, selectedCategory, form.payment);
+  // 주의사항은 상위 규정 것까지 이어받는다 — 공고는 자기가 따로 정한 것만 담기 때문이다.
+  const cautions = spendingCautions(pack, form.categoryId, selectedSub?.name, subStandard?.category);
+  const primary = primaryEvidence(guide);
+  // 규정이 요구하는 증빙을 서류 단위로 쪼개 체크리스트로 만든다. 모두 켠 채로 시작하고
+  // 해당 없는 조건(국내/국외 출장 등)만 사용자가 끈다 — extraDocs는 '끈 것' 목록이다.
+  const docList = evidenceChecklistFor(pack, form.categoryId, selectedSub?.name, subStandard?.category, primary.rules, subStandard?.pack ?? pack);
+  const toggleDoc = (doc: string) => setExtraDocs((prev) => { const next = new Set(prev); if (next.has(doc)) next.delete(doc); else next.add(doc); return next; });
+  const baseDocs = docList.documents.length ? docList.documents : withAlwaysRequired(primary.template);
+  const checklist = [...baseDocs, ...customDocs].filter((doc) => !extraDocs.has(doc));
+  const addCustomDoc = () => {
+    const name = newDoc.trim();
+    if (!name || checklist.includes(name)) { setNewDoc(''); return; }
+    setCustomDocs((prev) => [...prev, name]);
+    setNewDoc('');
+  };
+  // 체크리스트를 실제로 만든 근거를 그대로 토글로 쓴다. primary.items를 따로 보면 세목 기준이
+  // 비목으로 fallback되거나 evidenceRules에서 서류가 온 경우 체크리스트만 나오고 원문이 빠진다.
+  const evidenceArticles = docList.sources;
+  // 세목별 추가 입력은 규정 기준으로 해석한 이름(회의비·출장비)으로 찾는다 — '회의 식비'로 편성돼도 회의비 서식을 쓴다.
+  const detailFields = detailFieldsFor(subStandard?.category.name ?? selectedSub?.name);
+  const setDetail = (key: string, value: string) => setForm((prev) => ({ ...prev, details: { ...prev.details, [key]: value } }));
+  // 수정 중인 집행건은 세목 잔액 계산에서도 제외한다.
+  const subSpent = selectedSub ? project.expenses.filter((e) => e.categoryId === form.categoryId && e.subItemId === selectedSub.id && e.id !== editingId).reduce((total, e) => total + e.amount, 0) : 0;
+  // 비목을 바꾸면 세목·고른 증빙·세목별 입력이 모두 안 맞으므로 함께 비운다.
+  const pickCategoryId = (categoryId: string) => { setForm((prev) => ({ ...prev, categoryId, subItemId: '', details: {} })); setExtraDocs(new Set()); setCustomDocs([]); };
+  const pickSubItem = (subItemId: string) => { setForm((prev) => ({ ...prev, subItemId, details: {} })); setExtraDocs(new Set()); setCustomDocs([]); };
   const budget = project.budgets.find((b) => b.categoryId === form.categoryId)?.amount ?? 0;
   // 수정 중인 집행건은 잔액 계산에서 제외해 이중 집계를 막는다.
   const spent = project.expenses.filter((e) => e.categoryId === form.categoryId && e.id !== editingId).reduce((s, e) => s + e.amount, 0);
@@ -1285,14 +1471,16 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
       setOcr({ status: 'error', message: `OCR 인식에 실패했습니다${detail}. 첫 실행은 인식 엔진 내려받기에 시간이 걸릴 수 있어요. 잠시 후 다시 시도하거나 값을 직접 입력해주세요.` });
     }
   };
-  const resetForm = () => { setForm(emptyExpenseForm()); setReceipt(null); setOcr({ status: 'idle' }); setEditingId(null); setExtraDocs(new Set()); };
-  const closeForm = () => { resetForm(); setShowForm(false); };
+  const resetForm = () => { setForm(emptyExpenseForm()); setReceipt(null); setOcr({ status: 'idle' }); setEditingId(null); setExtraDocs(new Set()); setCustomDocs([]); setNewDoc(''); };
+  const closeForm = () => resetForm();
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (isOver && !window.confirm(`잔액보다 ${formatWon(amount - (budget - spent))} 초과합니다. 그래도 등록할까요?`)) return;
     const editing = editingId ? project.expenses.find((e) => e.id === editingId) : undefined;
     // 수정 시에는 기존 증빙 체크리스트(업로드 파일 포함)를 유지하고, 신규 등록 시에만 새로 만든다.
-    const docs = [...documentsFor(selectedCategory, form.payment), ...extraDocs];
+    // 화면에서 고른 기준 하나만 체크리스트에 넣는다 — 규정이 증빙을 정했으면 앱 기본 예시는 쓰지 않는다.
+    // 품의서·지출결의서는 어느 기준이든 항상 들어간다.
+    const docs = checklist;
     let evidence: Evidence[] = editing ? editing.evidence : docs.map((label) => ({ id: uid(), label, completed: false }));
     // 먼저 올린 영수증은 증빙 체크리스트의 영수증 항목에 자동 첨부한다.
     if (receipt) {
@@ -1304,15 +1492,15 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
         } catch { alert('영수증 파일 저장에 실패했습니다. 증빙 칸에서 다시 업로드해주세요.'); }
       }
     }
-    const base = { date: form.date, categoryId: form.categoryId, amount, supplyAmount: amount || undefined, vatAmount: Number(form.vat) || undefined, paymentMethod: form.payment, purpose: form.purpose, vendor: form.vendor, evidence };
+    const base = { date: form.date, categoryId: form.categoryId, subItemId: form.subItemId || undefined, subItemName: selectedSub?.name, amount, supplyAmount: amount || undefined, vatAmount: Number(form.vat) || undefined, paymentMethod: form.payment, purpose: form.purpose, vendor: form.vendor, details: Object.keys(form.details).length ? form.details : undefined, evidence };
     update(editing
       ? { ...project, expenses: project.expenses.map((e) => e.id === editing.id ? { ...editing, ...base } : e) }
       : { ...project, expenses: [{ id: uid(), createdAt: new Date().toISOString(), ...base }, ...project.expenses] });
     closeForm();
   };
   const startEdit = (expense: Expense) => {
-    setForm({ date: expense.date, categoryId: expense.categoryId, payment: expense.paymentMethod ?? 'card', supply: String(expense.supplyAmount ?? expense.amount), vat: expense.vatAmount ? String(expense.vatAmount) : '', purpose: expense.purpose, vendor: expense.vendor });
-    setReceipt(null); setOcr({ status: 'idle' }); setEditingId(expense.id); setShowForm(true);
+    setForm({ date: expense.date, categoryId: expense.categoryId, subItemId: expense.subItemId ?? '', payment: expense.paymentMethod ?? 'card', supply: String(expense.supplyAmount ?? expense.amount), vat: expense.vatAmount ? String(expense.vatAmount) : '', purpose: expense.purpose, vendor: expense.vendor, details: expense.details ?? {} });
+    setReceipt(null); setOcr({ status: 'idle' }); setEditingId(expense.id);
   };
   const removeExpense = async (expense: Expense) => {
     if (!window.confirm(`"${expense.purpose}" 집행건을 삭제할까요? 업로드한 증빙 파일도 함께 삭제됩니다.`)) return;
@@ -1333,45 +1521,163 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
     const file = await getEvidence(evidenceId); if (!file) { alert('저장된 파일을 찾지 못했습니다.'); return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = fileName || file.name; a.click(); URL.revokeObjectURL(a.href);
   };
-  return <div className="page-content"><div className="page-title"><div><span className="eyebrow">모듈 2</span><h2>집행 · 증빙 관리</h2><p>집행을 등록하면 잔액과 필요한 증빙을 바로 연결합니다.</p></div><button className="primary" onClick={() => showForm ? closeForm() : setShowForm(true)}><Plus /> 집행건 등록</button></div>
-    {showForm && <form className="panel expense-form" onSubmit={submit}><div className="form-title"><div><h3>{editingId ? '집행건 수정' : '새 집행건'}</h3><p>{editingId ? '비목과 결제수단은 수정할 수 없어요. 바뀌었다면 삭제 후 다시 등록해주세요.' : '비목과 결제수단을 선택하면 필요한 서류가 자동으로 바뀝니다.'}</p></div><button type="button" className="close" onClick={closeForm}>×</button></div>
-      <div className="ocr-strip"><div><ScanLine /><div><strong>영수증 먼저 업로드 — OCR 자동 입력</strong><span>집행일자 · 거래처명 · 공급가액 · 부가세액을 읽어 아래 칸을 자동으로 채워드려요.</span></div></div><label className="upload-button"><Upload /> {ocr.status === 'working' ? '인식 중…' : receipt ? '다시 업로드' : '영수증 업로드'}<input type="file" accept="image/*" disabled={ocr.status === 'working'} onChange={(e) => { onReceipt(e.target.files?.[0]); e.target.value = ''; }} /></label></div>
-      {ocr.status === 'done' && <p className="ocr-note ok"><CheckCircle2 /> {ocr.message}</p>}
-      {ocr.status === 'error' && <p className="ocr-note bad"><AlertCircle /> {ocr.message}</p>}
-      {ocr.text && <details className="ocr-raw"><summary>OCR 인식 원문 보기</summary><pre>{ocr.text}</pre></details>}
-      <div className="field-grid three"><label>집행일<input required type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label><label>비목<select value={form.categoryId} disabled={!!editingId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>결제수단<select value={form.payment} disabled={!!editingId} onChange={(e) => setForm({ ...form, payment: e.target.value as PaymentMethod })}><option value="card">카드 결제</option><option value="transfer">계좌이체 (세금계산서)</option></select></label></div><div className="field-grid three"><label><span className="label-line">공급가액 <b>집계 기준</b></span><input required inputMode="numeric" value={withCommas(form.supply)} onChange={(e) => setMoney('supply', e.target.value)} placeholder="0" /></label><label><span className="label-line">부가세액 <b>선택</b></span><input inputMode="numeric" value={withCommas(form.vat)} onChange={(e) => setMoney('vat', e.target.value)} placeholder="0" /></label><label><span className="label-line">합계 금액 <b>자동</b></span><input readOnly tabIndex={-1} value={withCommas(String(totalWithVat))} placeholder="0" /></label></div><p className="field-hint">과제비 집계는 <strong>공급가액 기준(부가세 제외)</strong>입니다. 합계 금액은 공급가액+부가세액으로 자동 계산되며, 영수증의 결제금액과 맞는지 확인하는 참고용입니다.</p><div className="field-grid"><label>용도<input required value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} placeholder="예: 외부 전문가 참석 정기 회의" /></label><label>거래처<input required value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} placeholder="거래처명" /></label></div>
-      {categoryWarnings.length > 0 && <div className="rule-warnings">{categoryWarnings.map((rule) => <p key={rule.id}><AlertCircle /> {rule.message} <em>({rule.source.ref})</em></p>)}</div>}
-      <div className={`balance-preview ${isOver ? 'over' : ''}`}><WalletCards /><div><span>{selectedCategory.name} 등록 후 잔액</span><strong>{formatWon(budget - spent - amount)}</strong></div>{isOver && <p><AlertCircle /> 잔액을 초과합니다. 확인 후 등록할 수 있어요.</p>}</div>
-      {(() => {
-        const guide = evidenceGuide(pack, selectedCategory, form.payment);
-        const toggleDoc = (doc: string) => setExtraDocs((prev) => { const next = new Set(prev); if (next.has(doc)) next.delete(doc); else next.add(doc); return next; });
-        return <>
-          <div className="auto-docs"><strong><FileCheck2 /> 자동 안내 증빙 <em>앱 기본 예시</em></strong><div>{guide.template.map((doc) => <span key={doc}><Check />{doc}</span>)}{[...extraDocs].map((doc) => <span key={doc} className="added"><Check />{doc}</span>)}</div></div>
-          {/* 규정DB에서 온 증빙. 조건이 갈리는 것이 있어(10만원 초과/이하) 자동으로 넣지 않고 골라 담게 한다.
-              공고가 정하지 않은 부분은 상위 규정을 따르므로, 그쪽 증빙도 출처를 밝혀 함께 보여준다. */}
-          {[
-            { set: { rules: guide.rules, items: guide.items }, guideline: guide.guideline, inherited: false },
-            ...(guide.base ? [{ set: guide.base, guideline: guide.base.guideline, inherited: true }] : []),
-          ].filter((group) => group.set.rules.length > 0).map((group) => <div className="reg-docs" key={group.guideline}>
-            <strong><BookOpenCheck /> {group.inherited ? '상위 규정이 요구하는 증빙' : '규정이 요구하는 증빙'} <em>{group.guideline}</em></strong>
-            {group.inherited && <small>이 사업 공고·지침이 따로 정하지 않은 부분은 이 기준을 따릅니다.</small>}
-            {group.set.rules.map((rule) => <div className="reg-doc-rule" key={rule.name}>
-              <span>{rule.name} <em>({rule.source.ref})</em></span>
-              <div className="doc-chips">{rule.documents.map((doc) => <button type="button" key={doc} className={extraDocs.has(doc) ? 'on' : ''} onClick={() => toggleDoc(doc)}>
-                {extraDocs.has(doc) ? <Check /> : <Plus />}{doc}
-              </button>)}</div>
-            </div>)}
-            <small>해당하는 조건의 증빙을 눌러 이 집행건의 체크리스트에 넣으세요.</small>
-          </div>)}
-          {(() => {
-            const items = [...guide.items, ...(guide.base?.items ?? [])];
-            if (!items.length) return null;
-            return <details className="item-docs"><summary>{selectedCategory.name} 세부 항목별 증빙 {items.length}건</summary>
-              {items.map((item) => <p key={item.name}><b>{item.name}</b> {item.evidence}</p>)}
-            </details>;
-          })()}
-        </>;
-      })()}<div className="form-actions"><button type="button" className="secondary" onClick={closeForm}>취소</button><button className="primary" type="submit">{editingId ? '수정 저장' : isOver ? '확인 후 등록' : '집행 등록'}</button></div></form>}
+  return <div className="page-content"><div className="page-title"><div><span className="eyebrow">모듈 2</span><h2>집행 · 증빙 관리</h2><p>집행을 등록하면 잔액과 필요한 증빙을 바로 연결합니다.</p></div></div>
+    <section className="panel spend-dashboard">
+      <div className="panel-head">
+        <div><h3><WalletCards /> 예산 집행 현황</h3><p>편성에서 확정한 예산 기준입니다. 비목을 누르면 아래 등록 폼이 그 비목으로 맞춰집니다.</p></div>
+        {allMonths.length > 0 && <button type="button" className="secondary" onClick={() => setMonthsHidden(!monthsHidden)}>{monthsHidden ? '월별 보기' : '월별 숨기기'}</button>}
+      </div>
+      {!monthsHidden && allMonths.length > 0 && <div className="month-picker">
+        <span>월 표시</span>
+        <em className="period">사업기간 {project.startDate} ~ {project.endDate} · {allMonths.length}개월</em>
+        <div className="month-checks">{allMonths.map((month) => <label key={month}><input type="checkbox" checked={!hiddenMonths.has(month)} onChange={() => toggleMonth(month)} />{month.slice(2)}</label>)}</div>
+        <button type="button" className="text-button" onClick={() => setHiddenMonths(new Set())}>전체</button>
+        <button type="button" className="text-button" onClick={() => setHiddenMonths(new Set(allMonths))}>해제</button>
+      </div>}
+      {/* 월 열이 하나뿐이거나 아예 없으면 계산이 아니라 과제 정보가 잘못된 것이다 — 어디를 고쳐야 하는지 알려준다. */}
+      {allMonths.length <= 1 && <p className="month-gap">{allMonths.length === 0
+        ? `사업기간이 설정되어 있지 않아 월별 계획을 만들 수 없습니다 (시작일 "${project.startDate || '없음'}" · 종료일 "${project.endDate || '없음'}").`
+        : `사업기간이 ${project.startDate} ~ ${project.endDate}, 1개월로 잡혀 있어 월이 하나만 나옵니다.`} 설정 → 과제 정보에서 시작일·종료일을 확인해주세요.</p>}
+      <div className="matrix-scroll">
+        <table className="spend-matrix">
+          <thead>
+            <tr>
+              <th rowSpan={2} className="col-name">비목 · 세목</th>
+              <th rowSpan={2}>예산</th><th rowSpan={2}>집행금액</th><th rowSpan={2}>잔액</th><th rowSpan={2}>소진율</th>
+              {shownMonths.map((month) => <th key={month} colSpan={2} className="month-group">{month}</th>)}
+            </tr>
+            <tr>{shownMonths.flatMap((month) => [
+              <th key={`${month}-p`} className="cell-plan">계획</th>,
+              <th key={`${month}-a`}>집행</th>,
+            ])}</tr>
+          </thead>
+          <tbody>
+            {matrixRows.map(({ key, row, sub }) => {
+              const line = sub ?? row;
+              const editable = sub ? sub.planEditable : row.planEditable;
+              return <tr key={key} className={`${sub ? 'sub' : 'cat'} ${!sub && row.over ? 'over' : ''} ${!sub && form.categoryId === row.categoryId ? 'on' : ''}`}>
+                <td className="col-name">{sub
+                  ? (sub.subItemId && !sub.orphan
+                    ? <button type="button" className="text-button" onClick={() => pickCategory(row.categoryId, sub.subItemId)}>└ {sub.name}</button>
+                    : <span>└ {sub.name}{sub.orphan ? ' (편성에서 삭제됨)' : ''}</span>)
+                  : <><button type="button" className="text-button" onClick={() => pickCategory(row.categoryId)}>{row.name}</button>
+                    {row.subRows.length > 0 && <button type="button" className="text-button sub-toggle" onClick={() => toggleRow(row.categoryId)}>세목 {row.subRows.length}개 {openRows.has(row.categoryId) ? '접기' : '보기'}</button>}</>}
+                </td>
+                <td>{sub && !sub.budget ? '—' : formatWon(line.budget)}</td>
+                <td>{formatWon(line.spent)}</td>
+                <td className={line.remaining < 0 ? 'bad' : ''}>{sub && !sub.budget ? '—' : formatWon(line.remaining)}</td>
+                <td>{sub ? '' : <span className="spend-rate"><span className="track"><i style={{ width: `${Math.min(100, row.rate)}%` }} /></span>{Math.round(row.rate)}%</span>}</td>
+                {line.cells.flatMap((cell) => [
+                  <td key={`${cell.month}-p`} className="cell-plan">{editable
+                    ? <input aria-label={`${line.name} ${cell.month} 계획`} inputMode="numeric" value={withCommas(String(cell.plan))} onChange={(e) => editPlan(row.categoryId, sub?.subItemId, cell.month, e.target.value)} />
+                    : cell.plan ? formatWon(cell.plan) : '—'}</td>,
+                  // 계획보다 많이 쓴 달은 눈에 띄어야 한다.
+                  <td key={`${cell.month}-a`} className={cell.actual > cell.plan ? 'bad' : ''}>{cell.actual ? formatWon(cell.actual) : '—'}</td>,
+                ])}
+              </tr>;
+            })}
+            {matrix.outOfRange && <tr className="outside">
+              <td className="col-name">기간 외 집행 <em>{matrix.outOfRange.count}건</em></td>
+              <td>—</td><td className="bad">{formatWon(matrix.outOfRange.actual)}</td><td>—</td><td />
+              {shownMonths.flatMap((month) => [<td key={`${month}-p`} className="cell-plan">—</td>, <td key={`${month}-a`}>—</td>])}
+            </tr>}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td className="col-name"><strong>합계</strong></td>
+              <td>{formatWon(matrix.totals.budget)}</td>
+              <td>{formatWon(matrix.totals.spent)}</td>
+              <td className={matrix.totals.remaining < 0 ? 'bad' : ''}>{formatWon(matrix.totals.remaining)}</td>
+              <td><span className="spend-rate"><span className="track"><i style={{ width: `${Math.min(100, matrix.totals.rate)}%` }} /></span>{Math.round(matrix.totals.rate)}%</span></td>
+              {matrix.totals.cells.flatMap((cell) => [
+                <td key={`${cell.month}-p`} className="cell-plan">{formatWon(cell.plan)}</td>,
+                <td key={`${cell.month}-a`} className={cell.actual > cell.plan ? 'bad' : ''}>{formatWon(cell.actual)}</td>,
+              ])}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      {matrix.outOfRange && <p className="month-gap">사업기간 밖 집행이 {matrix.outOfRange.count}건 있습니다. 정산에서 문제가 될 수 있으니 집행일을 확인해주세요.</p>}
+    </section>
+    <form className="panel expense-form" onSubmit={submit}><div className="form-title"><div><h3>{editingId ? '집행건 수정' : '새 집행건'}</h3><p>{editingId ? '비목·세목과 결제수단은 수정할 수 없어요. 바뀌었다면 삭제 후 다시 등록해주세요.' : '비목과 세목을 고르면 그 규정이 요구하는 서류가 자동으로 바뀝니다.'}</p></div>{editingId && <button type="button" className="close" onClick={closeForm} aria-label="수정 취소">×</button>}</div>
+      {/* ① 무엇을 집행하는지부터 고른다. 비목·세목이 정해져야 어떤 규정을 따르는지 알 수 있다. */}
+      <fieldset className="step-block"><legend>① 무엇을 집행하나요?</legend>
+        <div className="field-grid"><label>비목<select value={form.categoryId} disabled={!!editingId} onChange={(e) => pickCategoryId(e.target.value)}>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+          {/* 편성 화면에서 나눠둔 세목만 올린다. 안 나눈 비목은 이 칸 자체가 나오지 않는다. */}
+          {subRequired && <label>세목<select required value={form.subItemId} disabled={!!editingId} onChange={(e) => pickSubItem(e.target.value)}><option value="">세목을 선택하세요</option>{subItems.map((sub) => <option key={sub.id} value={sub.id}>{sub.name}</option>)}</select></label>}</div>
+        {subRequired && !form.subItemId && !editingId && <p className="field-error"><AlertCircle /> 세목을 선택해야 집행을 등록할 수 있습니다. 비목마다 요구하는 증빙이 다릅니다.</p>}
+      </fieldset>
+
+      {/* ② 고른 비목·세목의 규정을 먼저 읽고 나서 금액을 적게 한다. */}
+      <fieldset className="step-block"><legend>② {selectedSub?.name ?? selectedCategory.name} 집행 시 유의사항</legend>
+        {/* 사전승인은 집행하고 나서 알면 되돌릴 수 없다 — 승인이 먼저 오도록 정렬해서 낸다. */}
+        {cautions.items.length > 0 && <div className="caution-list">{cautions.items.map((item) => <CautionCard key={item.key} item={item} pack={pack} />)}</div>}
+        {/* 공고가 따로 정하지 않은 부분은 상위 규정을 따른다 — 출처를 밝혀 함께 보여준다. */}
+        {cautions.inherited.length > 0 && <details className="inherited-cautions" open={!cautions.items.length}>
+          <summary>상위 규정도 지켜야 합니다 — {cautions.inheritedGuideline} <b>{cautions.inherited.length}건</b></summary>
+          <div className="caution-list">{cautions.inherited.map((item) => <CautionCard key={item.key} item={item} pack={pack} />)}</div>
+        </details>}
+        {selectedSub && subStandard?.category.limitText && <p className="field-hint"><strong>{selectedSub.name} 기준</strong> — {subStandard.category.limitText}{subStandard.category.limitSource?.ref ? ` (${subStandard.category.limitSource.ref})` : ''}</p>}
+        {/* 조건별 증빙과 항목별 증빙은 서로 다른 기준이 아니라 같은 기준(고른 세목)에서 나온 두 가지다.
+            제목을 따로 세우면 경쟁하는 출처처럼 보여서, 한 덩어리로 묶고 그 안에서 나눈다. */}
+        {/* 규정이 요구하는 증빙을 서류 단위로 쪼개 조건별로 묶은 체크리스트.
+            규정이 말하는 것은 모두 켠 채로 시작하고, 해당 없는 조건만 끈다. */}
+        <div className="doc-checklist">
+          <strong><FileCheck2 /> 이 집행건에 들어갈 증빙 <em>{docList.sourceName} 기준 · {checklist.length}건</em></strong>
+          {docList.groups.length > 0
+            ? docList.groups.map((group) => <div className="doc-group" key={group.condition ?? '공통'}>
+              <span className="doc-group-label">{group.condition ?? '공통'}{group.ref && <em>({group.ref})</em>}</span>
+              <div className="doc-boxes">{group.documents.map((doc) => <label key={doc} className={extraDocs.has(doc) ? 'off' : ''}>
+                <input type="checkbox" checked={!extraDocs.has(doc)} onChange={() => toggleDoc(doc)} />{doc}
+              </label>)}</div>
+            </div>)
+            : <div className="doc-boxes">{baseDocs.map((doc) => <label key={doc} className={extraDocs.has(doc) ? 'off' : ''}>
+              <input type="checkbox" checked={!extraDocs.has(doc)} onChange={() => toggleDoc(doc)} />{doc}
+            </label>)}</div>}
+          {customDocs.length > 0 && <div className="doc-group">
+            <span className="doc-group-label">직접 추가<em>규정에는 없는 서류</em></span>
+            <div className="doc-boxes">{customDocs.map((doc) => <label key={doc} className={extraDocs.has(doc) ? 'off' : ''}>
+              <input type="checkbox" checked={!extraDocs.has(doc)} onChange={() => toggleDoc(doc)} />{doc}
+              <button type="button" aria-label={`${doc} 삭제`} onClick={() => setCustomDocs((prev) => prev.filter((entry) => entry !== doc))}>×</button>
+            </label>)}</div>
+          </div>}
+          {/* 규정DB에 그 세목 증빙이 없으면 왜 짧은지 알려준다 — 빈 화면으로 두면 누락으로 오해한다. */}
+          <small>{docList.groups.every((group) => group.condition === '항상 필요')
+            ? `${docList.sourceName}은 규정에 증빙이 따로 적혀 있지 않습니다. 필요한 서류를 아래에서 직접 추가하세요.`
+            : '해당하지 않는 조건은 체크를 풀어주세요. 켜둔 서류가 이 집행건의 증빙 목록이 됩니다.'}</small>
+          {/* 유의사항과 같은 방식으로 근거 조문 원문을 펼쳐 본다. 같은 조문을 가리키는 항목이
+              여러 개라(인건비 4개 항목이 모두 '비목별 증빙서류') 조문 단위로 한 번만 낸다. */}
+          {evidenceArticles.map((item) => <ArticleToggle key={item.ref} pack={pack} refText={item.ref} phrase={item.phrase} label="근거 지침 원문 보기" />)}
+          {/* 규정에 없는 서류도 실무에서 요구받는다 (월별 4대보험가입자 명부·완납증명서 등) — 직접 넣을 수 있게 한다. */}
+          <div className="doc-add">
+            <input aria-label="증빙 직접 추가" value={newDoc} placeholder="규정에 없는 증빙 직접 추가 (예: 4대보험 완납증명서)"
+              onChange={(e) => setNewDoc(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomDoc(); } }} />
+            <button type="button" className="secondary" onClick={addCustomDoc} disabled={!newDoc.trim()}><Plus /> 추가</button>
+          </div>
+        </div>
+        <div className={`balance-preview ${isOver ? 'over' : ''}`}><WalletCards /><div><span>{selectedCategory.name} 등록 후 잔액</span><strong>{formatWon(budget - spent - amount)}</strong></div>
+          {selectedSub && <div><span>{selectedSub.name} 등록 후 잔액</span><strong>{formatWon(selectedSub.amount - subSpent - amount)}</strong></div>}
+          {isOver && <p><AlertCircle /> 잔액을 초과합니다. 확인 후 등록할 수 있어요.</p>}</div>
+      </fieldset>
+
+      {/* ③ 집행 내용 */}
+      <fieldset className="step-block"><legend>③ 집행 내용</legend>
+        <div className="ocr-strip"><div><ScanLine /><div><strong>영수증 먼저 업로드 — OCR 자동 입력</strong><span>집행일자 · 거래처명 · 공급가액 · 부가세액을 읽어 아래 칸을 자동으로 채워드려요.</span></div></div><label className="upload-button"><Upload /> {ocr.status === 'working' ? '인식 중…' : receipt ? '다시 업로드' : '영수증 업로드'}<input type="file" accept="image/*" disabled={ocr.status === 'working'} onChange={(e) => { onReceipt(e.target.files?.[0]); e.target.value = ''; }} /></label></div>
+        {ocr.status === 'done' && <p className="ocr-note ok"><CheckCircle2 /> {ocr.message}</p>}
+        {ocr.status === 'error' && <p className="ocr-note bad"><AlertCircle /> {ocr.message}</p>}
+        {ocr.text && <details className="ocr-raw"><summary>OCR 인식 원문 보기</summary><pre>{ocr.text}</pre></details>}
+        <div className="field-grid"><label>집행일<input required type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label><label>결제수단<select value={form.payment} disabled={!!editingId} onChange={(e) => setForm({ ...form, payment: e.target.value as PaymentMethod })}><option value="card">카드 결제</option><option value="transfer">계좌이체 (세금계산서)</option></select></label></div>
+        <div className="field-grid three"><label><span className="label-line">공급가액 <b>집계 기준</b></span><input required inputMode="numeric" value={withCommas(form.supply)} onChange={(e) => setMoney('supply', e.target.value)} placeholder="0" /></label><label><span className="label-line">부가세액 <b>선택</b></span><input inputMode="numeric" value={withCommas(form.vat)} onChange={(e) => setMoney('vat', e.target.value)} placeholder="0" /></label><label><span className="label-line">합계 금액 <b>자동</b></span><input readOnly tabIndex={-1} value={withCommas(String(totalWithVat))} placeholder="0" /></label></div>
+        <p className="field-hint">과제비 집계는 <strong>공급가액 기준(부가세 제외)</strong>입니다. 합계 금액은 공급가액+부가세액으로 자동 계산되며, 영수증의 결제금액과 맞는지 확인하는 참고용입니다.</p>
+        <div className="field-grid"><label>용도<input required value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} placeholder="예: 외부 전문가 참석 정기 회의" /></label><label>거래처<input required value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} placeholder="거래처명" /></label></div>
+        {detailFields.length > 0 && <div className="detail-fields"><strong>{selectedSub?.name} 집행에 필요한 항목</strong><div className="field-grid">{detailFields.map((field) => <label key={field.key}>{field.label}{field.required ? '' : ' (선택)'}
+          {field.type === 'textarea'
+            ? <textarea rows={3} required={field.required} value={form.details[field.key] ?? ''} onChange={(e) => setDetail(field.key, e.target.value)} />
+            : <input type={field.type === 'date' ? 'date' : 'text'} required={field.required} value={form.details[field.key] ?? ''} onChange={(e) => setDetail(field.key, e.target.value)} placeholder={field.hint} />}
+        </label>)}</div></div>}
+      </fieldset>
+      <div className="form-actions"><button type="button" className="secondary" onClick={closeForm}>{editingId ? '수정 취소' : '입력 초기화'}</button><button className="primary" type="submit" disabled={!editingId && subRequired && !form.subItemId}>{editingId ? '수정 저장' : isOver ? '확인 후 등록' : '집행 등록'}</button></div></form>
     <div className="template-strip"><div><FileText /><div><strong>자주 쓰는 증빙 템플릿</strong><span>집행 기록에 필요한 기본 항목을 담았습니다.</span></div></div><div>{(['품의서', '회의록', '출장보고서'] as const).map((type) => <button key={type} onClick={() => withExporters((m) => m.downloadTemplate(type))}><Download /> {type}</button>)}</div></div>
     <section className="expense-list"><div className="section-title"><h3>집행 내역 <b>{project.expenses.length}</b></h3><p>파일 업로드 완료 응답 후에만 증빙이 완료 처리됩니다.</p></div>{project.expenses.length === 0 ? <div className="empty-state"><FileClock /><h3>아직 등록된 집행이 없어요</h3><p>첫 집행을 등록하면 증빙 체크리스트가 여기에 나타납니다.</p></div> : project.expenses.map((expense) => { const rule = categoryOf(pack, expense.categoryId); const complete = expense.evidence.filter((e) => e.completed).length; return <article className="expense-card" key={expense.id}><div className="expense-summary"><div className="date-box"><strong>{new Date(expense.date).getDate()}</strong><span>{new Date(expense.date).toLocaleDateString('ko-KR', { month: 'short' })}</span></div><div><span className="category-label">{rule.name}</span><h4>{expense.purpose}</h4><small>{expense.vendor}{expense.paymentMethod ? ` · ${expense.paymentMethod === 'card' ? '카드 결제' : '계좌이체'}` : ''}</small></div><div className="expense-amount"><strong>{formatWon(expense.amount)}</strong>{expense.vatAmount ? <small className="vat-note">부가세 {formatWon(expense.vatAmount)} 별도</small> : null}<span className={complete === expense.evidence.length ? 'complete' : 'incomplete'}>{complete}/{expense.evidence.length} 증빙 완료</span></div><div className="expense-actions"><button type="button" aria-label={`${expense.purpose} 수정`} onClick={() => startEdit(expense)}><Pencil /></button><button type="button" className="danger" aria-label={`${expense.purpose} 삭제`} onClick={() => removeExpense(expense)}><Trash2 /></button></div></div><div className="evidence-grid">{expense.evidence.map((evidence) => <div className={evidence.completed ? 'evidence done' : 'evidence'} key={evidence.id}><div>{evidence.completed ? <CheckCircle2 /> : <FileText />}<span><strong>{evidence.label}</strong><small>{evidence.fileName || 'PDF 또는 이미지 · 최대 10MB'}</small></span></div>{evidence.completed ? <button onClick={() => downloadEvidence(evidence.id, evidence.fileName)}><Download /> 열기</button> : <label className="upload-button"><Upload /> 업로드<input type="file" accept="application/pdf,image/*" onChange={(ev) => upload(expense.id, evidence.id, ev.target.files?.[0])} /></label>}</div>)}</div></article>; })}</section>
   </div>;

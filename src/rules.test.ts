@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOverlay, articlesForRef, baseStandardFor, basisFormula, budgetBases, capFor, evidenceGuide, categoryOf, fundingCapChecks, maxAmountWithinCap, subItemChoicesFor, fundingRateChecks, packIsMissing, replacementPacksFor, rescaleBudgets, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories } from './rules';
+import { applyOverlay, articlesForRef, baseStandardFor, basisFormula, budgetBases, capFor, evidenceGuide, categoryOf, fundingCapChecks, maxAmountWithinCap, subItemChoicesFor, fundingRateChecks, packIsMissing, parseEvidenceText, evidenceChecklistFor, primaryEvidence, spendingCautions, subItemStandardFor, warningsFor, withAlwaysRequired, replacementPacksFor, rescaleBudgets, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories } from './rules';
 import type { Project, RulePack } from './types';
 
 describe('규정 팩 로더', () => {
@@ -285,6 +285,321 @@ describe('디딤돌 증빙 (상위 규정 상속)', () => {
   it('상위 규정을 밝히지 않은 팩은 자기 증빙만 쓴다', () => {
     const pack = getPack('prestartup2026');
     expect(evidenceGuide(pack, categoryOf(pack, 'PRE_FEE'), 'card').base).toBeUndefined();
+  });
+});
+
+describe('증빙 기준 하나만 고르기', () => {
+  it('이 사업 규정 > 상위 규정 > 앱 기본 예시 순으로 하나만 고른다', () => {
+    // 1순위 — 팁스는 자기 지침에 증빙이 있으니 상위 규정도 앱 예시도 쓰지 않는다
+    const tips = getPack('tips2026-general');
+    const own = primaryEvidence(evidenceGuide(tips, categoryOf(tips, 'DIRECT_LABOR'), 'card'));
+    expect(own.kind).toBe('pack');
+    expect(own.guideline).toContain('팁스');
+    expect(own.template).toEqual([]);
+
+    // 2순위 — 예시 팩은 자기 증빙이 없어 공통 규정 기준을 따른다. 앱 기본 예시가 있어도 상위 규정이 이긴다.
+    const legacy = getPack('legacy-rnd');
+    const guide = evidenceGuide(legacy, categoryOf(legacy, 'meeting'), 'card');
+    expect(guide.template).toContain('회의록');
+    const inherited = primaryEvidence(guide);
+    expect(inherited.kind).toBe('base');
+    expect(inherited.guideline).toContain('국가연구개발사업 연구개발비 사용 기준');
+    expect(inherited.template).toEqual([]);
+
+    // 3순위 — 규정DB에 아무것도 없을 때만 앱 기본 예시를 쓴다
+    const bare = primaryEvidence({ template: ['내부품의서', '카드 영수증'], rules: [], items: [] });
+    expect(bare.kind).toBe('template');
+    expect(bare.template).toEqual(['내부품의서', '카드 영수증']);
+  });
+
+  it('품의서·지출결의서는 어느 기준이든 항상 들어가고 겹치면 넣지 않는다', () => {
+    expect(withAlwaysRequired(['국외출장계획서'])).toEqual(['품의서', '지출결의서', '국외출장계획서']);
+    // '내부품의서'가 이미 품의서 역할을 하므로 '품의서'를 또 넣지 않는다
+    expect(withAlwaysRequired(['내부품의서', '카드 영수증'])).toEqual(['지출결의서', '내부품의서', '카드 영수증']);
+    expect(withAlwaysRequired(['지출결의서', '지출결의서'])).toEqual(['품의서', '지출결의서']);
+  });
+});
+
+describe('세목별 증빙 체크리스트', () => {
+  const listFor = (packId: string, categoryId: string, subItemName?: string) => {
+    const pack = getPack(packId);
+    const standard = subItemName ? subItemStandardFor(pack, subItemName) : null;
+    const guide = standard ? evidenceGuide(standard.pack, standard.category, 'card') : evidenceGuide(pack, categoryOf(pack, categoryId), 'card');
+    return evidenceChecklistFor(pack, categoryId, subItemName, standard?.category, primaryEvidence(guide).rules, standard?.pack ?? pack);
+  };
+
+  it('규정 문구를 조건별 묶음과 서류 단위로 쪼갠다', () => {
+    const list = listFor('tips2026-general', 'DIRECT_ACTIVITY', '출장비');
+    expect(list.groups.map((group) => group.condition))
+      .toEqual(['항상 필요', '국내(여비기준 있음)', '국내(여비기준 없음)', '국외']);
+    expect(list.groups[1].documents).toEqual(['내부여비규정', '출장신청서', '계좌이체증명', '출장지 카드매출전표']);
+  });
+
+  it('출장신청서가 있으면 품의서를 따로 요구하지 않는다', () => {
+    const travel = listFor('tips2026-general', 'DIRECT_ACTIVITY', '출장비');
+    expect(travel.documents).toContain('지출결의서');
+    expect(travel.documents).not.toContain('품의서');
+    // 승인 문서가 없는 인건비에는 그대로 들어간다
+    expect(listFor('tips2026-general', 'DIRECT_LABOR', '내부 인건비 (기존)').documents).toContain('품의서');
+  });
+
+  it('모든 비목에 똑같이 붙은 규칙은 넣지 않는다', () => {
+    // '연구장비 실물 사진'이 인건비 체크리스트에 딸려 나오던 문제
+    const labor = listFor('tips2026-general', 'DIRECT_LABOR', '내부 인건비 (기존)');
+    expect(labor.documents).not.toContain('연구장비 실물 사진');
+    expect(labor.documents.join()).not.toContain('전자세금계산서');
+    expect(labor.documents).toContain('급여명세서(월별)');
+  });
+
+  it('세목에 증빙이 없으면 비목 것으로 내려받는다 — 세목이 다 비어 있을 때만', () => {
+    // 팁스 인건비 세목은 모두 비어 있어 비목 증빙이 곧 그 세목의 증빙이다
+    expect(listFor('tips2026-general', 'DIRECT_LABOR', '내부 인건비 (기존)').documents.length).toBeGreaterThan(5);
+  });
+
+  it('형제 세목이 자기 증빙을 가진 비목은 비목 증빙을 내려받지 않는다', () => {
+    // 연구활동비 증빙은 회의비·출장비 등으로 나뉘어 있다 — 클라우드 활용비를 골랐는데
+    // 출장·회의 증빙까지 딸려오면 안 된다
+    const cloud = listFor('nrd2026-forprofit', 'DIRECT_ACTIVITY', '클라우드컴퓨팅서비스 활용비');
+    expect(cloud.documents.join()).not.toContain('출장');
+    expect(cloud.documents.join()).not.toContain('회의');
+    expect(cloud.groups.every((group) => group.condition === '항상 필요')).toBe(true);
+    // 자기 증빙이 있는 세목은 그대로 나온다
+    expect(listFor('nrd2026-forprofit', 'DIRECT_ACTIVITY', '회의비').documents.length).toBeGreaterThan(2);
+  });
+
+  it('같은 서류를 증빙 규칙과 항목별 증빙이 겹쳐 적어도 한 번만 담는다', () => {
+    const meeting = listFor('tips2026-general', 'DIRECT_ACTIVITY', '회의비');
+    expect(new Set(meeting.documents).size).toBe(meeting.documents.length);
+  });
+});
+
+describe('증빙 문구 쪼개기', () => {
+  it('조건이 앞에 붙은 문장을 조건과 서류로 나눈다', () => {
+    expect(parseEvidenceText('내부여비규정, 출장신청서. 국외: 출장계획서, 계좌이체증명')).toEqual([
+      { documents: ['내부여비규정', '출장신청서'] },
+      { condition: '국외', documents: ['출장계획서', '계좌이체증명'] },
+    ]);
+  });
+
+  it("'또는'을 조건으로 잘못 읽지 않는다", () => {
+    const groups = parseEvidenceText('카드매출전표 또는 계좌이체증명, 거래명세서');
+    expect(groups).toEqual([{ documents: ['카드매출전표 또는 계좌이체증명', '거래명세서'] }]);
+  });
+
+  it("'…로 대신할 수 있음' 같은 설명은 서류로 담지 않는다", () => {
+    expect(parseEvidenceText('별도 증명자료로 대신할 수 있음')).toEqual([]);
+  });
+
+  it('빈 문구는 빈 배열이다', () => {
+    expect(parseEvidenceText('')).toEqual([]);
+  });
+});
+
+describe('계상 가능 세목의 설명', () => {
+  it('세목이 자기 인정 항목을 갖고 있으면 설명으로 붙인다', () => {
+    // 비목의 인정 항목(연구활동비 71건)은 세목별 항목을 평평하게 합친 것이라 그대로 나열하면 못 읽는다
+    const pack = getPack('nrd2026-forprofit');
+    const choices = subItemChoicesFor(pack, 'DIRECT_ACTIVITY');
+    const meeting = choices.own.find((choice) => choice.name === '회의비')!;
+    expect(meeting.items).toEqual(['회의장 임차료', '속기료', '통역료', '회의·세미나 개최비', '회의 식비']);
+    const travel = choices.own.find((choice) => choice.name === '출장비')!;
+    expect(travel.items).toContain('국내출장 교통비');
+    expect(travel.items).toHaveLength(9);
+  });
+
+  it('세목별 항목을 모두 합치면 비목의 인정 항목 수와 같다', () => {
+    // 둘이 같은 데이터임을 못박아 둔다 — 하나가 늘면 다른 하나도 늘어야 한다
+    const pack = getPack('nrd2026-forprofit');
+    const category = pack.categories.find((c) => c.id === 'DIRECT_ACTIVITY')!;
+    const choices = subItemChoicesFor(pack, 'DIRECT_ACTIVITY');
+    const total = choices.own.reduce((sum, choice) => sum + (choice.items?.length ?? 0), 0);
+    expect(total).toBe(category.allowedItems!.length);
+  });
+
+  it('세목이 곧 인정 항목인 비목은 설명을 만들지 않는다', () => {
+    // 인건비의 세목(참여연구자 급여 등)은 같은 이름의 비목이 따로 없다 — 자기 자신을 설명으로 물면 안 된다
+    const pack = getPack('nrd2026-forprofit');
+    const choices = subItemChoicesFor(pack, 'DIRECT_LABOR');
+    expect(choices.own.every((choice) => !choice.items)).toBe(true);
+    expect(choices.own.map((choice) => choice.name)).toContain('참여연구자 급여');
+  });
+});
+
+describe('세목의 규정 기준 찾기', () => {
+  it('세목 이름이 세부 비목에 있으면 그 기준을 준다', () => {
+    const pack = getPack('nrd2026-forprofit');
+    const meeting = subItemStandardFor(pack, '회의비')!;
+    expect(meeting.category.id).toBe('ACTIVITY_MEETING');
+    expect(meeting.category.evidenceRules?.map((rule) => rule.name)).toContain('10만원 초과 회의비 기본 증빙');
+
+    const travel = subItemStandardFor(pack, '출장비')!;
+    expect(travel.category.evidenceRules?.map((rule) => rule.name)).toContain('국외출장 집행 전 출장계획서 구비');
+  });
+
+  it('세목 이름이 인정 항목 수준이면 그것을 품은 세목을 찾는다', () => {
+    // subItemOptions가 없는 팩은 allowedItems가 세목 후보가 된다 — '회의 식비'로 편성될 수 있다
+    const pack = getPack('nrd2026-forprofit');
+    expect(subItemStandardFor(pack, '회의 식비')?.category.name).toBe('회의비');
+    expect(subItemStandardFor(pack, '국내출장 교통비')?.category.name).toBe('출장비');
+  });
+
+  it('상위 규정을 밝힌 팩은 상위 규정에서도 찾는다', () => {
+    // 디딤돌은 basePackId가 국가연구개발비 팩이다
+    const didimdol = getPack('didimdol2026');
+    const found = subItemStandardFor(didimdol, '회의비')!;
+    expect(found.category.name).toBe('회의비');
+    expect(found.category.evidenceRules?.length).toBeGreaterThan(0);
+  });
+
+  it('이름이 너무 짧거나 어디에도 없으면 null이다', () => {
+    const pack = getPack('nrd2026-forprofit');
+    expect(subItemStandardFor(pack, 'ㅇ')).toBeNull();
+    expect(subItemStandardFor(pack, '존재하지 않는 세목 이름')).toBeNull();
+  });
+});
+
+describe('세목별 유의사항 거르기', () => {
+  it('세목을 고르면 그 세목 유의사항만 남는다', () => {
+    const pack = getPack('tips2026-general');
+    const all = warningsFor(pack, 'DIRECT_ACTIVITY');
+    expect(all.length).toBeGreaterThan(5);   // 연구활동비 전체 주의사항
+
+    const travel = warningsFor(pack, 'DIRECT_ACTIVITY', '출장비', subItemStandardFor(pack, '출장비')?.category);
+    expect(travel.map((rule) => rule.message).join()).toContain('출장비는');
+    // 회의 다과·식비, 야근 식대 같은 다른 세목 규칙은 빠진다
+    expect(travel.map((rule) => rule.message).join()).not.toContain('회의 다과');
+    expect(travel.map((rule) => rule.message).join()).not.toContain('야근');
+    expect(travel.length).toBeLessThan(all.length);
+  });
+
+  it('띄어쓰기가 달라도 같은 세목으로 본다', () => {
+    // 규칙은 '연구실 운영비', 세부 비목은 '연구실운영비'로 적혀 있다
+    const pack = getPack('tips2026-general');
+    const lab = warningsFor(pack, 'DIRECT_ACTIVITY', '연구실운영비', subItemStandardFor(pack, '연구실운영비')?.category);
+    expect(lab.map((rule) => rule.message).join()).toContain('소모성 비용');
+  });
+
+  it('세목이 한 단계 아래 이름으로 적힌 규칙도 그 세목에 붙인다', () => {
+    // 규칙의 item이 인정 항목 수준일 수 있다 — 출장비의 인정 항목이면 출장비에 나와야 한다
+    const pack = getPack('nrd2026-forprofit');
+    const travel = warningsFor(pack, 'DIRECT_ACTIVITY', '출장비', subItemStandardFor(pack, '출장비')?.category);
+    expect(travel.every((rule) => !rule.item || /출장/.test(rule.item))).toBe(true);
+    expect(travel.length).toBeGreaterThan(0);
+  });
+
+  it('비목 전체에 걸리는 규칙(item 없음)은 어느 세목에서나 남는다', () => {
+    const pack = getPack('nrd2026-forprofit');
+    const noItem = rulesFor(pack, 'DIRECT_ACTIVITY', 'warning').filter((rule) => !rule.item);
+    const travel = warningsFor(pack, 'DIRECT_ACTIVITY', '출장비', subItemStandardFor(pack, '출장비')?.category);
+    for (const rule of noItem) expect(travel).toContain(rule);
+  });
+
+  it('세목을 고르지 않으면 비목의 유의사항을 모두 준다', () => {
+    const pack = getPack('nrd2026-forprofit');
+    expect(warningsFor(pack, 'DIRECT_ACTIVITY')).toEqual(rulesFor(pack, 'DIRECT_ACTIVITY', 'warning'));
+  });
+});
+
+describe('집행 시 유의사항 (주의 + 사전승인 + 상위 규정)', () => {
+  const textOf = (items: { title: string; detail?: string }[]) => items.map((item) => `${item.title} ${item.detail ?? ''}`).join('\n');
+
+  it('공고가 정하지 않은 주의사항을 상위 규정에서 이어받는다', () => {
+    // 디딤돌 연구활동비는 자기 주의사항이 몇 건뿐이고 나머지는 국가연구개발비 사용 기준을 따른다
+    const cautions = spendingCautions(getPack('didimdol2026'), 'DIRECT_ACTIVITY');
+    expect(cautions.items.length).toBeGreaterThan(0);
+    expect(cautions.inheritedGuideline).toContain('국가연구개발사업 연구개발비 사용 기준');
+    expect(cautions.inherited.length).toBeGreaterThan(10);
+    expect(cautions.total).toBe(cautions.items.length + cautions.inherited.length);
+  });
+
+  it('사전승인 절차를 이 사업 것과 상위 규정 것 모두 준다', () => {
+    const cautions = spendingCautions(getPack('didimdol2026'), 'DIRECT_ACTIVITY');
+    expect(cautions.items.some((item) => item.kind === 'approval')).toBe(true);
+    expect(cautions.inherited.some((item) => item.kind === 'approval')).toBe(true);
+  });
+
+  it('같은 조항이 승인과 주의 양쪽에 실려 있으면 한 건으로 합치고 설명을 붙인다', () => {
+    // '연구실운영비 평가위원회 승인'(승인)과 '영리기관이 연구실운영비를…'(주의)은 근거가 같다
+    const cautions = spendingCautions(getPack('didimdol2026'), 'DIRECT_ACTIVITY');
+    const lab = cautions.items.filter((item) => /연구실운영비/.test(item.title) || /연구실운영비/.test(item.detail ?? ''));
+    expect(lab).toHaveLength(1);
+    expect(lab[0].kind).toBe('approval');
+    expect(lab[0].status).toBe('전문기관 인정 필요');
+    // "인정 필요"만으로는 무엇을 해야 하는지 알 수 없다 — 같은 조항의 설명을 함께 싣는다
+    expect(lab[0].detail).toContain('평가위원회 승인');
+  });
+
+  it('근거를 순서만 바꿔 적은 같은 조항은 한 건으로 합친다', () => {
+    // '붙임2-5 주요 연구개발비 산정기준·관리지침 바.2)' 와 '관리지침 바.2)·붙임2-5' 는 같은 조항이다
+    const cautions = spendingCautions(getPack('didimdol2026'), 'DIRECT_ACTIVITY');
+    const required = cautions.items.filter((item) => /200만원/.test(`${item.title}${item.detail ?? ''}`));
+    expect(required).toHaveLength(1);
+    // 합칠 때는 더 자세한 쪽을 남긴다 — 해약 가능성까지 적힌 문구
+    expect(`${required[0].title}${required[0].detail ?? ''}`).toContain('해약');
+  });
+
+  it('근거조항이 다르면 내용이 비슷해도 남긴다', () => {
+    // 관리지침 아.4)와 사.3) 다)는 각각 다른 의무다 — 비슷하다고 지우면 누락이 된다
+    const cautions = spendingCautions(getPack('didimdol2026'), 'DIRECT_ACTIVITY');
+    const refs = cautions.items.map((item) => item.ref.replace(/\s/g, ''));
+    expect(refs.some((ref) => ref.includes('아.4)'))).toBe(true);
+    expect(refs.some((ref) => ref.includes('사.3)다)'))).toBe(true);
+  });
+
+  it('한 화면에 같은 근거조항이 두 번 나오지 않는다', () => {
+    for (const packId of ['didimdol2026', 'tips2026-general', 'nrd2026-forprofit']) {
+      const pack = getPack(packId);
+      for (const category of pack.categories.filter((c) => c.allowed)) {
+        const cautions = spendingCautions(pack, category.id);
+        const refs = [...cautions.items, ...cautions.inherited].map((item) => item.ref.replace(/\s/g, ''));
+        expect(new Set(refs).size, `${packId}/${category.name}`).toBe(refs.length);
+      }
+    }
+  });
+
+  it('이 사업이 따로 정한 것은 상위 규정 쪽에서 빼 두 번 나오지 않는다', () => {
+    const cautions = spendingCautions(getPack('didimdol2026'), 'DIRECT_LABOR');
+    const own = new Set(cautions.items.map((item) => item.title));
+    expect(cautions.inherited.every((item) => !own.has(item.title))).toBe(true);
+  });
+
+  it('세목을 고르면 다른 세목의 승인 항목은 빠진다', () => {
+    // 승인 항목에는 세목이 적혀 있지 않아, 출장비를 골라도 회의비 승인이 그대로 따라 나왔다.
+    // '외부인 참석 회의만 식비 계상'(지침 11.다.1) 연구활동비 마)②)은 같은 조항의 주의사항이 회의비다.
+    const pack = getPack('tips2026-general');
+    const travel = spendingCautions(pack, 'DIRECT_ACTIVITY', '출장비', subItemStandardFor(pack, '출장비')?.category);
+    expect(travel.items.map((item) => item.title).join()).not.toContain('회의');
+    const meeting = spendingCautions(pack, 'DIRECT_ACTIVITY', '회의비', subItemStandardFor(pack, '회의비')?.category);
+    expect(meeting.items.some((item) => item.kind === 'approval' && item.title.includes('회의'))).toBe(true);
+  });
+
+  it('승인 이름에 세목 이름이 들어 있으면 그것으로 가른다', () => {
+    // '연구실운영비 평가위원회 승인'은 같은 조항의 주의사항이 없어도 이름으로 세목을 알 수 있다
+    const pack = getPack('didimdol2026');
+    const lab = spendingCautions(pack, 'DIRECT_ACTIVITY', '연구실운영비', subItemStandardFor(pack, '연구실운영비')?.category);
+    expect(lab.items.some((item) => item.title.includes('연구실운영비'))).toBe(true);
+    const external = spendingCautions(pack, 'DIRECT_ACTIVITY', '외부 전문기술 활용비', subItemStandardFor(pack, '외부 전문기술 활용비')?.category);
+    expect(external.items.some((item) => item.title.includes('연구실운영비'))).toBe(false);
+  });
+
+  it('세목을 고르지 않으면 비목의 승인 항목을 모두 준다', () => {
+    const pack = getPack('tips2026-general');
+    const all = spendingCautions(pack, 'DIRECT_ACTIVITY');
+    expect(all.items.some((item) => item.kind === 'approval')).toBe(true);
+  });
+
+  it('세목을 고르면 상위 규정 주의사항도 그 세목 것만 남는다', () => {
+    const pack = getPack('didimdol2026');
+    const travel = spendingCautions(pack, 'DIRECT_ACTIVITY', '출장비', subItemStandardFor(pack, '출장비')?.category);
+    expect(textOf(travel.inherited)).toContain('출장비');
+    expect(textOf(travel.inherited)).not.toContain('종신 학회비');
+  });
+
+  it('상위 규정이 없는 팩은 자기 것만 준다', () => {
+    const cautions = spendingCautions(getPack('nrd2026-forprofit'), 'DIRECT_ACTIVITY');
+    expect(cautions.inherited).toEqual([]);
+    expect(cautions.inheritedGuideline).toBeNull();
+    expect(cautions.total).toBe(cautions.items.length);
   });
 });
 

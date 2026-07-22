@@ -3,7 +3,7 @@ import nrd2026Packs from './rulepacks/nrd2026.json';
 import tips2026Packs from './rulepacks/tips2026.json';
 import prestartup2026Packs from './rulepacks/prestartup2026.json';
 import didimdol2026Packs from './rulepacks/didimdol2026.json';
-import type { BudgetCategoryId, BudgetItem, PackAllowedItem, PackArticle, PackCategory, PackOverlay, PackRule, PackSource, Participant, PaymentMethod, Project, RulePack } from './types';
+import type { BudgetCategoryId, BudgetItem, PackAllowedItem, PackApproval, PackArticle, PackCategory, PackEvidenceRule, PackOverlay, PackRule, PackSource, Participant, PaymentMethod, Project, RulePack } from './types';
 
 export const RULES_EFFECTIVE_DATE = '2026-07-19';
 
@@ -156,7 +156,7 @@ export const documentsFor = (category: PackCategory, payment: PaymentMethod): st
 // 서로 어긋나는 서류를 함께 요구하게 된다. 조건과 근거를 보여주고 고르게 한다.
 export interface EvidenceSet {
   rules: { name: string; documents: string[]; source: PackSource }[];   // 조건부 증빙 규칙
-  items: { name: string; evidence: string }[];                          // 인정 항목별 증빙
+  items: { name: string; evidence: string; ref?: string }[];            // 인정 항목별 증빙 (ref = 그 증빙의 근거 조문)
 }
 export interface CategoryEvidence extends EvidenceSet {
   template: string[];                                     // 앱 예시 기본값 (결제수단 반영)
@@ -168,7 +168,7 @@ const evidenceSetOf = (category?: PackCategory): EvidenceSet => ({
   rules: (category?.evidenceRules ?? []).filter((rule) => rule.documents.length),
   items: (category?.allowedItems ?? [])
     .filter((item): item is PackAllowedItem & { evidence: string } => !!item.evidence)
-    .map((item) => ({ name: item.name, evidence: item.evidence })),
+    .map((item) => ({ name: item.name, evidence: item.evidence, ref: item.evidenceSource?.ref ?? item.source.ref })),
 });
 
 export const evidenceGuide = (pack: RulePack, category: PackCategory, payment: PaymentMethod): CategoryEvidence => {
@@ -189,6 +189,278 @@ export const evidenceGuide = (pack: RulePack, category: PackCategory, payment: P
     rules: own.rules, items: own.items,
     guideline: own.rules.length || own.items.length ? pack.guideline : undefined,
     ...(base && (base.rules.length || base.items.length) ? { base } : {}),
+  };
+};
+
+// 증빙 출처가 셋(이 사업 규정 · 상위 규정 · 앱 기본 예시)이라 셋을 한꺼번에 펼치니
+// 고를 것이 너무 많았다. 근거가 구체적인 것부터 하나만 고른다 —
+// 이 사업 규정 > 상위 규정 > 앱 기본 예시. 여기서 고른 기준이 체크리스트에도 그대로 간다.
+export interface PrimaryEvidence extends EvidenceSet {
+  kind: 'pack' | 'base' | 'template';
+  guideline?: string;
+  template: string[];   // kind가 'template'일 때만 채운다
+}
+export const primaryEvidence = (guide: CategoryEvidence): PrimaryEvidence => {
+  if (guide.rules.length || guide.items.length)
+    return { kind: 'pack', guideline: guide.guideline, rules: guide.rules, items: guide.items, template: [] };
+  if (guide.base && (guide.base.rules.length || guide.base.items.length))
+    return { kind: 'base', guideline: guide.base.guideline, rules: guide.base.rules, items: guide.base.items, template: [] };
+  return { kind: 'template', rules: [], items: [], template: guide.template };
+};
+
+// 규정이 따로 적지 않아도 실무에서는 집행건마다 늘 필요한 서류다.
+// 품의서는 집행 전 내부 승인 문서라, 같은 역할을 하는 서류가 이미 있으면 또 요구하지 않는다 —
+// 출장은 출장신청서로, 물품 구매는 내부결재문서로 승인을 받는다.
+const ALWAYS_REQUIRED: { name: string; satisfiedBy: RegExp }[] = [
+  { name: '품의서', satisfiedBy: /품의서|출장신청서|내부결재문서/ },
+  { name: '지출결의서', satisfiedBy: /지출결의서/ },
+];
+export const ALWAYS_REQUIRED_DOCS = ALWAYS_REQUIRED.map((entry) => entry.name);
+
+export const withAlwaysRequired = (docs: string[]): string[] => {
+  const unique = [...new Set(docs)];
+  const missing = ALWAYS_REQUIRED.filter((entry) => !unique.some((doc) => entry.satisfiedBy.test(doc)));
+  return [...missing.map((entry) => entry.name), ...unique];
+};
+
+// ---- 세목별 증빙 체크리스트 ----
+// 규정DB의 항목별 증빙은 "A, B, C. 조건X는 D, E. 조건Y 시 F" 꼴의 한 문단이다.
+// 그대로 두면 읽기만 할 뿐 체크리스트가 되지 못한다. 문장으로 끊고 조건을 떼어내 서류 단위로 쪼갠다.
+export interface EvidenceGroup { condition?: string; documents: string[]; ref?: string }
+
+// 조건은 문장 앞머리에 온다 — "국내(여비기준 있음):", "외부 참여연구자는", "현물 계상 시".
+// '카드매출전표 또는 계좌이체증명'의 '또는'이 조건으로 잘못 잡히지 않도록 또/혹 뒤는 제외한다.
+const EVIDENCE_CONDITION = /^([^,]{2,24}?)(?::|(?<![또혹])은\s|(?<![또혹])는\s|\s시\s)/;
+
+export const parseEvidenceText = (text: string): EvidenceGroup[] => {
+  const groups: EvidenceGroup[] = [];
+  for (const raw of (text ?? '').split(/(?<=[.。])\s+/)) {
+    let clause = raw.trim().replace(/[.。]\s*$/, '').trim();
+    if (!clause) continue;
+    let condition: string | undefined;
+    const match = EVIDENCE_CONDITION.exec(clause);
+    if (match) { condition = match[1].trim(); clause = clause.slice(match[0].length).trim(); }
+    const documents = [...new Set(clause.split(',').map((part) => part.trim())
+      // "…로 대신할 수 있음"처럼 서류가 아니라 설명인 조각은 체크리스트에 넣지 않는다.
+      .filter((part) => part.length >= 2 && !/(수 있음|수 있다|가능하다|해야 한다)$/.test(part)))];
+    if (documents.length) groups.push(condition ? { condition, documents } : { documents });
+  }
+  return groups;
+};
+
+// 모든 비목에 똑같이 붙어 있는 증빙 규칙은 그 비목 전용 요구가 아니라 사업 전체의 원칙이다
+// (규정DB의 expense_category_code = ALL). 인건비에 '연구장비 실물 사진'이 딸려 나오던 원인이라,
+// 체크리스트에 넣지 않고 참고로만 보여준다.
+export const commonEvidenceRuleNames = (pack: RulePack): Set<string> => {
+  const categories = pack.categories.filter((category) => category.allowed && category.evidenceRules?.length);
+  if (categories.length < 2) return new Set();
+  const counts = new Map<string, number>();
+  for (const category of categories) {
+    for (const name of new Set((category.evidenceRules ?? []).map((rule) => rule.name))) {
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+  }
+  return new Set([...counts].filter(([, count]) => count === categories.length).map(([name]) => name));
+};
+
+export interface EvidenceChecklist {
+  sourceName: string;        // 이 증빙이 어느 기준에서 왔는지 (세목명 또는 비목명)
+  groups: EvidenceGroup[];   // 조건별 묶음 — '항상 필요'가 맨 앞
+  documents: string[];       // 전체 서류 (중복 제거)
+  sources: { ref: string; phrase: string }[]; // 실제 체크리스트를 만든 근거 — 화면 원문 토글과 같은 출처를 쓴다
+}
+
+// 고른 세목의 증빙을 서류 단위로 쪼개 체크리스트로 만든다.
+// 세목에 증빙이 없으면(팁스 인건비 세목 등) 비목 것을 쓴다.
+// 모든 비목에 똑같이 붙은 규칙(ALL)은 그 비목 전용 요구가 아니므로 넣지 않는다.
+export const evidenceChecklistFor = (pack: RulePack, categoryId: BudgetCategoryId, subItemName?: string, standard?: PackCategory | null, rules: PackEvidenceRule[] = [], rulePack?: RulePack): EvidenceChecklist => {
+  const category = categoryOf(pack, categoryId);
+  const withEvidence = (entry?: PackCategory | null) => (entry?.allowedItems ?? []).filter((item) => item.evidence);
+  const fromSub = withEvidence(standard);
+  // 비목의 인정 항목 증빙은 세목별 증빙을 한데 모아둔 것이다 (연구활동비 = 회의비 + 출장비 + …).
+  // 세목을 고른 상태에서 이걸 그대로 내려받으면 클라우드 활용비를 골랐는데 출장·회의 증빙까지 딸려온다.
+  // 형제 세목 중 하나라도 자기 증빙을 갖고 있으면 이 비목의 증빙은 세목 단위로 나뉜 것이므로 내려받지 않는다.
+  // 반대로 세목이 다 비어 있으면(팁스 인건비) 비목 증빙이 곧 그 세목들의 증빙이라 내려받는다.
+  const dividedBySubItem = !!subItemName && (category.subItemOptions ?? []).some((name) => {
+    const sibling = subItemStandardFor(pack, name);
+    return !!sibling && sibling.category.id !== category.id && withEvidence(sibling.category).length > 0;
+  });
+  const items = fromSub.length ? fromSub : dividedBySubItem ? [] : withEvidence(category);
+  const sources = new Map<string, { ref: string; phrase: string }>();
+
+  const groups: EvidenceGroup[] = [];
+  const addGroup = (group: EvidenceGroup) => {
+    // 같은 조건이 여러 인정 항목에 겹쳐 나오므로 한 번만 담는다.
+    const found = groups.find((entry) => entry.condition === group.condition);
+    if (!found) { groups.push({ ...group, documents: [...group.documents] }); return; }
+    for (const document of group.documents) if (!found.documents.includes(document)) found.documents.push(document);
+  };
+  for (const item of items) {
+    const ref = item.evidenceSource?.ref ?? item.source.ref;
+    if (ref) sources.set(ref, { ref, phrase: `${item.name} ${item.evidence}` });
+    for (const group of parseEvidenceText(item.evidence!)) addGroup({ ...group, ref });
+  }
+
+  // 증빙 규칙은 항목별 증빙과 같은 서류를 다시 적는 경우가 많다(회의비 증빙자료 ↔ 회의비 인정항목).
+  // 이미 담긴 서류는 빼고, 남는 것이 없으면 묶음 자체를 만들지 않는다.
+  const already = new Set(groups.flatMap((group) => group.documents));
+  const common = commonEvidenceRuleNames(rulePack ?? pack);
+  for (const rule of rules) {
+    if (common.has(rule.name)) continue;
+    const documents = rule.documents.filter((document) => !already.has(document));
+    if (documents.length) {
+      addGroup({ condition: rule.name, documents, ref: rule.source.ref });
+      sources.set(rule.source.ref, { ref: rule.source.ref, phrase: `${rule.name} ${documents.join(' ')}` });
+    }
+  }
+
+  const always = withAlwaysRequired(groups.flatMap((group) => group.documents))
+    .filter((document) => !groups.some((group) => group.documents.includes(document)));
+  const all = [...always, ...groups.flatMap((group) => group.documents)];
+  return {
+    sourceName: (fromSub.length ? standard?.name : undefined) ?? subItemName ?? category.name,
+    groups: always.length ? [{ condition: '항상 필요', documents: always }, ...groups] : groups,
+    documents: [...new Set(all)],
+    sources: [...sources.values()],
+  };
+};
+
+// ---- 세목의 규정 기준 ----
+// 집행 화면에서 고른 세목(편성 화면에서 나눠둔 것)의 기준을 찾는다. 회의비·출장비처럼
+// 세부 비목은 referenceCategories 쪽에 자기 증빙 규칙과 인정 항목을 갖고 있다.
+// 세목 이름이 한 단계 아래(인정 항목 수준, 예: '회의 식비')일 수도 있어 그때는 그것을 품은 세목을 찾는다.
+export const subItemStandardFor = (pack: RulePack, subItemName: string): ReferenceStandard | null => {
+  const target = normCategoryName(subItemName);
+  if (target.length < 2) return null;
+  // 이 사업 팩 → 상위 규정 팩 순으로 본다. 세목 후보(subItemChoicesFor)가 오는 순서와 같다.
+  for (const candidate of [pack, basePackFor(pack)]) {
+    if (!candidate) continue;
+    // 세부 비목(회의비·출장비)을 먼저 본다. 편성 비목(연구활동비)은 세부 비목의 인정 항목을
+    // 모두 품고 있어서, 순서가 반대면 '회의 식비'가 연구활동비로 뭉뚱그려진다.
+    const all = [...(candidate.referenceCategories ?? []), ...candidate.categories];
+    const byName = all.find((category) => normCategoryName(category.name) === target);
+    if (byName) return { pack: candidate, category: byName };
+    // 이름이 인정 항목 수준이면 그것을 품은 세목이 기준이다 ('회의 식비' → '회의비').
+    const byItem = all.find((category) => category.allowedItems?.some((item) => normCategoryName(item.name) === target));
+    if (byItem) return { pack: candidate, category: byItem };
+  }
+  return referenceStandardFor(subItemName, pack.id);
+};
+
+// 세목을 고르면 그 세목의 유의사항만 남긴다. 규정DB의 주의 규칙은 비목(연구활동비) 하나에 묶여 있고
+// 어느 세목 것인지는 item에 적혀 있다 — 출장비를 골랐는데 회의 다과비·야근 식대까지 뜨면 안 된다.
+// item이 없는 규칙은 비목 전체에 걸리는 것이라 항상 남긴다.
+// 세목 이름과 그 세목의 인정 항목 이름까지 받아준다 (item이 '국내출장 교통비'처럼 한 단계 아래일 수 있다).
+const subItemNameSet = (subItemName?: string, standard?: PackCategory | null): Set<string> | null => {
+  if (!subItemName && !standard) return null;
+  return new Set([subItemName, standard?.name, ...(standard?.allowedItems ?? []).map((item) => item.name)]
+    .filter((name): name is string => !!name).map(normCategoryName));
+};
+
+export const warningsFor = (pack: RulePack, categoryId: BudgetCategoryId, subItemName?: string, standard?: PackCategory | null): PackRule[] => {
+  const rules = rulesFor(pack, categoryId, 'warning');
+  const names = subItemNameSet(subItemName, standard);
+  if (!names) return rules;
+  return rules.filter((rule) => !rule.item || names.has(normCategoryName(rule.item)));
+};
+
+// ---- 집행 시 유의사항 ----
+// 집행 화면은 이 팩의 주의사항만 보고 있었다. 공고·지침은 자기가 따로 정한 것만 담기 때문에
+// (디딤돌 연구활동비 5건 vs 상위 규정 23건) 정작 지켜야 할 대부분이 화면에 없었다.
+// 사전승인 절차도 빠져 있었는데, 집행하고 나서 "승인을 받았어야 했다"를 알면 되돌릴 수 없다.
+// 같은 조항이 승인 목록과 주의사항 양쪽에 실리거나(연구실운영비 평가위원회 승인),
+// 같은 근거를 순서만 바꿔 적은 규칙이 따로 들어와(붙임2-5·관리지침 바.2) ↔ 관리지침 바.2)·붙임2-5)
+// 화면에 같은 의무가 두 번 나왔다. 근거조항으로 같은 것인지 판단한다 —
+// 근거가 다르면 문구가 비슷해도 남긴다. 다른 조항은 지켜야 할 것이 따로 있는 것이다.
+const refAtoms = (ref: string): string[] => ref.split(/[·,]/).map((part) => part.replace(/\s/g, '')).filter(Boolean);
+
+const sameArticle = (left: string, right: string): boolean => {
+  const a = refAtoms(left);
+  const b = refAtoms(right);
+  if (!a.length || a.length !== b.length) return false;
+  // 한쪽이 '붙임2-5', 다른 쪽이 '붙임2-5주요연구개발비산정기준'처럼 설명이 더 붙어 있어도 같은 조항이다.
+  return a.every((atom) => b.some((other) => atom.startsWith(other) || other.startsWith(atom)));
+};
+
+// 긴 문장은 첫 문장만 제목으로 세우고 나머지는 풀어쓴 설명으로 내린다.
+const splitSentence = (text: string): { title: string; detail?: string } => {
+  const match = text.match(/^(.*?[.。]\s*)(\S.*)$/s);
+  return match ? { title: match[1].trim(), detail: match[2].trim() } : { title: text.trim() };
+};
+
+export interface CautionItem {
+  key: string;
+  kind: 'approval' | 'warning';
+  title: string;
+  detail?: string;    // 무엇을 해야 하는지 풀어쓴 설명 (같은 조항의 주의사항 문구가 있으면 그것)
+  status?: string;    // '전문기관 인정 필요' 등 — 승인 항목만
+  ref: string;
+  inherited?: boolean;
+}
+
+export interface SpendingCautions {
+  items: CautionItem[];               // 이 사업 규정
+  inherited: CautionItem[];           // 상위 규정에서 물려받은 것
+  inheritedGuideline: string | null;
+  total: number;
+}
+
+// 승인 항목에는 어느 세목 것인지가 적혀 있지 않다 (PackApproval에 item이 없다). 그래서 출장비를
+// 골라도 회의비 승인이 그대로 따라 나왔다. 두 가지로 세목을 알아낸다 —
+//   ① 같은 근거조항의 주의사항이 세목을 갖고 있으면 그것을 물려받는다
+//   ② 승인 이름 자체에 세목 이름이 들어 있으면(연구실운영비 평가위원회 승인) 그것으로 본다
+// 둘 다 안 되면 비목 전체에 걸리는 것으로 보고 남긴다 — 엉뚱하게 지워 누락되는 것이 더 나쁘다.
+const subItemOfApproval = (pack: RulePack, category: PackCategory, approval: PackApproval, warnings: PackRule[]): string | undefined => {
+  const byArticle = warnings.find((rule) => rule.item && sameArticle(rule.source.ref, approval.source.ref))?.item;
+  if (byArticle) return byArticle;
+  const name = normCategoryName(approval.name);
+  return (category.subItemOptions ?? []).find((option) => name.includes(normCategoryName(option)));
+};
+
+const cautionsOf = (pack: RulePack, categoryId: BudgetCategoryId, subItemName: string | undefined, standard: PackCategory | null | undefined, inherited: boolean): CautionItem[] => {
+  const category = categoryOf(pack, categoryId);
+  const names = subItemNameSet(subItemName, standard);
+  const allWarnings = rulesFor(pack, categoryId, 'warning');
+  const items: CautionItem[] = (category.approvals ?? [])
+    .filter((approval) => {
+      if (!names) return true;
+      const item = subItemOfApproval(pack, category, approval, allWarnings);
+      return !item || names.has(normCategoryName(item));
+    })
+    .map((approval) => ({
+      key: `av:${approval.name}`, kind: 'approval' as const,
+      title: approval.name, status: approval.status, ref: approval.source.ref, inherited,
+    }));
+  for (const rule of warningsFor(pack, categoryId, subItemName, standard)) {
+    const found = items.find((item) => sameArticle(item.ref, rule.source.ref));
+    // 같은 조항이 승인으로도 실려 있으면, 주의사항 문구를 그 승인의 설명으로 붙인다.
+    if (found) { found.detail = found.detail ?? rule.message; continue; }
+    const { title, detail } = splitSentence(rule.message);
+    items.push({ key: `wn:${rule.id}`, kind: 'warning', title, detail, ref: rule.source.ref, inherited });
+  }
+  // 같은 조항을 근거로 한 주의사항이 여럿이면 가장 자세한 것만 남긴다.
+  const kept: CautionItem[] = [];
+  for (const item of items) {
+    const index = kept.findIndex((other) => sameArticle(other.ref, item.ref));
+    if (index < 0) { kept.push(item); continue; }
+    const lengthOf = (entry: CautionItem) => entry.title.length + (entry.detail?.length ?? 0);
+    if (lengthOf(item) > lengthOf(kept[index])) kept[index] = { ...item, status: item.status ?? kept[index].status };
+  }
+  return kept;
+};
+
+export const spendingCautions = (pack: RulePack, categoryId: BudgetCategoryId, subItemName?: string, standard?: PackCategory | null): SpendingCautions => {
+  const items = cautionsOf(pack, categoryId, subItemName, standard, false);
+  const base = baseStandardFor(pack, categoryId);
+  // 이 사업이 따로 정한 것은 상위 규정 쪽에서 뺀다 — 같은 요구가 두 번 나오면 안 된다.
+  const inherited = base
+    ? cautionsOf(base.pack, base.category.id, subItemName, standard, true)
+      .filter((entry) => !items.some((own) => sameArticle(own.ref, entry.ref) || own.title === entry.title))
+    : [];
+  return {
+    items, inherited,
+    inheritedGuideline: inherited.length ? base!.pack.guideline : null,
+    total: items.length + inherited.length,
   };
 };
 
@@ -523,34 +795,52 @@ export const baseStandardFor = (pack: RulePack, categoryId: BudgetCategoryId): R
 // ---- 계상 가능 세목 후보 ----
 // 편성표에서 "세목 나누기"를 할 때 고를 수 있는 항목. 직접 입력도 되지만, 규정에 있는 이름을
 // 그대로 골라 쓰면 정산 때 비목-세목 대응을 다시 맞출 일이 없다.
-export interface SubItemChoice { name: string; note?: string }
+export interface SubItemChoice {
+  name: string;
+  note?: string;
+  items?: string[];   // 이 세목으로 쓸 수 있는 인정 항목 (회의비 → 회의장 임차료·속기료 …)
+}
 export interface SubItemChoices {
   own: SubItemChoice[];       // 이 사업 공고·지침이 직접 정한 세목
   base: SubItemChoice[];      // 상위 규정(국가연구개발사업 연구개발비 사용 기준 등)에서 온 세목
   basePack: RulePack | null;  // base가 어디서 왔는지 (화면에 출처를 밝힌다)
 }
 
-const choicesOf = (category?: PackCategory): SubItemChoice[] => {
+// 비목의 allowedItems는 세목별 인정 항목을 평평하게 합쳐 놓은 것이다 (연구활동비 71건 =
+// 회의비 5 + 출장비 9 + …). 그대로 나열하면 "회의장 임차료"와 "회의비"가 같은 층에 놓여 못 읽는다.
+// 세목이 자기 이름의 비목으로 따로 실려 있으면 그 인정 항목을 세목의 설명으로 쓴다.
+const itemsOfSubItem = (pack: RulePack, name: string, selfId: string): string[] | undefined => {
+  const target = normCategoryName(name);
+  const found = [...(pack.referenceCategories ?? []), ...pack.categories]
+    .find((entry) => entry.id !== selfId && normCategoryName(entry.name) === target);
+  const items = (found?.allowedItems ?? []).map((item) => item.name);
+  return items.length ? items : undefined;
+};
+
+const choicesOf = (pack: RulePack, category?: PackCategory): SubItemChoice[] => {
   if (!category) return [];
   const noteOf = (name: string) => {
     const item = category.allowedItems?.find((entry) => entry.name === name);
     return item?.condition ?? item?.description ?? item?.restriction;
   };
-  if (category.subItemOptions?.length) return category.subItemOptions.map((name) => ({ name, note: noteOf(name) }));
+  if (category.subItemOptions?.length) {
+    return category.subItemOptions.map((name) => ({ name, note: noteOf(name), items: itemsOfSubItem(pack, name, category.id) }));
+  }
+  // 세목을 따로 적지 않은 비목은 인정 항목이 곧 세목이다 (인건비의 참여연구자 급여 등).
   return (category.allowedItems ?? []).map((item) => ({ name: item.name, note: item.condition ?? item.description ?? item.restriction }));
 };
 
 export const subItemChoicesFor = (pack: RulePack, categoryId: BudgetCategoryId): SubItemChoices => {
   const category = pack.categories.find((c) => c.id === categoryId);
   if (!category) return { own: [], base: [], basePack: null };
-  const own = choicesOf(category);
+  const own = choicesOf(pack, category);
   // 상위 규정을 따른다고 규정DB가 밝힌 팩만 그 팩의 세목을 덧붙인다. 그런 선언이 없는 팩(예비창업패키지 등)은
   // 비목 체계 자체가 달라서 이름이 비슷하다고 국가 R&D 세목을 끌어오면 안 된다.
   // 공고에 기준이 아예 없는 비목은 예전처럼 이름으로 찾은 공통 규정 기준을 쓴다.
   const basePack = basePackFor(pack) ?? (own.length ? null : referenceStandardFor(category.name, pack.id)?.pack ?? null);
   if (!basePack) return { own, base: [], basePack: null };
   const taken = new Set(own.map((choice) => normCategoryName(choice.name)));
-  const base = choicesOf(matchingCategory(basePack, category)).filter((choice) => !taken.has(normCategoryName(choice.name)));
+  const base = choicesOf(basePack, matchingCategory(basePack, category)).filter((choice) => !taken.has(normCategoryName(choice.name)));
   return { own, base, basePack: base.length ? basePack : null };
 };
 

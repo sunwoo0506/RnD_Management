@@ -184,15 +184,30 @@ export type PaymentMethod = 'card' | 'transfer';
 export interface Expense {
   id: string;
   date: string;
-  categoryId: BudgetCategoryId;
+  categoryId: BudgetCategoryId;   // 편성 비목 — 예산 차감·잔액 계산은 언제나 이 기준이다
+  // 편성 화면에서 나눠둔 세목(BudgetSubItem). 집계·월별 계획·규정 조회의 단위이지 돈의 단위는 아니다.
+  // id는 연결용, name은 스냅샷 — 편성에서 세목을 지워도 이 집행이 무엇이었는지 남아야 한다.
+  subItemId?: string;
+  subItemName?: string;
   amount: number;
   supplyAmount?: number;
   vatAmount?: number;
   paymentMethod?: PaymentMethod;
   purpose: string;
   vendor: string;
+  // 세목별 추가 입력 (회의 목적·출장자 등). 키는 src/spendingForms.ts의 DETAIL_FIELDS 정의를 따른다.
+  details?: Record<string, string>;
   evidence: Evidence[];
   createdAt: string;
+}
+
+// 월별 집행계획에서 사용자가 직접 고친 칸만 저장한다. 저장되지 않은 달은
+// (예산 ÷ 사업기간 월수) 자동 계산값을 쓰므로, 예산이 바뀌면 알아서 따라간다.
+export interface MonthlyPlanEntry {
+  categoryId: BudgetCategoryId;
+  subItemId?: string;   // 없으면 비목 전체 기준
+  month: string;        // 'YYYY-MM'
+  amount: number;
 }
 
 export interface Member {
@@ -288,6 +303,7 @@ export interface Project {
   members: Member[];
   participants: Participant[];
   budgets: BudgetItem[];
+  monthlyPlan?: MonthlyPlanEntry[]; // 사용자가 고친 월별 계획 칸만 (나머지는 균등분할 자동값)
   expenses: Expense[];
   changes: BudgetChange[];
   emailLogs: EmailLog[];

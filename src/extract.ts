@@ -218,6 +218,44 @@ export const groupPdfItemsIntoRows = (items: PdfTextItem[]): PdfTextItem[][] => 
   return rows;
 };
 
+// 한글에서 내보낸 PDF는 본문을 문장부호 없이 한 조각으로 그리고, 괄호·쉼표를 그 위에 덧그린다.
+// 본문 조각에는 부호가 들어갈 자리마다 공백이 비어 있어서, 부호의 x를 조각 안 글자 번호로
+// 환산하면 어느 공백을 덮은 것인지 되짚을 수 있다. 이 되돌리기가 없으면 x로 정렬하는 것만으로는
+// 부호가 전부 줄 끝으로 밀려 "세금계산서 신용카드 영수증( )," 처럼 읽을 수 없는 줄이 된다.
+//
+// 부호를 덧그리지 않는 보통의 PDF에서는 부호 조각이 본문 조각의 x 범위 밖에 오므로,
+// 앞 조각 뒤에 그대로 이어 붙어 원래 순서가 유지된다.
+const PUNCTUATION_ONLY = /^[\s()[\]{}<>,.:;·․‧’‘'"~∼－-]+$/;
+
+export const restoreOverlaidPunctuation = (row: PdfTextItem[]): PdfTextItem[] => {
+  const byX = (a: PdfTextItem, b: PdfTextItem) => a.x - b.x;
+  const runs = row.filter((item) => !PUNCTUATION_ONLY.test(item.str)).sort(byX);
+  // 덧그린 부호는 본문 조각 '위에' 놓인다. 표의 '-' 칸처럼 제 자리를 가진 부호는 건드리지 않는다 —
+  // 앞 칸에 붙여버리면 열이 하나 사라진다.
+  const overlaid = new Set(row.filter((item) => PUNCTUATION_ONLY.test(item.str) && item.str.trim()
+    && runs.some((run) => item.x >= run.x - 0.5 && item.x < run.x + run.width)));
+  if (!overlaid.size) return row.filter((item) => item.str.trim()).sort(byX);
+
+  const chars = runs.map((run) => [...run.str]);
+  for (const mark of [...overlaid].sort(byX)) {
+    const index = runs.findIndex((run) => mark.x >= run.x - 0.5 && mark.x < run.x + run.width);
+    // 글자폭이 고른 조판이라 x 비례로 몇 번째 글자인지 환산된다.
+    const at = Math.round((mark.x - runs[index].x) / runs[index].width * chars[index].length);
+    let slot = -1;
+    for (let step = 0; step <= 2 && slot < 0; step++) {
+      if (chars[index][at + step] === ' ') slot = at + step;
+      else if (chars[index][at - step] === ' ') slot = at - step;
+    }
+    // 덮은 공백을 찾았으면 그 자리가 부호의 제자리다. 못 찾으면 순서만이라도 지키도록 뒤에 붙인다.
+    if (slot >= 0) chars[index][slot] = mark.str;
+    else chars[index].push(mark.str);
+  }
+
+  // 제 자리를 가진 부호('-' 칸 등)는 조각 그대로 남긴다. 자리만 채우던 공백 조각은 버린다.
+  const standalone = row.filter((item) => !overlaid.has(item) && PUNCTUATION_ONLY.test(item.str) && item.str.trim());
+  return [...runs.map((run, i) => ({ ...run, str: chars[i].join('') })), ...standalone].sort(byX);
+};
+
 // 한 행 안에서 조각 사이 간격이 평균 글자폭의 3배(최소 8pt) 이상 벌어지면 다음 열로 넘어간다.
 export const rowToColumns = (row: PdfTextItem[]): string[] => {
   if (!row.length) return [];
@@ -258,7 +296,7 @@ export const detectPdfTableRuns = (rowColumns: string[][]): { start: number; end
 // 비교하므로 이 변경에 영향받지 않는다.
 export const renderPdfPageText = (items: PdfTextItem[]): string => {
   if (!items.length) return '';
-  const rows = groupPdfItemsIntoRows(items);
+  const rows = groupPdfItemsIntoRows(items).map(restoreOverlaidPunctuation);
   const rowColumns = rows.map(rowToColumns);
   const runs = detectPdfTableRuns(rowColumns);
   const plainLine = (from: number, to: number) =>

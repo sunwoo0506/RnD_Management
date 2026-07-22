@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { strToU8, zipSync } from 'fflate';
-import { collectHwpSectionText, collectHwpxSectionContent, collectHwpxSectionText, collectHwpxTable, decodeHwpParagraphText, detectPdfTableRuns, extractDocumentText, groupPdfItemsIntoRows, parseHwpxCell, renderPdfPageText, rowToColumns } from './extract';
+import { collectHwpSectionText, collectHwpxSectionContent, collectHwpxSectionText, collectHwpxTable, decodeHwpParagraphText, detectPdfTableRuns, extractDocumentText, groupPdfItemsIntoRows, parseHwpxCell, renderPdfPageText, restoreOverlaidPunctuation, rowToColumns } from './extract';
 
 // UTF-16LE 문자열 + 컨트롤 문자로 PARA_TEXT 페이로드를 만든다.
 const paraBytes = (codes: number[]): Uint8Array => {
@@ -223,6 +223,53 @@ describe('PDF 행 → 열 나누기', () => {
       { str: '지원금', x: 20, y: 0, width: 30 },
     ];
     expect(rowToColumns(row)).toEqual(['정부지원금']);
+  });
+});
+
+// 한글에서 내보낸 PDF는 본문을 부호 없이 한 조각으로 그리고 괄호·쉼표를 그 위에 덧그린다.
+// 실제로 통합관리지침 표-10의 증빙서류 칸이 이 때문에 통째로 읽을 수 없는 줄이 됐었다.
+describe('PDF 덧그린 문장부호 되돌리기', () => {
+  // 통합관리지침 제14차 17쪽 실제 좌표 — 본문 조각 하나에 부호 셋이 얹혀 있다.
+  const row = [
+    { str: '세금계산서 신용카드 영수증', x: 154.2, y: 353, width: 143.1 },
+    { str: '(', x: 209.2, y: 353, width: 5.5 },
+    { str: '),', x: 297.3, y: 353, width: 8.7 },
+    { str: '견적서', x: 311.4, y: 353, width: 33.0 },
+    { str: ',', x: 344.4, y: 353, width: 3.2 },
+  ];
+
+  it('본문 위에 겹친 여는 괄호를 덮인 공백 자리로 되돌린다', () => {
+    // 되돌리기 전에는 "세금계산서 신용카드 영수증( ),"처럼 부호가 줄 끝으로 밀렸다.
+    expect(restoreOverlaidPunctuation(row)[0].str).toBe('세금계산서(신용카드 영수증');
+  });
+
+  it('열로 이어 붙여도 부호가 제자리에 남는다', () => {
+    // 조각 사이 공백은 예전부터 열을 합치면서 사라진다 (인용 대조는 공백을 무시하므로 무해하다).
+    expect(rowToColumns(restoreOverlaidPunctuation(row))).toEqual(['세금계산서(신용카드 영수증),견적서,']);
+  });
+
+  it('x 좌표와 폭은 그대로 둬 열 나누기가 흔들리지 않는다', () => {
+    const [first] = restoreOverlaidPunctuation(row);
+    expect([first.x, first.width]).toEqual([154.2, 143.1]);
+  });
+
+  it('제 자리를 가진 부호 칸은 앞 칸에 붙이지 않는다', () => {
+    // 표의 '-' 칸을 부호로 보고 합치면 열이 하나 사라진다
+    const table = [
+      { str: '1차년도', x: 0, y: 0, width: 40 },
+      { str: '66,500', x: 120, y: 0, width: 30 },
+      { str: '-', x: 200, y: 0, width: 5 },
+    ];
+    expect(rowToColumns(restoreOverlaidPunctuation(table))).toEqual(['1차년도', '66,500', '-']);
+  });
+
+  it('부호를 덧그리지 않는 PDF는 조각을 그대로 둔다', () => {
+    const plain = [
+      { str: '견적서', x: 0, y: 0, width: 30 },
+      { str: ',', x: 30, y: 0, width: 3 },
+      { str: '계약서', x: 40, y: 0, width: 30 },
+    ];
+    expect(restoreOverlaidPunctuation(plain).map((item) => item.str)).toEqual(['견적서', ',', '계약서']);
   });
 });
 

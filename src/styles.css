@@ -107,6 +107,24 @@ svg { width: 18px; height: 18px; flex: none; }
 .reg-docs > strong svg { width: 14px; }
 .reg-docs > strong em { font-style: normal; font-weight: 600; font-size: 10.5px; color: #6179ad; }
 .reg-docs > small { font-size: 10.5px; color: #6179ad; }
+/* 조건별 증빙과 항목별 증빙은 같은 기준에서 나온 두 가지다 — 한 블록 안에서 소제목으로만 나눈다 */
+.reg-docs-sub { font-size: 10.5px; color: #6179ad; font-weight: 600; }
+/* 이 집행건에 들어갈 증빙 — 규정이 요구하는 서류를 조건별로 묶은 체크리스트 */
+.doc-checklist { display: grid; gap: 10px; margin-top: 9px; padding: 12px 14px; background: #f7faff; border: 1px solid #dbe6fb; border-radius: 12px; }
+.doc-checklist > strong { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #315dc8; }
+.doc-checklist > strong svg { width: 14px; }
+.doc-checklist > strong em { font-style: normal; font-weight: 600; font-size: 10.5px; color: #6179ad; }
+.doc-checklist > small { font-size: 10.5px; color: #6179ad; }
+.doc-group { display: grid; gap: 5px; }
+.doc-group-label { font-size: 11px; font-weight: 700; color: #46516a; }
+.doc-group-label em { font-style: normal; font-weight: 500; font-size: 10.5px; color: #8792a8; margin-left: 5px; }
+.doc-boxes { display: flex; flex-wrap: wrap; gap: 5px; }
+.doc-boxes label { display: flex; align-items: flex-start; gap: 5px; font-size: 11.5px; color: #2f3a4d; background: white; border: 1px solid #cfdcf5; border-radius: 7px; padding: 5px 9px; cursor: pointer; max-width: 100%; line-height: 1.5; }
+.doc-boxes label:hover { border-color: var(--blue); }
+.doc-boxes label.off { color: #98a2b3; background: #f3f5f9; border-color: #e2e7ef; text-decoration: line-through; }
+.doc-boxes input { margin: 2px 0 0; width: 13px; height: 13px; flex: none; }
+.reg-docs > .item-docs { margin-top: 2px; background: white; border-color: #dbe6fb; }
+.reg-docs > .item-docs summary em { font-style: normal; font-weight: 600; font-size: 10.5px; color: #6179ad; margin-left: 5px; }
 .reg-doc-rule { display: grid; gap: 5px; }
 .reg-doc-rule > span { font-size: 11.5px; color: #4d586c; font-weight: 600; }
 .reg-doc-rule > span em { font-style: normal; color: var(--muted); font-weight: 500; }
@@ -206,6 +224,16 @@ svg { width: 18px; height: 18px; flex: none; }
 .panel-line.ok-line { color: #1d8a5f; display: flex; gap: 5px; align-items: center; font-weight: 600; }
 .panel-line.ok-line svg { width: 12px; }
 .panel-ref { margin: 8px 0 0; font-size: 11px; color: var(--muted); }
+/* 계상 가능 세목 — 세목 이름 옆에 그 세목으로 쓸 수 있는 인정 항목을 설명으로 붙인다 */
+.sub-choices { display: grid; gap: 6px; }
+.sub-choice { display: grid; grid-template-columns: minmax(120px, max-content) 1fr; gap: 4px 10px; align-items: baseline; }
+.sub-choice > button { border: 1px solid #dde3ec; background: #f8fafd; color: #4d586c; border-radius: 7px; padding: 4px 9px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.sub-choice > button svg { width: 11px; color: #8f98a9; }
+.sub-choice > button:hover:not(:disabled) { border-color: var(--blue); color: var(--blue); background: #eef3ff; }
+.sub-choice > button:hover:not(:disabled) svg { color: var(--blue); }
+.sub-choice > button:disabled { opacity: .45; }
+.sub-choice > span { color: var(--muted); font-size: 11px; line-height: 1.6; }
+@media (max-width: 720px) { .sub-choice { grid-template-columns: 1fr; } }
 .panel-chips { display: flex; flex-wrap: wrap; gap: 5px; }
 .panel-chips button { border: 1px solid #dde3ec; background: #f8fafd; color: #4d586c; border-radius: 7px; padding: 5px 9px; font-size: 11.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
 .panel-chips button svg { width: 11px; color: #8f98a9; }
@@ -250,6 +278,84 @@ svg { width: 18px; height: 18px; flex: none; }
 .section-title { margin: 25px 0 12px; }.section-title h3 { margin: 0; font-size: 16px; }.section-title h3 b { color: var(--blue); }.section-title p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 label { display: grid; gap: 6px; color: #4d586c; font-size: 13px; font-weight: 700; }input, select, textarea { border: 1px solid #dbe1ea; border-radius: 8px; background: white; color: var(--navy); padding: 9px 10px; outline: 0; font-size: 13px; }input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px #3867e814; }textarea { resize: vertical; line-height: 1.65; }
 .field-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }.field-grid.three { grid-template-columns: repeat(3, 1fr); }
+/* ---- 한눈에 보기: 증빙 준비 현황 체크리스트 ---- */
+.evidence-readiness { margin-top: 16px; padding-bottom: 18px; }
+.readiness-bar { height: 6px; border-radius: 4px; background: #e9edf5; margin: 0 22px 14px; overflow: hidden; }
+.readiness-bar i { display: block; height: 100%; border-radius: 4px; background: var(--blue); transition: width .2s; }
+.readiness-bar i.done { background: #2f9e6e; }
+.doc-tally { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 22px 14px; }
+.doc-tally span { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: #8a5320; background: #fff7f0; border: 1px solid #f2ddc8; border-radius: 7px; padding: 4px 9px; }
+.doc-tally span.ok { color: #2f7a5c; background: #eef8f3; border-color: #cfe8dd; }
+.doc-tally svg { width: 12px; }
+.doc-tally b { font-weight: 800; }
+.todo-list { display: grid; gap: 8px; padding: 0 22px; }
+.todo-list > button { display: grid; gap: 7px; text-align: left; width: 100%; border: 1px solid var(--line); border-radius: 11px; padding: 11px 13px; background: white; }
+.todo-list > button:hover { border-color: var(--blue); background: #f7faff; }
+.todo-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.todo-head strong { font-size: 13px; color: var(--navy); }
+.todo-head em { font-style: normal; font-size: 11px; color: var(--muted); }
+.todo-head b { margin-left: auto; font-size: 11px; font-weight: 800; color: var(--blue); }
+.todo-head b.none { color: #d0342c; }
+.todo-missing { display: flex; flex-wrap: wrap; gap: 5px; }
+.todo-missing span { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #6b7688; background: #f4f7fb; border-radius: 6px; padding: 3px 8px; }
+.todo-missing svg { width: 11px; color: #a3aebf; }
+
+/* ---- 예산 집행 현황 (비목·세목 × 월 매트릭스) ---- */
+.spend-dashboard { margin-bottom: 16px; }
+.month-picker { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 22px 14px; }
+.month-picker > span { font-size: 12px; font-weight: 700; color: var(--muted); }
+.month-picker .period { font-style: normal; font-size: 11px; color: var(--blue); background: #eef3ff; padding: 3px 8px; border-radius: 6px; }
+.month-checks { display: flex; gap: 4px; flex-wrap: wrap; }
+.month-checks label { display: flex; align-items: center; gap: 3px; font-size: 11px; padding: 3px 7px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+.month-checks label:has(input:checked) { background: #eef3ff; border-color: #b9cbff; color: var(--blue); font-weight: 700; }
+.month-checks input { margin: 0; width: 12px; height: 12px; }
+.matrix-scroll { overflow-x: auto; padding: 0 22px 4px; }
+.spend-matrix { border-collapse: collapse; white-space: nowrap; font-size: 12px; min-width: 100%; }
+.spend-matrix th, .spend-matrix td { padding: 7px 10px; text-align: right; border-bottom: 1px solid #edf0f4; }
+/* 제목줄 — 표의 머리임이 분명하도록 바탕을 깔고 아래를 굵게 막는다 */
+.spend-matrix thead th { color: #4d5871; font-size: 11px; font-weight: 700; background: #e7ecf5; border-bottom: 2px solid #c3cee1; }
+.spend-matrix th.month-group { text-align: center; border-left: 2px solid #c3cee1; color: var(--navy); font-size: 12px; font-weight: 800; border-bottom: 1px solid #d3dbe9; }
+/* 비목 이름은 가로로 스크롤해도 자리를 지킨다. 겹쳐 지나가는 칸을 가려야 하므로 배경은 불투명해야 한다. */
+.spend-matrix .col-name { position: sticky; left: 0; z-index: 1; text-align: left; background: white; min-width: 190px; }
+.spend-matrix thead .col-name { background: #e7ecf5; color: var(--navy); font-size: 12px; font-weight: 800; }
+
+/* 비목 행 — 그룹의 머리. 위에 굵은 선을 둘러 비목끼리 갈라 보이게 한다. */
+.spend-matrix tbody tr.cat > td { border-top: 2px solid #dfe5ee; font-weight: 700; color: var(--navy); background: white; }
+.spend-matrix tbody tr.cat:first-child > td { border-top: 0; }
+.spend-matrix tbody tr.cat .col-name > button:first-child { font-size: 13px; font-weight: 800; color: var(--navy); }
+
+/* 세목 행 — 비목 안쪽임이 드러나도록 들여쓰고 바탕을 깐다. */
+.spend-matrix tbody tr.sub > td { background: #f4f7fb; color: #6b7688; font-weight: 400; border-bottom-color: #e6ecf4; }
+.spend-matrix tbody tr.sub .col-name { padding-left: 24px; }
+.spend-matrix tbody tr.sub .col-name > button:first-child { font-size: 12px; font-weight: 600; color: #5a6478; }
+
+/* 지금 등록 폼이 물고 있는 비목 — 행 전체를 물들여 어디를 보고 있는지 알린다. */
+.spend-matrix tbody tr.on > td { background: #eaf0ff; }
+.spend-matrix tbody tr.over > td { background: #fff8f7; }
+.spend-matrix tbody tr.outside > td { background: #fff8f7; color: #a3564a; }
+
+.spend-matrix td.cell-plan { border-left: 2px solid #dfe5ee; }
+.spend-matrix th.cell-plan { border-left: 2px solid var(--line); }
+.spend-matrix td.bad { color: #d0342c; font-weight: 700; }
+.spend-matrix .col-name em { font-style: normal; font-size: 11px; color: var(--muted); }
+.spend-matrix .col-name > button:first-child { padding: 0; font-size: 12px; text-align: left; }
+.spend-matrix .sub-toggle { font-size: 11px; color: var(--muted); font-weight: 600; margin-top: 2px; }
+.spend-matrix td.cell-plan input { width: 84px; border: 1px solid transparent; border-radius: 6px; padding: 3px 6px; background: #f7f9fc; text-align: right; font-size: 12px; }
+.spend-matrix td.cell-plan input:focus { border-color: var(--blue); background: white; outline: 0; }
+/* 합계 — 본문과 다른 바탕을 깔아 마지막 줄임을 드러낸다 */
+.spend-matrix tfoot td { font-weight: 800; color: var(--navy); border-top: 2px solid #c3cee1; border-bottom: 0; background: #dfe7f5; }
+.spend-matrix tfoot .col-name { background: #dfe7f5; }
+.spend-matrix tfoot td.cell-plan { border-left-color: #c3cee1; }
+.spend-rate { display: grid; gap: 4px; font-size: 11px; color: var(--muted); justify-items: end; min-width: 58px; }
+.spend-rate .track { display: block; width: 100%; height: 4px; border-radius: 3px; background: #e3e9f2; overflow: hidden; }
+.spend-rate i { display: block; height: 100%; border-radius: 3px; background: var(--blue); }
+.month-gap { margin: 10px 22px 18px; color: #b4530f; background: #fff6ec; border-radius: 8px; padding: 8px 10px; font-size: 12px; }
+/* 집행건 등록: ① 비목·세목 → ② 규정 안내 → ③ 집행 내용 */
+.step-block { border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px 18px; margin: 0; display: grid; gap: 13px; }
+.step-block > legend { padding: 0 8px; margin-left: 4px; font-size: 13px; font-weight: 800; color: var(--navy); }
+.detail-fields { border-top: 1px dashed var(--line); padding-top: 13px; display: grid; gap: 10px; }
+.detail-fields > strong { font-size: 13px; color: var(--navy); }
+.detail-fields textarea { border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; resize: vertical; }
 .expense-form, .change-form { padding: 22px; }.expense-form { display: grid; gap: 14px; }.expense-form .form-title { margin-bottom: 4px; }.form-title { margin-bottom: 18px; }.close { border: 0; background: #f2f4f8; color: #748096; width: 30px; height: 30px; border-radius: 8px; font-size: 20px; }
 .label-line { display: flex; align-items: center; gap: 5px; }.label-line b { color: #9da5b3; font-size: 11px; font-weight: 600; background: #f2f4f8; padding: 2px 6px; border-radius: 8px; }
 .balance-preview { margin-top: 14px; padding: 12px 14px; display: flex; align-items: center; gap: 10px; background: #f3f7ff; border: 1px solid #dfe9ff; color: #315fc6; border-radius: 9px; }.balance-preview div { display: grid; }.balance-preview span { font-size: 12px; }.balance-preview strong { font-size: 13px; }.balance-preview p { margin-left: auto; display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; }.balance-preview.over { background: #fff1ef; border-color: #ffd3cf; color: #cf4138; }
@@ -465,6 +571,30 @@ mark.hl.current { background: #e5473c; color: white; box-shadow: 0 0 0 2px #b336
 .rule-warnings p { margin: 0; display: flex; gap: 6px; align-items: flex-start; background: #fff7f0; color: #b45f22; border: 1px solid #f2ddc8; border-radius: 8px; padding: 8px 10px; font-size: 12px; line-height: 1.55; }
 .rule-warnings svg { width: 14px; flex: none; margin-top: 1px; }
 .rule-warnings em, .warn-item em { font-style: normal; color: var(--muted); font-size: 11px; }
+/* 집행 시 유의사항 한 건 — 제목 + 풀어쓴 설명 + 근거 조문 토글 */
+.caution-list { display: grid; gap: 7px; }
+.caution { border-radius: 9px; padding: 10px 12px; font-size: 12px; line-height: 1.6; background: #fff7f0; border: 1px solid #f2ddc8; color: #8a5320; }
+/* 사전승인은 놓치면 집행 후에 되돌릴 수 없어 주의사항보다 강하게 세운다 */
+.caution.approval { background: #fdf0f0; border-color: #f3d2cf; color: #a3342c; }
+.caution-head { display: flex; gap: 7px; align-items: flex-start; }
+.caution-head svg { width: 14px; flex: none; margin-top: 2px; }
+.caution-head strong { font-weight: 700; }
+.caution-head p { margin: 5px 0 0; color: #63594e; }
+.caution.approval .caution-head p { color: #6d4b47; }
+.caution em.tag { font-style: normal; margin-left: 6px; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 5px; background: #f7dedb; color: #a3342c; }
+.caution-ref { display: block; margin-top: 6px; padding-left: 21px; color: var(--muted); font-size: 11px; }
+.caution-article { margin-top: 7px; padding-left: 21px; }
+.caution-article > summary { cursor: pointer; font-size: 11px; font-weight: 700; color: var(--blue); }
+.caution-article > summary em { font-style: normal; color: var(--muted); font-weight: 400; margin-left: 5px; }
+.caution-article b { display: block; margin: 7px 0 3px; font-size: 11px; color: var(--navy); }
+.caution-article pre { margin: 0; white-space: pre-wrap; word-break: break-word; font: inherit; font-size: 11px; color: #4a5568; background: white; border: 1px solid var(--line); border-radius: 7px; padding: 8px 10px; max-height: 220px; overflow: auto; }
+/* 이 유의사항이 가리키는 문단 — 조문은 조 전체라 어디를 읽어야 하는지 짚어준다 */
+.caution-article pre .hit { display: block; font-weight: 700; color: var(--navy); background: #eef3ff; box-shadow: inset 3px 0 0 var(--blue); border-radius: 4px; padding: 3px 6px 3px 9px; margin: 2px -6px 2px -9px; }
+.caution-article pre mark { background: #ffe9a8; color: inherit; border-radius: 3px; padding: 0 1px; }
+/* 상위 규정에서 물려받은 것 — 접어두되 이 사업 규정이 비어 있으면 펼쳐서 보여준다 */
+.inherited-cautions > summary { cursor: pointer; font-size: 12px; font-weight: 700; color: var(--muted); padding: 7px 2px; }
+.inherited-cautions > summary b { color: var(--blue); }
+.inherited-cautions > div { margin-top: 6px; }
 .global-warnings { display: grid; gap: 8px; }
 .warn-item { display: flex; gap: 10px; align-items: flex-start; background: white; border: 1px solid #f0d9d6; border-radius: 10px; padding: 12px 14px; }
 .warn-item svg { color: #d6453d; width: 16px; flex: none; margin-top: 2px; }
@@ -678,3 +808,17 @@ input[readonly] { background: #f7f8fa; color: #667087; pointer-events: none; }
 .pack-current strong { font-size: 15px; }
 .pack-current small { font-size: 11px; color: var(--muted); }
 .pack-current .pack-verified { margin-left: auto; flex: none; }
+
+/* 규정 원문 보기 — 항목별 증빙 요약 + 그 근거 조문 토글 */
+.item-doc { padding: 7px 0; border-top: 1px solid #eef1f6; }
+.item-doc:first-of-type { border-top: 0; }
+.item-doc .caution-article { padding-left: 0; margin-top: 5px; }
+
+/* 규정에 없는 증빙 직접 추가 */
+.doc-add { display: flex; gap: 6px; }
+.doc-add input { flex: 1; min-width: 0; border: 1px solid #cfdcf5; border-radius: 7px; padding: 6px 10px; font-size: 11.5px; background: white; }
+.doc-add input:focus { border-color: var(--blue); outline: 0; }
+.doc-add button { display: flex; align-items: center; gap: 4px; font-size: 11.5px; padding: 6px 11px; border-radius: 7px; white-space: nowrap; }
+.doc-add button svg { width: 12px; }
+.doc-boxes label > button { border: 0; background: none; color: #98a2b3; font-size: 14px; line-height: 1; padding: 0 0 0 3px; }
+.doc-boxes label > button:hover { color: #d0342c; }

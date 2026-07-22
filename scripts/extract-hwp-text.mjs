@@ -1,6 +1,6 @@
 // 규정 문서에서 본문 텍스트를 뽑는다 (규정 DB 추출의 0단계).
 // 사용법: node scripts/extract-hwp-text.mjs <파일> [출력.txt]
-// 지원: HWP 5.0 · HWPX · DOCX (PDF는 앱의 src/extract.ts에서 pdfjs로 처리)
+// 지원: HWP 5.0 · HWPX · DOCX · PDF
 //
 // 파싱 방식은 앱의 src/extract.ts와 같다. HWP는 OLE 복합문서에서 BodyText/Section{n}의
 // PARA_TEXT(태그 67) 레코드만 모으고, HWPX·DOCX는 ZIP 안의 XML에서 텍스트 노드를 모은다.
@@ -142,6 +142,53 @@ const extractDocx = (filePath) => {
 // ---- PDF ----
 // 같은 줄(y좌표 ±3pt)에 있는 조각을 묶고 위→아래, 왼→오 순으로 이어 붙인다.
 // 표는 열 구분 없이 한 줄로 이어지지만 규정 문장을 읽는 데는 충분하다.
+
+// 한글에서 내보낸 PDF는 본문을 문장부호 없이 한 조각으로 그리고, 괄호·쉼표를 그 위에 덧그린다.
+// 부호의 x를 본문 조각 안 글자 번호로 환산해 덮인 공백 자리를 되짚는다 —
+// 이게 없으면 "세금계산서(신용카드 영수증), 견적서"가 "세금계산서 신용카드 영수증( ),  견적서"가 된다.
+// 앱의 src/extract.ts 의 restoreOverlaidPunctuation 과 같은 규칙이다.
+const PUNCTUATION_ONLY = /^[\s()[\]{}<>,.:;·․‧’‘'"~∼－-]+$/;
+
+const restoreOverlaidPunctuation = (row) => {
+  const byX = (a, b) => a.x - b.x;
+  const runs = row.filter((item) => !PUNCTUATION_ONLY.test(item.str)).sort(byX);
+  // 덧그린 부호는 본문 조각 '위에' 놓인다. 표의 '-' 칸처럼 제 자리를 가진 부호는 건드리지 않는다.
+  const overlaid = new Set(row.filter((item) => PUNCTUATION_ONLY.test(item.str) && item.str.trim()
+    && runs.some((run) => item.x >= run.x - 0.5 && item.x < run.x + run.width)));
+  if (!overlaid.size) return row.filter((item) => item.str.trim()).sort(byX);
+
+  const chars = runs.map((run) => [...run.str]);
+  for (const mark of [...overlaid].sort(byX)) {
+    const index = runs.findIndex((run) => mark.x >= run.x - 0.5 && mark.x < run.x + run.width);
+    const at = Math.round((mark.x - runs[index].x) / runs[index].width * chars[index].length);
+    let slot = -1;
+    for (let step = 0; step <= 2 && slot < 0; step++) {
+      if (chars[index][at + step] === ' ') slot = at + step;
+      else if (chars[index][at - step] === ' ') slot = at - step;
+    }
+    if (slot >= 0) chars[index][slot] = mark.str;
+    else chars[index].push(mark.str);
+  }
+  const standalone = row.filter((item) => !overlaid.has(item) && PUNCTUATION_ONLY.test(item.str) && item.str.trim());
+  return [...runs.map((run, i) => ({ ...run, str: chars[i].join('') })), ...standalone].sort(byX);
+};
+
+// 조각을 이어 붙일 때 사이가 벌어진 곳에만 공백을 넣는다.
+// 무조건 공백을 넣으면 한 낱말이 조각으로 갈린 자리에 "거래처 사 업자등록증"처럼 없는 공백이
+// 생기고, 무조건 붙이면 낱말끼리 들러붙는다. 기준은 그 행의 평균 글자폭 1/4 —
+// 열을 가르는 기준(평균 글자폭 3배)보다 훨씬 좁아서, 낱말 사이 공백만 가려낸다.
+const joinRowText = (row) => {
+  if (!row.length) return '';
+  const averageCharWidth = row.reduce((sum, item) => sum + item.width / Math.max(item.str.length, 1), 0) / row.length;
+  const gapThreshold = Math.max(averageCharWidth / 4, 1);
+  let out = row[0].str;
+  for (let i = 1; i < row.length; i++) {
+    const gap = row[i].x - (row[i - 1].x + row[i - 1].width);
+    out += (gap > gapThreshold ? ' ' : '') + row[i].str;
+  }
+  return out;
+};
+
 const extractPdf = async (filePath) => {
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const doc = await getDocument({ data: new Uint8Array(readFileSync(filePath)), useSystemFonts: true }).promise;
@@ -150,13 +197,13 @@ const extractPdf = async (filePath) => {
     const content = await (await doc.getPage(i)).getTextContent();
     const items = content.items
       .filter((item) => 'str' in item && item.str.trim())
-      .map((item) => ({ str: item.str, x: item.transform[4], y: item.transform[5] }));
+      .map((item) => ({ str: item.str, x: item.transform[4], y: item.transform[5], width: item.width ?? 0 }));
     const rows = [];
     for (const item of [...items].sort((a, b) => b.y - a.y)) {
       const row = rows.find((r) => Math.abs(r[0].y - item.y) < 3);
       if (row) row.push(item); else rows.push([item]);
     }
-    pages.push(rows.map((row) => row.sort((a, b) => a.x - b.x).map((i) => i.str).join(' ')).join('\n'));
+    pages.push(rows.map((row) => joinRowText(restoreOverlaidPunctuation(row))).join('\n'));
   }
   const text = pages.join('\n');
   if (text.replace(/\s/g, '').length < 50) throw new Error('PDF에서 텍스트를 읽지 못했습니다 (스캔본이면 OCR이 필요합니다).');
