@@ -6,7 +6,7 @@ import {
   Pencil, Plus, RefreshCw, ScanLine, Settings as SettingsIcon, ShieldCheck, Sparkles, Trash2, Upload, UserPlus, Users, WalletCards,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
-import { baseStandardFor, capFor, categoryOf, DEFAULT_INSURANCE_RATE, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
+import { baseStandardFor, capFor, categoryOf, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
 import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, getEvidence, getProjectDocument, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
 import { isCloudEnabled, supabase } from './supabase';
@@ -1075,9 +1075,13 @@ function Budget({ project, update, setScreen }: { project: Project; update: (p: 
         const min = minFor(pack, category.id);
         const over = cap?.amount != null && amount > cap.amount;
         const under = min != null && amount < min.amount;
-        return <div key={category.id}><div className={`table-row ${over || under ? 'row-danger' : ''}`}><div><strong>{category.name}</strong>
-          <small>{category.definition ?? `초안 ${category.draftRate}%`}</small>
-          <button type="button" className="text-button sub-toggle" onClick={() => toggleSub(category.id)}>{hasSubs ? `세목 ${subs.length}개 ${open ? '접기' : '보기'}` : open ? '세목 입력 닫기' : '+ 세목 나누기'}</button></div>
+        // 비목 칸에는 이름만 둔다 — 용도 설명은 마우스를 올렸을 때 옆에 띄워 편성표를 가볍게 유지한다.
+        const definition = category.definition ?? referenceByCategory.get(category.id)?.category.definition;
+        const mustNotes = mandatoryNotesFor(pack, category.id);
+        return <div key={category.id}><div className={`table-row ${over || under ? 'row-danger' : ''}`}><div className="name-cell">
+          <strong>{category.name}</strong>
+          <button type="button" className="text-button sub-toggle" onClick={() => toggleSub(category.id)}>{hasSubs ? `세목 ${subs.length}개 ${open ? '접기' : '보기'}` : open ? '세목 입력 닫기' : '+ 세목 나누기'}</button>
+          {definition && <div className="def-card" role="tooltip"><strong>{category.name}</strong><p>{definition}</p>{!category.definition && <em>{referenceByCategory.get(category.id)?.pack.guideline} 기준</em>}</div>}</div>
         {/* 상한의 근거·조건은 "기준" 패널에 있으므로, 여기서는 금액이 어떻게 나왔는지 계산식만 보여준다. */}
         <div className="cap-cell">{cap
           ? cap.basisAmount != null
@@ -1102,7 +1106,11 @@ function Budget({ project, update, setScreen }: { project: Project; update: (p: 
             : `미편성 잔액 ${formatWon(free)}`;
           return <div className="amount-slider"><input type="range" aria-label={`${category.name} 편성 금액 조절`} min={0} max={project.totalBudget} step={step} value={Math.min(amount, project.totalBudget)} onChange={(e) => changeAmount(category.id, Math.min(Number(e.target.value), dragLimit))} /><small>{hint}</small></div>;
         })()}</div><div className="rate-cell"><div className="mini-progress"><i className={over || under ? 'danger' : ''} style={{ width: `${cap?.amount ? Math.min(amount / cap.amount * 100, 100) : Math.min(rate, 100)}%` }} /></div><b>{rate.toFixed(1)}%</b></div><span className={`status ${over || under ? 'bad' : 'good'}`}>{over ? <><AlertCircle /> 상한 초과</> : under ? <><AlertCircle /> 필수 금액 미달</> : <><Check /> 정상</>}</span>
-        <button type="button" className={`standard-open ${standardId === category.id ? 'active' : ''}`} aria-label={`${category.name} 기준 보기`} title={`${category.name} 기준 보기`} onClick={() => setStandardId(standardId === category.id ? null : category.id)}><BookOpenCheck /></button></div>
+        <button type="button" className={`standard-open ${standardId === category.id ? 'active' : ''}`} aria-label={`${category.name} 기준 보기`} title={definition ? `${category.name} — ${definition}` : `${category.name} 기준 보기`} onClick={() => setStandardId(standardId === category.id ? null : category.id)}><BookOpenCheck /></button></div>
+        {/* 빠뜨리면 협약까지 걸리는 필수 계상은 기준 패널 안이 아니라 비목 바로 아래에 세운다. */}
+        {mustNotes.map((rule) => <p key={rule.id} className="must-note">
+          <AlertCircle /><span><b>{rule.trigger ?? '필수 계상'}</b> {rule.message} {refLink(rule)}</span>
+        </p>)}
         {open && <div className="sub-items">
           {subs.map((sub) => <div className="sub-item-row" key={sub.id}>
             <input aria-label={`${category.name} 세목 이름`} placeholder="세목 이름 (예: 기술도입비)" value={sub.name} disabled={confirmed} onChange={(e) => setSubItems(category.id, subs.map((x) => x.id === sub.id ? { ...x, name: e.target.value } : x))} />

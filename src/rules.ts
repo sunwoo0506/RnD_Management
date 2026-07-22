@@ -178,6 +178,27 @@ const rulesForWithNameFallback = (pack: RulePack, categoryId: BudgetCategoryId, 
   return globalRules(pack, kind).filter((rule) => ruleMatchesCategory(rule, name));
 };
 
+// ---- 꼭 계상해야 하는 것 ----
+// "연구활동비 내 외부전문기술 활용비로 200만원을 필수 계상해야 한다" 같은 규칙은 금지·주의와
+// 성격이 다르다. 편성 단계에서 빠뜨리면 나중에 협약 해약까지 갈 수 있는데, 기준 패널을 열어야
+// 보이면 그대로 지나친다. 그래서 이것만 골라 편성표의 비목 아래에 세운다.
+const MUST_ALLOCATE = /(필수|반드시|의무적으로)\s*계상/;
+const NOT_ALLOCATE = /계상\s*(금지|불가|제외)|계상할\s*수\s*없/;
+
+export const mandatoryNotesFor = (pack: RulePack, categoryId: BudgetCategoryId): PackRule[] => {
+  const found = rulesForWithNameFallback(pack, categoryId, 'warning')
+    .filter((rule) => MUST_ALLOCATE.test(`${rule.message} ${rule.trigger ?? ''}`) && !NOT_ALLOCATE.test(rule.message));
+  // 같은 요구가 공고와 지침에 따로 실려 있으면(문구만 다른 같은 금액의 필수 계상) 한 번만 보여준다.
+  const byAmount = new Map<string, PackRule>();
+  for (const rule of found) {
+    const key = (rule.message.match(/\d[\d,]*\s*(?:억|천만|백만|만)?\s*원/g) ?? [rule.id]).join('·');
+    const kept = byAmount.get(key);
+    // 같은 요구면 사정을 더 자세히 적은 쪽(문구가 긴 쪽)을 남긴다.
+    if (!kept || kept.message.length < rule.message.length) byAmount.set(key, rule);
+  }
+  return [...byAmount.values()];
+};
+
 // ---- 상한 계산 ----
 // ratio 규칙의 basis를 편성표에서 계산 가능한 경우에만 금액 상한으로 환산한다.
 // (구입가·도입비 등 편성표 밖의 기준은 계산 불가 → 안내 텍스트로만 표시)

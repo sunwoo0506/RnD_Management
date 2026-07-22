@@ -99,6 +99,18 @@ svg { width: 18px; height: 18px; flex: none; }
 .sub-item-row > input { padding: 8px 10px; font-size: 12px; }
 .sub-item-row .money-input { height: 34px; }
 .sub-item-row .danger-button svg { width: 13px; }
+/* 비목 칸은 이름만 두고, 용도 설명은 마우스를 올렸을 때 오른쪽에 띄운다.
+   pointer-events를 꺼둬야 카드가 덮은 편성 금액·막대바를 그대로 조작할 수 있다. */
+.name-cell { position: relative; }
+.def-card { display: none; position: absolute; left: calc(100% + 12px); top: 50%; transform: translateY(-50%); z-index: 30; width: 300px; padding: 11px 13px; background: white; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 32px #1720331f; pointer-events: none; }
+.name-cell:hover .def-card { display: block; }
+.def-card strong { display: block; font-size: 12.5px; color: var(--navy); margin-bottom: 4px; }
+.def-card p { margin: 0; font-size: 11.5px; line-height: 1.65; color: #4d586c; }
+.def-card em { display: block; margin-top: 5px; font-style: normal; font-size: 10.5px; color: var(--muted); }
+/* 빠뜨리면 협약까지 걸리는 필수 계상 — 비목 행 바로 아래에 폭 전체로 세운다 */
+.must-note { display: flex; gap: 7px; align-items: flex-start; margin: 0; padding: 9px 22px 11px 42px; background: #fff6f2; border-bottom: 1px solid #f6e0d4; color: #a8452c; font-size: 11.5px; line-height: 1.65; }
+.must-note svg { width: 14px; flex: none; margin-top: 2px; }
+.must-note b { color: #8f331d; margin-right: 4px; }
 /* 계상 가능 세목 고르기 — 목록이 길어질 수 있어(연구활동비 11개, 장비비 12개) 높이를 묶어 스크롤한다 */
 .sub-picker { display: grid; gap: 6px; border: 1px solid #e4e9f1; background: #fff; border-radius: 10px; padding: 9px 11px; max-height: 190px; overflow-y: auto; }
 .sub-picker-label { font-size: 11px; font-weight: 700; color: #4d586c; }

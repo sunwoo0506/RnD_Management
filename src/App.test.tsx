@@ -92,6 +92,21 @@ describe('과제온 핵심 사용자 흐름', () => {
     expect(within(group).getByRole('button', { name: '회의비' })).toBeDisabled(); // 이미 넣은 세목은 다시 못 고른다
   });
 
+  it('비목 칸은 이름만 두고, 필수 계상은 비목 아래에 강조해 세운다', async () => {
+    localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture('didimdol2026')));
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole('button', { name: '예산 편성' }));
+    // 용도 설명은 편성표에서 빠지고, 마우스를 올렸을 때 뜨는 카드와 기준 버튼 툴팁으로 옮겨졌다
+    const row = screen.getByLabelText('연구활동비 편성 금액').closest('.table-row') as HTMLElement;
+    expect(within(row).getByRole('button', { name: '연구활동비 기준 보기' }))
+      .toHaveAttribute('title', expect.stringContaining('출장비, 외부 전문기술 활용비'));
+    // 빠뜨리면 협약이 해약될 수 있는 필수 계상은 비목 바로 아래에 나온다
+    expect(screen.getByText(/업무지원기관을 통한 사업화 지원 비용 200만원/)).toBeInTheDocument();
+    expect(screen.getByText(/협약이 해약될 수 있습니다/)).toBeInTheDocument();
+    // 같은 200만원 필수 계상이 공고·지침에 두 번 실려 있어도 한 번만 보여준다
+    expect(screen.queryByText(/특화 프로그램 수행을 위해/)).toBeNull();
+  });
+
   it('편성 확정 시 0원 비목이 집행 화면 비목 선택에서 사라진다', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture()));
