@@ -222,16 +222,35 @@ export interface CategoryCap {
 const inKindOnlyRule = (rule: PackRule): boolean =>
   /현물(으?로)?\s*계상/.test([rule.item, rule.message, rule.quote, rule.note, rule.condition].filter(Boolean).join(' '));
 
-// 계산식에 쓰는 기준 이름은 괄호 앞까지만 남긴다 —
-// "수정직접비(직접비 중 현물·위탁연구개발비·국제공동연구개발비 제외)"가 칸을 통째로 먹지 않게.
-const shortBasis = (basis: string): string => basis.split(/[(（]/)[0].trim() || basis;
+// 기준 이름은 괄호 앞까지만 남기되, 괄호 안의 "제외" 문구는 짧게 요약해 붙인다.
+// 같은 "직접비"라도 무엇을 빼는지에 따라 금액이 달라서(위탁 상한의 직접비 ≠ 간접비 상한의 직접비),
+// 괄호를 통째로 버리면 편성표에 이름은 같고 금액만 다른 기준이 나란히 서게 된다.
+const EXCLUSION_LABELS: [RegExp, string][] = [
+  [/현물/, '현물'], [/미지급인건비/, '미지급인건비'], [/위탁/, '위탁'],
+  [/국제공동/, '국제공동'], [/부담비/, '부담비'], [/간접비/, '간접비'],
+];
+// 기준 문구의 괄호에서 "무엇을 빼는지"만 추린다.
+//   "현물, 위탁연구개발비 제외"        → 쉼표로 나열된 것이 모두 제외 대상
+//   "현물 포함, 위탁연구개발비 제외"    → 포함이라고 밝힌 조각만 빼고 나머지가 제외 대상
+const exclusionText = (basis: string): string => {
+  const inside = /[(（]([^)）]*)[)）]/.exec(basis)?.[1] ?? '';
+  if (!/제외/.test(inside)) return '';
+  if (!/포함/.test(inside)) return inside;
+  return inside.split(/[,，]/).filter((part) => !/포함/.test(part)).join(' ');
+};
 
-// inKindWon: 민간부담금 중 현물 금액 — basis가 "현물 제외"를 명시한 경우에만 차감한다.
-export const capFor = (pack: RulePack, budgets: BudgetItem[], totalBudget: number, categoryId: BudgetCategoryId, inKindWon = 0): CategoryCap | null => {
-  // 하한(이상 지급) 규칙은 상한 검사 대상이 아니다 (예: 학생인건비 10% 이상 지급 관리).
-  const ratio = rulesForWithNameFallback(pack, categoryId, 'ratio').find((rule) => rule.limitPct !== undefined && !/이상/.test(rule.basis ?? ''));
-  if (!ratio || ratio.limitPct === undefined) return null;
-  const basis = ratio.basis ?? '';
+const shortBasis = (basis: string): string => {
+  const head = basis.split(/[(（]/)[0].trim() || basis;
+  const excluded = exclusionText(basis);
+  const terms = EXCLUSION_LABELS.filter(([re]) => re.test(excluded)).map(([, label]) => label);
+  return terms.length ? `${head}(${terms.join('·')} 제외)` : head;
+};
+
+// 상한 기준 금액. "직접비"라고만 적힌 기준과 "직접비(위탁·국제공동 제외)"는 다른 금액이라,
+// 기준 문구가 빼라고 밝힌 비목만 정확히 뺀다. 예전에는 어느 직접비 기준이든 위탁을 함께 뺐는데,
+// 그러면 연구활동비 상한(직접비의 40%)이 규정보다 낮게 잡혔다.
+// inKindWon: 민간부담금 중 현물 금액 — 현물은 편성표 비목이 아니라 재원 구성에서 온다.
+export const basisAmountOf = (pack: RulePack, budgets: BudgetItem[], totalBudget: number, basis: string, inKindWon = 0): number | null => {
   const amountOf = (id: string) => budgets.find((item) => item.categoryId === id)?.amount ?? 0;
   // 내장 팩은 고정 비목 ID(personnel 등)를 쓰지만 AI 추출 팩은 문서 비목명 기반 ID(doc_0_인건비 등)라
   // ID로 못 찾으면 비목 "이름"으로 찾는다 — 안 그러면 인건비 편성액이 0으로 잡혀 상한이 0원이 된다.
@@ -242,16 +261,28 @@ export const capFor = (pack: RulePack, budgets: BudgetItem[], totalBudget: numbe
   };
   const resolve = (id: string, re: RegExp): number | null =>
     pack.categories.some((category) => category.id === id) ? amountOf(id) : sumByName(re);
-  let baseAmount: number | null = null;
-  if (/총\s*사업비|총액/.test(basis)) baseAmount = totalBudget;
-  else if (/직접비/.test(basis)) {
-    baseAmount = totalBudget - (resolve('indirect', /간접비/) ?? 0) - (resolve('outsourcing', /위탁연구|외주/) ?? 0);
-    // "직접비(현물 제외)"처럼 현물 차감이 명시된 기준만 민간부담 현물을 뺀다 (현물은 편성표 비목이 아니라 재원 구성에서 온다).
-    // "직접비(현물 포함)"은 차감하지 않는다 — 포함 표기가 있으면 제외 문구가 뒤따라도(위탁 제외 등) 현물은 그대로 둔다.
-    const inKindExcluded = /현물[^)]*제외|제외[^)]*현물/.test(basis) && !/현물\s*포함/.test(basis);
-    if (inKindExcluded) baseAmount = Math.max(0, baseAmount - inKindWon);
+  if (/총\s*사업비|총액/.test(basis)) return totalBudget;
+  if (/직접비/.test(basis)) {
+    // 직접비 = 총사업비 − 간접비. 여기서 기준이 "제외"라고 밝힌 비목을 더 뺀다.
+    let amount = totalBudget - (resolve('indirect', /간접비/) ?? 0);
+    const excluded = exclusionText(basis);
+    if (/위탁|외주/.test(excluded)) amount -= resolve('outsourcing', /위탁연구|외주/) ?? 0;
+    if (/국제공동/.test(excluded)) amount -= sumByName(/국제공동/) ?? 0;
+    if (/부담비/.test(excluded)) amount -= sumByName(/연구개발부담비/) ?? 0;
+    // "직접비(현물 포함)"은 빼지 않는다 — 포함 표기가 있으면 제외 문구가 뒤따라도 현물은 그대로 둔다.
+    if (/현물/.test(excluded) && !/현물\s*포함/.test(basis)) amount -= inKindWon;
+    return Math.max(0, amount);
   }
-  else if (/수정인건비|인건비/.test(basis)) baseAmount = resolve('personnel', /인건비/);
+  if (/수정인건비|인건비/.test(basis)) return resolve('personnel', /인건비/);
+  return null;
+};
+
+export const capFor = (pack: RulePack, budgets: BudgetItem[], totalBudget: number, categoryId: BudgetCategoryId, inKindWon = 0): CategoryCap | null => {
+  // 하한(이상 지급) 규칙은 상한 검사 대상이 아니다 (예: 학생인건비 10% 이상 지급 관리).
+  const ratio = rulesForWithNameFallback(pack, categoryId, 'ratio').find((rule) => rule.limitPct !== undefined && !/이상/.test(rule.basis ?? ''));
+  if (!ratio || ratio.limitPct === undefined) return null;
+  const basis = ratio.basis ?? '';
+  const baseAmount = basisAmountOf(pack, budgets, totalBudget, basis, inKindWon);
   const category = categoryOf(pack, categoryId);
   // 규칙 대상이 비목 전체가 아니라 비목 안의 세부 항목(예: 간접비 중 능률성과급)이면 금액 상한으로 강제하지 않고 안내만 한다.
   // 이름 비교는 공백·중점·마침표 차이를 무시한다 ("연구시설·장비비" 규칙이 "연구시설.장비비" 비목의 세부 항목으로 오인되지 않게).
@@ -268,6 +299,35 @@ export const capFor = (pack: RulePack, budgets: BudgetItem[], totalBudget: numbe
     partial,
     inKindOnly: inKindOnlyRule(ratio),
   };
+};
+
+// ---- 상한 계산의 기준 금액 ----
+// "수정인건비 합계의 20%", "직접비의 40%"처럼 상한은 늘 다른 금액을 기준으로 잡힌다.
+// 그 기준 금액이 얼마인지는 비목마다 흩어져 있어서, 편성표 아래에 한 번에 모아 보여준다.
+// 이름이 같아 보여도(직접비) 무엇을 빼는지에 따라 금액이 다르므로 기준 문구 그대로 구분한다.
+export interface BudgetBasis {
+  basis: string;      // 기준 문구 원문 ("직접비(현물 포함, 위탁연구개발비 제외)")
+  label: string;      // 편성표에 쓰는 짧은 이름 ("직접비(위탁 제외)")
+  amount: number;     // 계산된 기준 금액
+  categories: string[]; // 이 기준을 쓰는 비목 이름
+}
+
+export const budgetBases = (pack: RulePack, budgets: BudgetItem[], totalBudget: number, inKindWon = 0): BudgetBasis[] => {
+  const found = new Map<string, BudgetBasis>();
+  for (const category of pack.categories.filter((c) => c.allowed)) {
+    const cap = capFor(pack, budgets, totalBudget, category.id, inKindWon);
+    // 금액으로 환산되지 않는 기준(구입가 등)은 편성표 밖 숫자라 여기 세울 수 없다.
+    if (!cap || cap.basisAmount === null) continue;
+    const entry = found.get(cap.rule.basis ?? '');
+    if (entry) { entry.categories.push(category.name); continue; }
+    found.set(cap.rule.basis ?? '', {
+      basis: cap.rule.basis ?? '',
+      label: shortBasis(cap.rule.basis ?? '기준'),
+      amount: cap.basisAmount,
+      categories: [category.name],
+    });
+  }
+  return [...found.values()];
 };
 
 // 상한을 넘지 않고 이 비목에 넣을 수 있는 최대 금액 (ceiling = 잔액까지 다 쓸 때의 금액).

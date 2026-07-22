@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOverlay, articlesForRef, baseStandardFor, capFor, categoryOf, fundingCapChecks, maxAmountWithinCap, subItemChoicesFor, fundingRateChecks, packIsMissing, replacementPacksFor, rescaleBudgets, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories } from './rules';
+import { applyOverlay, articlesForRef, baseStandardFor, budgetBases, capFor, categoryOf, fundingCapChecks, maxAmountWithinCap, subItemChoicesFor, fundingRateChecks, packIsMissing, replacementPacksFor, rescaleBudgets, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories } from './rules';
 import type { Project, RulePack } from './types';
 
 describe('규정 팩 로더', () => {
@@ -138,10 +138,14 @@ describe('상한 계산과 배분', () => {
     const budgets = makeDraftBudgets(pack, 100_000_000); // 사용 비목 10개 균등 → 각 10,000,000
     // 연구수당 = 수정인건비(인건비 편성액 근사) 10,000,000의 20%
     expect(capFor(pack, budgets, 100_000_000, 'DIRECT_INCENTIVE')?.amount).toBe(2_000_000);
-    // 간접비 = 수정직접비(총 1억 - 간접비 1천만 - 위탁 1천만)의 10%
-    expect(capFor(pack, budgets, 100_000_000, 'INDIRECT')?.amount).toBe(8_000_000);
-    // 위탁연구개발비 = 직접비(위탁 제외 근사)의 40%
-    expect(capFor(pack, budgets, 100_000_000, 'DIRECT_SUBCONTRACT')?.amount).toBe(32_000_000);
+    // 간접비 = 수정직접비(총 1억 - 간접비 1천만 - 위탁 1천만 - 국제공동 1천만)의 10%
+    // 기준 문구가 빼라고 한 비목을 모두 뺀다 — 국제공동·부담비를 빼지 않으면 상한이 규정보다 높게 잡힌다.
+    expect(capFor(pack, budgets, 100_000_000, 'INDIRECT')?.amount).toBe(7_000_000);
+    // 위탁연구개발비 = 직접비(위탁·국제공동·부담비 제외)의 40%
+    expect(capFor(pack, budgets, 100_000_000, 'DIRECT_SUBCONTRACT')?.amount).toBe(28_000_000);
+    // 같은 "직접비"라도 무엇을 빼느냐에 따라 기준 금액이 다르다 — 이름에 그 차이가 남아야 한다.
+    expect(capFor(pack, budgets, 100_000_000, 'DIRECT_SUBCONTRACT')?.basisLabel).toBe('직접비(위탁·국제공동·부담비 제외)');
+    expect(capFor(pack, budgets, 100_000_000, 'INDIRECT')?.basisLabel).toBe('수정직접비(현물·위탁·국제공동·부담비 제외)');
     // 영리기관 팩에서 학생인건비·연구개발부담비는 편성 대상이 아니다
     expect(pack.categories.find((c) => c.id === 'DIRECT_STUDENT_LABOR')?.allowed).toBe(false);
     expect(getPack('nrd2026-nonprofit').categories.find((c) => c.id === 'DIRECT_STUDENT_LABOR')?.allowed).toBe(true);
@@ -160,6 +164,21 @@ describe('상한 계산과 배분', () => {
     // 원문 인용이 규칙에 실려 미리보기 하이라이트 1순위로 쓰인다
     const incentiveRule = capFor(pack, budgets, 70_000_000, 'DIRECT_INCENTIVE')?.rule;
     expect(incentiveRule?.quote).toContain('수정인건비');
+  });
+
+  it('기준 금액을 한자리에 모아 보여준다 — 같은 "직접비"라도 빼는 것이 다르면 따로 세운다', () => {
+    // 위탁 상한의 직접비와 간접비 상한의 직접비는 금액이 다른데, 이름만 "직접비"로 줄이면
+    // 편성표에 같은 이름이 다른 금액으로 나란히 서서 무엇이 맞는지 알 수 없었다.
+    const pack = getPack('tips2026-general');
+    const budgets = makeDraftBudgets(pack, 70_000_000);
+    const bases = budgetBases(pack, budgets, 70_000_000, 5_000_000);
+    const byLabel = new Map(bases.map((basis) => [basis.label, basis]));
+    expect(byLabel.get('직접비(현물·위탁 제외)')?.amount).toBe(45_400_000);   // 간접비 상한의 기준
+    expect(byLabel.get('직접비(위탁 제외)')?.amount).toBe(50_400_000);        // 위탁 상한의 기준 (현물 포함)
+    expect(byLabel.get('수정인건비 합계')?.amount).toBe(11_200_000);          // 연구수당 상한의 기준
+    expect(byLabel.get('직접비(현물·위탁 제외)')?.categories).toEqual(['간접비']);
+    // 구입가처럼 편성표 밖 기준은 금액을 낼 수 없어 여기 세우지 않는다
+    expect(bases.some((basis) => /구입가/.test(basis.label))).toBe(false);
   });
 
   it('연구시설·장비비의 구입가 20% 상한은 현물 계상에만 걸리는 상한으로 표시된다', () => {

@@ -59,7 +59,8 @@ describe('과제온 핵심 사용자 흐름', () => {
     const indirect = screen.getByLabelText('간접비 편성 금액');
     await user.clear(indirect); // 잔액 1,000만 원 확보
     fireEvent.change(screen.getByLabelText('간접비 편성 금액 조절'), { target: { value: '100000000' } });
-    expect(indirect).toHaveValue('8,181,818'); // 잔액(1,000만)이 아니라 상한에서 멈춘다
+    // 잔액(1,000만)이 아니라 상한에서 멈춘다 — 수정직접비(1억 − 간접비 − 위탁 1천만 − 국제공동 1천만)의 10%
+    expect(indirect).toHaveValue('7,272,727');
     const row = indirect.closest('.table-row')!;
     expect(within(row as HTMLElement).getByText('정상')).toBeInTheDocument();
     expect(within(row as HTMLElement).queryByText('상한 초과')).toBeNull();

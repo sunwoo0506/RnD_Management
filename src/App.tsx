@@ -6,7 +6,7 @@ import {
   Pencil, Plus, RefreshCw, ScanLine, Settings as SettingsIcon, ShieldCheck, Sparkles, Trash2, Upload, UserPlus, Users, WalletCards,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
-import { baseStandardFor, capFor, categoryOf, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
+import { baseStandardFor, budgetBases, capFor, categoryOf, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
 import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, getEvidence, getProjectDocument, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
 import { isCloudEnabled, supabase } from './supabase';
@@ -16,7 +16,7 @@ import { initRegulationPacks, type RegulationPackStatus } from './regulationDb';
 import { buildRegulationPackage } from './regulationPackage';
 import { diffExtraction, overlayRulesFrom, summarizeDiff, type PackDiff } from './packDiff';
 import SetupWizard from './SetupWizard';
-import type { CategoryCap, CategoryMin, ReferenceStandard, SubItemChoice, SubItemChoices } from './rules';
+import type { BudgetBasis, CategoryCap, CategoryMin, ReferenceStandard, SubItemChoice, SubItemChoices } from './rules';
 import type { BudgetCategoryId, BudgetItem, BudgetSubItem, Evidence, Expense, PackAllowedItem, PackArticle, PackCategory, PackRule, Participant, PaymentMethod, Project, ProjectDocumentLink, RulePack, SavedRulePack, Screen } from './types';
 
 // 문서 생성 라이브러리(docx·excel)는 무거워서 첫 화면 번들에서 제외하고 버튼 클릭 시에만 불러온다.
@@ -702,13 +702,24 @@ const COMP_SLOTS = CAT_COLORS.length;
 const ETC_COLOR = '#8f98a9';
 const FREE_COLOR = '#e4e9f1';
 
-function BudgetComposition({ pack, project, cats }: { pack: RulePack; project: Project; cats: PackCategory[] }) {
+function BudgetComposition({ pack, project, cats, bases }: { pack: RulePack; project: Project; cats: PackCategory[]; bases: BudgetBasis[] }) {
   const slotOf = new Map(pack.categories.filter((c) => c.allowed).map((c, i) => [c.id, i]));
   const entries = cats
     .map((cat) => ({ cat, amount: project.budgets.find((b) => b.categoryId === cat.id)?.amount ?? 0, slot: slotOf.get(cat.id) ?? COMP_SLOTS }))
     .filter((e) => e.amount > 0);
   const planned = entries.reduce((sum, e) => sum + e.amount, 0);
-  if (!project.totalBudget || planned === 0) return null;
+  // 상한 계산의 기준 금액은 도넛과 같은 자리에 둔다 — 편성 금액을 옮길 때 함께 보는 숫자다.
+  // 아직 아무것도 편성하지 않아 도넛을 그릴 수 없어도 기준 금액은 보여준다.
+  const basisBlock = bases.length === 0 ? null : <div className="basis-strip">
+    <span className="basis-title">상한 계산의 기준 금액</span>
+    <div className="basis-items">{bases.map((basis) => <div className="basis-item" key={basis.basis} title={basis.basis}>
+      <span>{basis.label}</span>
+      <strong>{formatWon(basis.amount)}</strong>
+      <small>{basis.categories.join(' · ')} 상한의 기준</small>
+    </div>)}</div>
+    <p className="basis-note">편성 금액이 바뀌면 기준 금액도 함께 바뀝니다. 이름 위에 마우스를 올리면 규정 문구 그대로 볼 수 있어요.</p>
+  </div>;
+  if (!project.totalBudget || planned === 0) return basisBlock && <div className="budget-comp">{basisBlock}</div>;
   const folded = entries.filter((e) => e.slot >= COMP_SLOTS);
   const foldedSum = folded.reduce((sum, e) => sum + e.amount, 0);
   const free = Math.max(0, project.totalBudget - planned);
@@ -749,6 +760,7 @@ function BudgetComposition({ pack, project, cats }: { pack: RulePack; project: P
       {slices.map((s) => <span className="comp-chip" key={s.key}><i className="dot" style={{ background: s.color }} /><b>{s.name}</b><span>{formatWon(s.amount)} · {share(s.amount)}%</span></span>)}
       {planned > project.totalBudget && <span className="comp-chip over"><AlertCircle /><b>총사업비 초과</b><span>{formatWon(planned - project.totalBudget)}</span></span>}
     </div>
+    {basisBlock}
   </div>;
 }
 
@@ -811,18 +823,49 @@ function ParticipantsPanel({ project, update }: { project: Project; update: (p: 
   const sortedParticipants = [...project.participants].sort((a, b) => KIND_ORDER[fundingKindOf(a)] - KIND_ORDER[fundingKindOf(b)]);
   return <section className="panel participants-panel">
     <div className="panel-head"><div><span className="section-kicker">STEP 1 · 인건비 산정</span><h3>참여인력 · 참여율 · 인건비</h3><p>인력을 등록하고 인건비(4대보험·퇴직금 자동 계산)를 산출한 뒤, 아래 비목별 편성에 바로 반영하세요. 계상 구분(현물/현금)별로 묶어 보여드려요.</p></div></div>
-    <div className="participant-list">{sortedParticipants.map((p, index) => { const total = p.projectRate + p.externalRate; const over = total > 100; const cost = laborCostFor(p, laborOpts); const kind = fundingKindOf(p); const hasSeverance = severanceApplies(p, includeSeverance); const showGroup = index === 0 || fundingKindOf(sortedParticipants[index - 1]) !== kind; return <Fragment key={p.id}>{showGroup && <div className="labor-group"><b>{KIND_LABEL[kind]}</b><span>{sortedParticipants.filter((x) => fundingKindOf(x) === kind).length}명</span></div>}<div className={over ? 'participant over' : 'participant'}><div className="participant-name"><div className="avatar">{p.name[0]}</div><strong>{p.name}</strong><button type="button" className="person-remove" aria-label={`${p.name} 삭제`} onClick={() => removePerson(p)}><Trash2 /></button></div><label>현재 과제<input aria-label={`${p.name} 현재 과제 참여율`} type="number" min="0" value={p.projectRate} onChange={(e) => setRate(p.id, 'projectRate', Number(e.target.value))} /><b>%</b></label><label>타 과제 합계<input aria-label={`${p.name} 타 과제 참여율`} type="number" min="0" value={p.externalRate} onChange={(e) => setRate(p.id, 'externalRate', Number(e.target.value))} /><b>%</b></label><div className="rate-total"><span>합산</span><strong>{total}%</strong></div>
-      <div className="labor-editor">
-        <label>구분<select aria-label={`${p.name} 기존/신규 구분`} value={p.laborType ?? 'existing'} onChange={(e) => setP(p.id, { laborType: e.target.value as 'existing' | 'new' })}><option value="existing">기존인력</option><option value="new">신규인력</option></select></label>
-        <label>참여 시작<input type="date" aria-label={`${p.name} 참여 시작일`} value={p.laborStart ?? project.startDate} onChange={(e) => setP(p.id, { laborStart: e.target.value })} /></label>
-        <label>참여 종료<input type="date" aria-label={`${p.name} 참여 종료일`} value={p.laborEnd ?? project.endDate} onChange={(e) => setP(p.id, { laborEnd: e.target.value })} /></label>
-        <label>월급여(원)<input inputMode="numeric" aria-label={`${p.name} 월급여`} value={withCommas(String(p.monthlyPay ?? ''))} placeholder="0" onChange={(e) => setP(p.id, { monthlyPay: Number(digitsOnly(e.target.value)) || undefined })} /></label>
-        <label>계상 구분<select aria-label={`${p.name} 인건비 계상 구분`} value={kind} onChange={(e) => setP(p.id, { laborFunding: e.target.value as Participant['laborFunding'] })}><option value="cash">현금 (전액)</option><option value="inkind">현물 (전액)</option><option value="mixed">혼합</option></select></label>
-        {kind === 'mixed' && <label>합계 중 현물(원)<input inputMode="numeric" aria-label={`${p.name} 현물 계상액`} value={withCommas(String(p.laborInKind ?? ''))} placeholder="0" onChange={(e) => setP(p.id, { laborInKind: Number(digitsOnly(e.target.value)) || undefined })} /></label>}
-        <label className="labor-sev"><strong>퇴직금 포함</strong><input type="checkbox" aria-label={`${p.name} 퇴직금 포함`} checked={hasSeverance} onChange={(e) => setP(p.id, { includeSeverance: e.target.checked })} /><span>: 1년 이상 근무자만 퇴직금을 포함할 수 있어요 (월급여의 1/12)</span></label>
-        <p className="labor-calc">월급여 {formatWon(cost.pay)}{includeInsurance ? ` + 4대보험 ${formatWon(cost.insurance)}` : ''}{hasSeverance ? ` + 퇴직금 ${formatWon(cost.severance)}` : ' (퇴직금 미계상)'} → 월 {formatWon(cost.monthly)} <em>(참여율 {p.projectRate}% 적용)</em> × {cost.months}개월 = <strong>합계 {formatWon(cost.total)}</strong> · 현금 {formatWon(cost.cash)} / 현물 {formatWon(cost.inKind)}</p>
-      </div>
-    {over && <p><AlertCircle /> 참여율 합산이 100%를 초과했습니다. 100% 이하로 조정해주세요.</p>}</div></Fragment>; })}</div>
+    {/* 인력 한 명이 카드 하나를 차지하면 몇 명만 넣어도 편성표가 화면 밖으로 밀린다.
+        한 명 = 한 줄로 두고, 계산식처럼 늘 볼 필요 없는 것은 합계 칸 툴팁으로 넘긴다. */}
+    <div className="labor-table"><div className="labor-head">
+      <span>인력</span><span>구분</span><span>참여 기간</span><span>월급여</span><span>참여율 (현재 / 타 과제)</span><span>계상 구분</span><span>인건비 합계</span><span />
+    </div>{sortedParticipants.map((p, index) => {
+      const total = p.projectRate + p.externalRate; const over = total > 100;
+      const cost = laborCostFor(p, laborOpts); const kind = fundingKindOf(p);
+      const hasSeverance = severanceApplies(p, includeSeverance);
+      const showGroup = index === 0 || fundingKindOf(sortedParticipants[index - 1]) !== kind;
+      const calc = `월급여 ${formatWon(cost.pay)}${includeInsurance ? ` + 4대보험 ${formatWon(cost.insurance)}` : ''}${hasSeverance ? ` + 퇴직금 ${formatWon(cost.severance)}` : ' (퇴직금 미계상)'} → 월 ${formatWon(cost.monthly)} (참여율 ${p.projectRate}% 적용) × ${cost.months}개월 = 합계 ${formatWon(cost.total)}`;
+      return <Fragment key={p.id}>
+        {showGroup && <div className="labor-group"><b>{KIND_LABEL[kind]}</b><span>{sortedParticipants.filter((x) => fundingKindOf(x) === kind).length}명</span></div>}
+        <div className={over ? 'labor-row over' : 'labor-row'}>
+          <div className="labor-person"><div className="avatar">{p.name[0]}</div><strong>{p.name}</strong></div>
+          <select aria-label={`${p.name} 기존/신규 구분`} value={p.laborType ?? 'existing'} onChange={(e) => setP(p.id, { laborType: e.target.value as 'existing' | 'new' })}><option value="existing">기존인력</option><option value="new">신규인력</option></select>
+          <div className="labor-period">
+            <input type="date" aria-label={`${p.name} 참여 시작일`} value={p.laborStart ?? project.startDate} onChange={(e) => setP(p.id, { laborStart: e.target.value })} />
+            <input type="date" aria-label={`${p.name} 참여 종료일`} value={p.laborEnd ?? project.endDate} onChange={(e) => setP(p.id, { laborEnd: e.target.value })} />
+          </div>
+          <div className="labor-pay">
+            <label className="money-input"><input inputMode="numeric" aria-label={`${p.name} 월급여`} value={withCommas(String(p.monthlyPay ?? ''))} placeholder="0" onChange={(e) => setP(p.id, { monthlyPay: Number(digitsOnly(e.target.value)) || undefined })} /><b>원</b></label>
+            <label className="labor-sev" title="1년 이상 근무자만 퇴직금을 포함할 수 있어요 (월급여의 1/12)"><input type="checkbox" aria-label={`${p.name} 퇴직금 포함`} checked={hasSeverance} onChange={(e) => setP(p.id, { includeSeverance: e.target.checked })} /><span>퇴직금 포함</span></label>
+          </div>
+          <div className="labor-rates">
+            <label><input aria-label={`${p.name} 현재 과제 참여율`} type="number" min="0" value={p.projectRate} onChange={(e) => setRate(p.id, 'projectRate', Number(e.target.value))} /><b>%</b></label>
+            <label><input aria-label={`${p.name} 타 과제 참여율`} type="number" min="0" value={p.externalRate} onChange={(e) => setRate(p.id, 'externalRate', Number(e.target.value))} /><b>%</b></label>
+            <b className={over ? 'sum over' : 'sum'}>{total}%</b>
+          </div>
+          <div className="labor-fund">
+            <select aria-label={`${p.name} 인건비 계상 구분`} value={kind} onChange={(e) => setP(p.id, { laborFunding: e.target.value as Participant['laborFunding'] })}><option value="cash">현금 (전액)</option><option value="inkind">현물 (전액)</option><option value="mixed">혼합</option></select>
+            {kind === 'mixed' && <label className="money-input" title="합계 인건비 중 현물로 계상할 금액"><input inputMode="numeric" aria-label={`${p.name} 현물 계상액`} value={withCommas(String(p.laborInKind ?? ''))} placeholder="현물 0" onChange={(e) => setP(p.id, { laborInKind: Number(digitsOnly(e.target.value)) || undefined })} /><b>원</b></label>}
+          </div>
+          {/* 계산식은 매번 읽을 것이 아니라 "왜 이 금액이지" 할 때만 필요하다 — 합계 칸에 올리면 보인다. */}
+          <div className="labor-total" title={calc}>
+            <strong>{formatWon(cost.total)}</strong>
+            <small>현금 {formatWon(cost.cash)} · 현물 {formatWon(cost.inKind)}</small>
+            <small className="labor-basis">월 {formatWon(cost.monthly)} × {cost.months}개월</small>
+          </div>
+          <button type="button" className="person-remove" aria-label={`${p.name} 삭제`} onClick={() => removePerson(p)}><Trash2 /></button>
+        </div>
+        {over && <p className="labor-warn"><AlertCircle /> 참여율 합산이 100%를 초과했습니다. 100% 이하로 조정해주세요.</p>}
+      </Fragment>;
+    })}</div>
     <form className="person-add" onSubmit={addPerson}><input value={person} onChange={(e) => setPerson(e.target.value)} placeholder="새 참여 인력 이름" /><button className="secondary" type="submit"><Plus /> 인력 추가</button></form>
     {project.participants.length === 0 && <div className="inline-warning"><AlertCircle /> 참여율 데이터가 없어 초과 경고가 작동하지 않습니다. 참여 인력을 추가해주세요.</div>}
     {project.participants.length > 0 && <div className="labor-summary">
@@ -1062,7 +1105,7 @@ function Budget({ project, update, setScreen }: { project: Project; update: (p: 
           <div className={total === project.totalBudget ? 'sum-ok' : 'sum-bad'}>{total === project.totalBudget ? <CheckCircle2 /> : <AlertCircle />} 편성 합계 {formatWon(total)} {total !== project.totalBudget && `(차이 ${formatWon(total - project.totalBudget)})`}{confirmed && ' · 편성 확정됨'}</div>
           {funding.matching > 0 && totalInKind > 0 && <div className="sum-bad"><AlertCircle /> 현물 {formatWon(totalInKind)} 편성됨 — 한도 검증을 하려면 과제 설정에서 "민간부담금 중 현금 비율"을 입력하세요</div>}
         </>}</div></div>
-      <BudgetComposition pack={pack} project={project} cats={cats} />
+      <BudgetComposition pack={pack} project={project} cats={cats} bases={budgetBases(pack, project.budgets, project.totalBudget, inKind)} />
       <div className="budget-table"><div className="table-head"><span>비목 · 사용 예시</span><span>허용 상한</span><span>편성 금액</span><span>비율</span><span>상태</span><span>기준</span></div>{cats.map((category) => {
         const item = project.budgets.find((b) => b.categoryId === category.id);
         const amount = item?.amount ?? 0;
