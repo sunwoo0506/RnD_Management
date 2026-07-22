@@ -27,7 +27,9 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
   const [form, setForm] = useState({ name: '', subsidy: '100000000', subsidyRate: '', matchingCashRate: '', start: today(), end: '', deadline: '', company: '', owner: '', email: '' });
   const [participant, setParticipant] = useState('');
   // ---- 2단계: 규정 선택 ----
-  const [packId, setPackId] = useState('prestartup');
+  // 기본값을 고정 id로 두면 그 팩이 폐기됐을 때(SUPERSEDED_PACK_IDS) 목록에 없는 팩이 선택된 채로 시작한다.
+  // 선택 가능한 첫 팩을 쓴다 — selectablePacks()는 검증된 규정DB 팩을 앞에 놓는다.
+  const [packId, setPackId] = useState(() => selectablePacks()[0]?.id ?? '');
   const [registryPick, setRegistryPick] = useState<RegistryEntry | null>(null);
   const [docs, setDocs] = useState<DocItem[]>([]);
   const [match, setMatch] = useState<MatchResult | null>(null);
