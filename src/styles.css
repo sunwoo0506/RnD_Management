@@ -99,6 +99,29 @@ svg { width: 18px; height: 18px; flex: none; }
 .sub-item-row > input { padding: 8px 10px; font-size: 12px; }
 .sub-item-row .money-input { height: 34px; }
 .sub-item-row .danger-button svg { width: 13px; }
+/* 규정DB에서 온 증빙 — 앱 예시 기본값(auto-docs)과 섞이지 않게 따로 세운다 */
+.auto-docs strong em { font-style: normal; font-weight: 600; font-size: 10.5px; color: var(--muted); margin-left: 5px; }
+.auto-docs span.added { border-color: #b9cdf5; background: #f4f8ff; color: #315dc8; }
+.reg-docs { display: grid; gap: 8px; margin-top: 9px; padding: 11px 13px; background: #f7faff; border: 1px solid #dbe6fb; border-radius: 10px; }
+.reg-docs > strong { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #315dc8; }
+.reg-docs > strong svg { width: 14px; }
+.reg-docs > strong em { font-style: normal; font-weight: 600; font-size: 10.5px; color: #6179ad; }
+.reg-docs > small { font-size: 10.5px; color: #6179ad; }
+.reg-doc-rule { display: grid; gap: 5px; }
+.reg-doc-rule > span { font-size: 11.5px; color: #4d586c; font-weight: 600; }
+.reg-doc-rule > span em { font-style: normal; color: var(--muted); font-weight: 500; }
+.doc-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.doc-chips button { border: 1px solid #dde3ec; background: white; color: #4d586c; border-radius: 7px; padding: 5px 9px; font-size: 11.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; text-align: left; }
+.doc-chips button svg { width: 11px; color: #8f98a9; flex: none; }
+.doc-chips button:hover { border-color: var(--blue); color: var(--blue); }
+.doc-chips button.on { border-color: var(--blue); background: #eef4ff; color: #315dc8; }
+.doc-chips button.on svg { color: var(--blue); }
+.item-docs { margin-top: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; }
+.item-docs summary { font-size: 11.5px; font-weight: 700; color: #4d586c; cursor: pointer; }
+.item-docs p { margin: 7px 0 0; font-size: 11px; color: #5b667b; line-height: 1.6; }
+.item-docs p b { color: var(--navy); margin-right: 4px; }
+.allowed-item .item-evidence { display: block; margin-top: 3px; font-style: normal; font-size: 10.5px; color: #6179ad; }
+.allowed-item .item-evidence svg { width: 11px; vertical-align: -1px; margin-right: 3px; }
 /* 상한 계산의 기준 금액 — 도넛과 같은 칸에 둬서 편성을 옮기며 함께 본다 */
 .basis-strip { flex: 1 0 100%; display: grid; gap: 7px; padding: 13px 0 0; border-top: 1px dashed #e4e9f1; }
 .basis-title { font-size: 11px; font-weight: 700; color: #8490a4; }

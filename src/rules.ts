@@ -3,7 +3,7 @@ import nrd2026Packs from './rulepacks/nrd2026.json';
 import tips2026Packs from './rulepacks/tips2026.json';
 import prestartup2026Packs from './rulepacks/prestartup2026.json';
 import didimdol2026Packs from './rulepacks/didimdol2026.json';
-import type { BudgetCategoryId, BudgetItem, PackArticle, PackCategory, PackOverlay, PackRule, Participant, PaymentMethod, Project, RulePack } from './types';
+import type { BudgetCategoryId, BudgetItem, PackAllowedItem, PackArticle, PackCategory, PackOverlay, PackRule, PackSource, Participant, PaymentMethod, Project, RulePack } from './types';
 
 export const RULES_EFFECTIVE_DATE = '2026-07-19';
 
@@ -146,6 +146,35 @@ export const documentsFor = (category: PackCategory, payment: PaymentMethod): st
   if (payment !== 'card') return category.requiredDocs;
   const kept = category.requiredDocs.filter((doc) => !/세금계산서|계좌이체|이체 ?확인증|영수증/.test(doc));
   return [...kept, '카드 영수증'];
+};
+
+// ---- 집행 증빙 안내 ----
+// 집행 화면이 보여주던 증빙은 앱이 비목별로 넣어둔 예시 기본값(requiredDocs)뿐이었다.
+// 규정DB에서 온 증빙(조건부 증빙 규칙·인정 항목별 증빙)은 예산편성 기준 패널에만 있어,
+// 정작 증빙을 챙기는 자리에서 보이지 않았다. 셋을 한자리에 모으되 출처를 섞지 않는다 —
+// 규정 증빙은 "10만원 초과/이하"처럼 조건이 갈리는 것이 있어 자동으로 체크리스트에 넣으면
+// 서로 어긋나는 서류를 함께 요구하게 된다. 조건과 근거를 보여주고 고르게 한다.
+export interface CategoryEvidence {
+  template: string[];                                                   // 앱 예시 기본값 (결제수단 반영)
+  rules: { name: string; documents: string[]; source: PackSource }[];    // 규정DB 조건부 증빙
+  items: { name: string; evidence: string }[];                           // 규정DB 인정 항목별 증빙
+  guideline?: string;                                                   // 규정 증빙의 출처 지침명
+}
+
+export const evidenceGuide = (pack: RulePack, category: PackCategory, payment: PaymentMethod): CategoryEvidence => {
+  // 공고 팩에 기준이 없으면(AI 추출 팩·예시 팩) 이름으로 찾은 공통 규정 기준을 쓴다 — 기준 패널과 같은 방식.
+  const hasOwn = !!(category.evidenceRules?.length || category.allowedItems?.some((item) => item.evidence));
+  const reference = hasOwn ? null : referenceStandardFor(category.name, pack.id);
+  const std = reference?.category ?? category;
+  const rules = (std.evidenceRules ?? []).filter((rule) => rule.documents.length);
+  const items = (std.allowedItems ?? [])
+    .filter((item): item is PackAllowedItem & { evidence: string } => !!item.evidence)
+    .map((item) => ({ name: item.name, evidence: item.evidence }));
+  return {
+    template: documentsFor(category, payment),
+    rules, items,
+    guideline: rules.length || items.length ? (reference?.pack ?? pack).guideline : undefined,
+  };
 };
 
 // ---- 규칙 조회 ----

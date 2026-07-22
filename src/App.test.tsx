@@ -139,6 +139,26 @@ describe('과제온 핵심 사용자 흐름', () => {
     expect(screen.getByText('0/4 증빙 완료')).toBeInTheDocument();
   });
 
+  it('집행 화면이 규정DB 증빙을 근거와 함께 보여주고, 고른 것을 체크리스트에 넣는다', async () => {
+    localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture('nrd2026-forprofit')));
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole('button', { name: '집행 · 증빙' }));
+    await user.selectOptions(screen.getByLabelText('비목'), 'DIRECT_ACTIVITY');
+    // 규정 증빙은 조건이 갈리므로(10만원 초과/이하) 자동으로 넣지 않고 근거와 함께 보여준다
+    expect(screen.getByText(/10만원 초과 회의비 기본 증빙/)).toBeInTheDocument();
+    expect(screen.getByText(/제25조제5항 단서/)).toBeInTheDocument();
+    // 인정 항목별 증빙도 여기서 볼 수 있다 (예전에는 팩에 실려 있어도 화면에 없었다)
+    expect(screen.getByText(/세부 항목별 증빙 14건/)).toBeInTheDocument();
+    // 해당하는 증빙을 눌러 담으면 체크리스트에 함께 들어간다 (기본 3건 + 고른 1건)
+    await user.click(screen.getByRole('button', { name: '국외출장계획서' }));
+    await user.type(screen.getByLabelText(/공급가액/), '300000');
+    await user.type(screen.getByLabelText('용도'), '국외 학회 출장');
+    await user.type(screen.getByLabelText('거래처'), '항공사');
+    await user.click(screen.getByRole('button', { name: '집행 등록' }));
+    expect(screen.getByText('0/4 증빙 완료')).toBeInTheDocument();
+    expect(screen.getByText('국외출장계획서')).toBeInTheDocument();
+  });
+
   it('공급가액·부가세액 입력 시 집행금액은 부가세를 제외한 공급가액으로 잡힌다', async () => {
     localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture()));
     const user = userEvent.setup(); render(<App />);

@@ -6,7 +6,7 @@ import {
   Pencil, Plus, RefreshCw, ScanLine, Settings as SettingsIcon, ShieldCheck, Sparkles, Trash2, Upload, UserPlus, Users, WalletCards,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
-import { baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, documentsFor, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
+import { baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, documentsFor, evidenceGuide, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, transferLimitError, visibleCategories } from './rules';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
 import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, getEvidence, getProjectDocument, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
 import { isCloudEnabled, supabase } from './supabase';
@@ -469,7 +469,9 @@ function AllowedItemList({ items, refLink }: { items: PackAllowedItem[]; refLink
       {item.status ? <AlertCircle /> : <Check />}
       <span><b>{item.name}</b>{item.status === 'CONDITIONAL' ? <em className="tag">조건부</em> : item.status === 'INSTITUTION_SPECIFIC' ? <em className="tag">기관 한정</em> : null}{item.requiresApproval && <em className="tag warn">사전승인</em>}
         {item.description ? ` ${item.description}` : ''}
-        {' '}{refLink({ item: item.name, message: item.description ?? item.name, source: item.source })}</span>
+        {' '}{refLink({ item: item.name, message: item.description ?? item.name, source: item.source })}
+        {/* 규정DB에 항목별 증빙이 있으면 여기서 보여준다 — 예전에는 실려 있어도 화면에 나오지 않았다. */}
+        {item.evidence && <em className="item-evidence"><FileCheck2 /> 증빙 {item.evidence}</em>}</span>
     </p>)}
     {items.length > ALLOWED_ITEM_PREVIEW && <button type="button" className="text-button more-items" onClick={() => setExpanded(!expanded)}>
       {expanded ? '접기' : `${items.length - ALLOWED_ITEM_PREVIEW}건 더 보기`}
@@ -1244,6 +1246,8 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
   const [receipt, setReceipt] = useState<File | null>(null);
   const [ocr, setOcr] = useState<{ status: 'idle' | 'working' | 'done' | 'error'; message?: string; text?: string }>({ status: 'idle' });
   const [editingId, setEditingId] = useState<string | null>(null);
+  // 규정 증빙 중 이 집행건에 해당한다고 고른 것 — 등록할 때 체크리스트에 함께 넣는다.
+  const [extraDocs, setExtraDocs] = useState<Set<string>>(new Set());
   const selectedCategory = categoryOf(pack, form.categoryId);
   const categoryWarnings = rulesFor(pack, form.categoryId, 'warning');
   const budget = project.budgets.find((b) => b.categoryId === form.categoryId)?.amount ?? 0;
@@ -1281,14 +1285,15 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
       setOcr({ status: 'error', message: `OCR 인식에 실패했습니다${detail}. 첫 실행은 인식 엔진 내려받기에 시간이 걸릴 수 있어요. 잠시 후 다시 시도하거나 값을 직접 입력해주세요.` });
     }
   };
-  const resetForm = () => { setForm(emptyExpenseForm()); setReceipt(null); setOcr({ status: 'idle' }); setEditingId(null); };
+  const resetForm = () => { setForm(emptyExpenseForm()); setReceipt(null); setOcr({ status: 'idle' }); setEditingId(null); setExtraDocs(new Set()); };
   const closeForm = () => { resetForm(); setShowForm(false); };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (isOver && !window.confirm(`잔액보다 ${formatWon(amount - (budget - spent))} 초과합니다. 그래도 등록할까요?`)) return;
     const editing = editingId ? project.expenses.find((e) => e.id === editingId) : undefined;
     // 수정 시에는 기존 증빙 체크리스트(업로드 파일 포함)를 유지하고, 신규 등록 시에만 새로 만든다.
-    let evidence: Evidence[] = editing ? editing.evidence : documentsFor(selectedCategory, form.payment).map((label) => ({ id: uid(), label, completed: false }));
+    const docs = [...documentsFor(selectedCategory, form.payment), ...extraDocs];
+    let evidence: Evidence[] = editing ? editing.evidence : docs.map((label) => ({ id: uid(), label, completed: false }));
     // 먼저 올린 영수증은 증빙 체크리스트의 영수증 항목에 자동 첨부한다.
     if (receipt) {
       const slot = evidence.find((item) => item.label.includes('영수증'));
@@ -1337,7 +1342,27 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
       <div className="field-grid three"><label>집행일<input required type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label><label>비목<select value={form.categoryId} disabled={!!editingId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>결제수단<select value={form.payment} disabled={!!editingId} onChange={(e) => setForm({ ...form, payment: e.target.value as PaymentMethod })}><option value="card">카드 결제</option><option value="transfer">계좌이체 (세금계산서)</option></select></label></div><div className="field-grid three"><label><span className="label-line">공급가액 <b>집계 기준</b></span><input required inputMode="numeric" value={withCommas(form.supply)} onChange={(e) => setMoney('supply', e.target.value)} placeholder="0" /></label><label><span className="label-line">부가세액 <b>선택</b></span><input inputMode="numeric" value={withCommas(form.vat)} onChange={(e) => setMoney('vat', e.target.value)} placeholder="0" /></label><label><span className="label-line">합계 금액 <b>자동</b></span><input readOnly tabIndex={-1} value={withCommas(String(totalWithVat))} placeholder="0" /></label></div><p className="field-hint">과제비 집계는 <strong>공급가액 기준(부가세 제외)</strong>입니다. 합계 금액은 공급가액+부가세액으로 자동 계산되며, 영수증의 결제금액과 맞는지 확인하는 참고용입니다.</p><div className="field-grid"><label>용도<input required value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} placeholder="예: 외부 전문가 참석 정기 회의" /></label><label>거래처<input required value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} placeholder="거래처명" /></label></div>
       {categoryWarnings.length > 0 && <div className="rule-warnings">{categoryWarnings.map((rule) => <p key={rule.id}><AlertCircle /> {rule.message} <em>({rule.source.ref})</em></p>)}</div>}
       <div className={`balance-preview ${isOver ? 'over' : ''}`}><WalletCards /><div><span>{selectedCategory.name} 등록 후 잔액</span><strong>{formatWon(budget - spent - amount)}</strong></div>{isOver && <p><AlertCircle /> 잔액을 초과합니다. 확인 후 등록할 수 있어요.</p>}</div>
-      <div className="auto-docs"><strong><FileCheck2 /> 자동 안내 증빙</strong><div>{documentsFor(selectedCategory, form.payment).map((doc) => <span key={doc}><Check />{doc}</span>)}</div></div><div className="form-actions"><button type="button" className="secondary" onClick={closeForm}>취소</button><button className="primary" type="submit">{editingId ? '수정 저장' : isOver ? '확인 후 등록' : '집행 등록'}</button></div></form>}
+      {(() => {
+        const guide = evidenceGuide(pack, selectedCategory, form.payment);
+        const toggleDoc = (doc: string) => setExtraDocs((prev) => { const next = new Set(prev); if (next.has(doc)) next.delete(doc); else next.add(doc); return next; });
+        return <>
+          <div className="auto-docs"><strong><FileCheck2 /> 자동 안내 증빙 <em>앱 기본 예시</em></strong><div>{guide.template.map((doc) => <span key={doc}><Check />{doc}</span>)}{[...extraDocs].map((doc) => <span key={doc} className="added"><Check />{doc}</span>)}</div></div>
+          {/* 규정DB에서 온 증빙. 조건이 갈리는 것이 있어(10만원 초과/이하) 자동으로 넣지 않고 골라 담게 한다. */}
+          {guide.rules.length > 0 && <div className="reg-docs">
+            <strong><BookOpenCheck /> 규정이 요구하는 증빙 <em>{guide.guideline}</em></strong>
+            {guide.rules.map((rule) => <div className="reg-doc-rule" key={rule.name}>
+              <span>{rule.name} <em>({rule.source.ref})</em></span>
+              <div className="doc-chips">{rule.documents.map((doc) => <button type="button" key={doc} className={extraDocs.has(doc) ? 'on' : ''} onClick={() => toggleDoc(doc)}>
+                {extraDocs.has(doc) ? <Check /> : <Plus />}{doc}
+              </button>)}</div>
+            </div>)}
+            <small>해당하는 조건의 증빙을 눌러 이 집행건의 체크리스트에 넣으세요.</small>
+          </div>}
+          {guide.items.length > 0 && <details className="item-docs"><summary>{selectedCategory.name} 세부 항목별 증빙 {guide.items.length}건</summary>
+            {guide.items.map((item) => <p key={item.name}><b>{item.name}</b> {item.evidence}</p>)}
+          </details>}
+        </>;
+      })()}<div className="form-actions"><button type="button" className="secondary" onClick={closeForm}>취소</button><button className="primary" type="submit">{editingId ? '수정 저장' : isOver ? '확인 후 등록' : '집행 등록'}</button></div></form>}
     <div className="template-strip"><div><FileText /><div><strong>자주 쓰는 증빙 템플릿</strong><span>집행 기록에 필요한 기본 항목을 담았습니다.</span></div></div><div>{(['품의서', '회의록', '출장보고서'] as const).map((type) => <button key={type} onClick={() => withExporters((m) => m.downloadTemplate(type))}><Download /> {type}</button>)}</div></div>
     <section className="expense-list"><div className="section-title"><h3>집행 내역 <b>{project.expenses.length}</b></h3><p>파일 업로드 완료 응답 후에만 증빙이 완료 처리됩니다.</p></div>{project.expenses.length === 0 ? <div className="empty-state"><FileClock /><h3>아직 등록된 집행이 없어요</h3><p>첫 집행을 등록하면 증빙 체크리스트가 여기에 나타납니다.</p></div> : project.expenses.map((expense) => { const rule = categoryOf(pack, expense.categoryId); const complete = expense.evidence.filter((e) => e.completed).length; return <article className="expense-card" key={expense.id}><div className="expense-summary"><div className="date-box"><strong>{new Date(expense.date).getDate()}</strong><span>{new Date(expense.date).toLocaleDateString('ko-KR', { month: 'short' })}</span></div><div><span className="category-label">{rule.name}</span><h4>{expense.purpose}</h4><small>{expense.vendor}{expense.paymentMethod ? ` · ${expense.paymentMethod === 'card' ? '카드 결제' : '계좌이체'}` : ''}</small></div><div className="expense-amount"><strong>{formatWon(expense.amount)}</strong>{expense.vatAmount ? <small className="vat-note">부가세 {formatWon(expense.vatAmount)} 별도</small> : null}<span className={complete === expense.evidence.length ? 'complete' : 'incomplete'}>{complete}/{expense.evidence.length} 증빙 완료</span></div><div className="expense-actions"><button type="button" aria-label={`${expense.purpose} 수정`} onClick={() => startEdit(expense)}><Pencil /></button><button type="button" className="danger" aria-label={`${expense.purpose} 삭제`} onClick={() => removeExpense(expense)}><Trash2 /></button></div></div><div className="evidence-grid">{expense.evidence.map((evidence) => <div className={evidence.completed ? 'evidence done' : 'evidence'} key={evidence.id}><div>{evidence.completed ? <CheckCircle2 /> : <FileText />}<span><strong>{evidence.label}</strong><small>{evidence.fileName || 'PDF 또는 이미지 · 최대 10MB'}</small></span></div>{evidence.completed ? <button onClick={() => downloadEvidence(evidence.id, evidence.fileName)}><Download /> 열기</button> : <label className="upload-button"><Upload /> 업로드<input type="file" accept="application/pdf,image/*" onChange={(ev) => upload(expense.id, evidence.id, ev.target.files?.[0])} /></label>}</div>)}</div></article>; })}</section>
   </div>;
