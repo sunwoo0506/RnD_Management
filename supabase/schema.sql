@@ -282,29 +282,32 @@ create policy "extraction cache read" on public.extraction_cache
 -- ===========================================================================
 -- 7) Storage 버킷
 -- ===========================================================================
+-- reset.sql 은 버킷을 지우지 않는다 (Supabase 가 storage 테이블 직접 삭제를 막는다).
+-- 그래서 여기 insert 는 모두 on conflict do nothing — 이미 있는 버킷은 그대로 두고
+-- 정책만 다시 만든다. 버킷 안의 파일을 비우려면 scripts/reset-supabase-storage.mjs 를 쓴다.
 
 -- 7.1 규정DB 패키지 원본 — 경로: {package_name}/{파일명}
 --     manifest.json + 6개 JSON + Review.xlsx + README.md + packs/{pack_id}.json
-insert into storage.buckets (id, name, public) values ('regulation-db', 'regulation-db', false);
+insert into storage.buckets (id, name, public) values ('regulation-db', 'regulation-db', false) on conflict (id) do nothing;
 
 create policy "regulation db read" on storage.objects
   for select to authenticated using (bucket_id = 'regulation-db');
 
 -- 7.2 공유 규정 원본 문서 (승인된 파일만) — 경로: {document_id}/{version_id}/{file_id}/original.<ext>
-insert into storage.buckets (id, name, public) values ('public-regulations', 'public-regulations', false);
+insert into storage.buckets (id, name, public) values ('public-regulations', 'public-regulations', false) on conflict (id) do nothing;
 
 create policy "public regulations read" on storage.objects
   for select to authenticated using (bucket_id = 'public-regulations');
 
 -- 7.3 신청 대기 파일 — 본인 폴더에만 업로드. 읽기·삭제는 service role 만.
-insert into storage.buckets (id, name, public) values ('registry_pending', 'registry_pending', false);
+insert into storage.buckets (id, name, public) values ('registry_pending', 'registry_pending', false) on conflict (id) do nothing;
 
 create policy "registry pending insert own" on storage.objects
   for insert to authenticated
   with check (bucket_id = 'registry_pending' and auth.uid()::text = (storage.foldername(name))[1]);
 
 -- 7.4 증빙 파일 — 본인 폴더 전용
-insert into storage.buckets (id, name, public) values ('evidence', 'evidence', false);
+insert into storage.buckets (id, name, public) values ('evidence', 'evidence', false) on conflict (id) do nothing;
 
 create policy "evidence read own" on storage.objects
   for select using (bucket_id = 'evidence' and auth.uid()::text = (storage.foldername(name))[1]);
@@ -316,7 +319,7 @@ create policy "evidence delete own" on storage.objects
   for delete using (bucket_id = 'evidence' and auth.uid()::text = (storage.foldername(name))[1]);
 
 -- 7.5 과제 전용 문서 (협약서·사업계획서 등) — 본인 폴더 전용
-insert into storage.buckets (id, name, public) values ('project-documents', 'project-documents', false);
+insert into storage.buckets (id, name, public) values ('project-documents', 'project-documents', false) on conflict (id) do nothing;
 
 create policy "project documents read own" on storage.objects
   for select using (bucket_id = 'project-documents' and auth.uid()::text = (storage.foldername(name))[1]);
@@ -330,4 +333,5 @@ create policy "project documents delete own" on storage.objects
 -- ===========================================================================
 -- Authentication → Users 에서 관리자 전용 계정의 User UID 를 복사해 아래 값을 확인하세요.
 -- reset.sql 은 auth.users 를 지우지 않으므로 기존 UID 가 그대로 유효합니다.
-insert into public.document_reviewers (user_id) values ('51ecc617-8cc8-4b28-a1b0-1022512fdf27');
+insert into public.document_reviewers (user_id) values ('51ecc617-8cc8-4b28-a1b0-1022512fdf27')
+  on conflict (user_id) do nothing;
