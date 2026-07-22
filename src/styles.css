@@ -273,7 +273,9 @@ label { display: grid; gap: 6px; color: #4d586c; font-size: 13px; font-weight: 7
 .person-add { display: flex; gap: 7px; }
 .person-add input { flex: 1; }
 .labor-summary { border-top: 1px solid var(--line); margin-top: 10px; padding: 14px 20px 18px; display: grid; gap: 10px; }
-.labor-summary > div:not(.settings-save) { display: grid; grid-template-columns: 1fr auto auto; align-items: baseline; gap: 10px; }
+/* 합계 줄만 3단으로 정렬한다. 예전에는 이 규칙이 .labor-toggles까지 잡아(특이도가 더 높다)
+   4대보험 토글과 요율 입력이 화면 양끝으로 벌어져 있었다. */
+.labor-sum-row { display: grid; grid-template-columns: 1fr auto auto; align-items: baseline; gap: 10px; }
 /* 인건비 합계 두 줄은 표 바로 아래에 붙인다 — 아래 설정·버튼과는 옅은 선으로 나눈다 */
 .labor-sum-row strong { color: var(--navy); }
 .labor-sum-row + .labor-sum-row { padding-bottom: 10px; border-bottom: 1px dashed #e4e9f1; }
@@ -282,8 +284,9 @@ label { display: grid; gap: 6px; color: #4d586c; font-size: 13px; font-weight: 7
 .labor-summary small { color: var(--muted); font-size: 11px; }
 .labor-toggles { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .labor-toggles .share-toggle { padding: 0; }
-.labor-rate { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); font-weight: 600; }
-.labor-rate input { width: 70px; padding: 6px 8px; font-size: 12px; }
+.labor-rate { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); font-weight: 600; }
+.labor-rate input { width: 62px; padding: 6px 8px; font-size: 12px; text-align: right; }
+.labor-rate b { font-size: 11px; color: var(--muted); }
 .reminder-panel { margin-top: 15px; }.panel-head h3 svg { vertical-align: middle; margin-right: 5px; color: var(--blue); }.log-table { padding: 0 20px 18px; }.log-table > div { display: grid; grid-template-columns: 1.2fr 1.3fr .5fr .5fr .8fr; gap: 10px; padding: 10px 8px; border-top: 1px solid var(--line); font-size: 11px; align-items: center; }.log-status { color: #218760; background: #e8f7f1; padding: 4px 6px; border-radius: 5px; text-align: center; }
 .setup-page { min-height: 100vh; background: #0f1b31; color: white; padding: 28px 4vw 50px; }.setup-brand { max-width: 1180px; margin: 0 auto; }.setup-card { max-width: 1180px; min-height: 690px; margin: 25px auto 0; display: grid; grid-template-columns: .85fr 1.15fr; border-radius: 22px; overflow: hidden; box-shadow: 0 30px 80px #050a15a8; }.setup-copy { padding: 78px 58px; background: radial-gradient(circle at 20% 90%, #284b9b 0, transparent 50%), linear-gradient(145deg, #172a4c, #13213b); }.setup-copy h1 { font-size: 41px; line-height: 1.25; letter-spacing: -2px; margin: 17px 0; }.setup-copy h1 em { color: #81a4ff; font-style: normal; }.setup-copy > p { color: #aeb9ca; font-size: 13px; line-height: 1.8; max-width: 370px; }.setup-points { margin-top: 45px; display: grid; gap: 14px; }.setup-points span { display: flex; align-items: center; gap: 9px; color: #d8e1ef; font-size: 14px; }.setup-points svg { color: #75a0ff; }.setup-form { background: white; color: var(--navy); padding: 42px 50px; display: grid; gap: 15px; align-content: center; }.setup-form h2 { margin: 8px 0 3px; font-size: 23px; }.setup-form > div:first-child p { margin: 0; color: var(--muted); font-size: 13px; }.step-pill { font-size: 11px; color: var(--blue); background: #eaf0ff; padding: 4px 7px; border-radius: 12px; font-weight: 800; }.optional { color: #9da5b3; font-size: 11px; }.fine-print { color: #8a94a6; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 11px; margin: -4px 0 0; }.fine-print svg { width: 12px; }
 .setup-form.wizard { align-content: start; overflow-y: auto; max-height: 690px; }

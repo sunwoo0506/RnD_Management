@@ -885,7 +885,8 @@ function ParticipantsPanel({ project, update }: { project: Project; update: (p: 
       <div className="labor-sum-row"><span>신규인력 인건비 합계</span><strong>{formatWon(sumNew.total)}</strong><small>현금 {formatWon(sumNew.cash)} · 현물 {formatWon(sumNew.inKind)}</small></div>
       <div className="labor-toggles">
         <label className="share-toggle"><input type="checkbox" checked={includeInsurance} onChange={(e) => update({ ...project, laborIncludeInsurance: e.target.checked })} /><span><strong>4대보험 포함</strong> — 사업별 계상 기준에 따라</span></label>
-        {includeInsurance && <label className="labor-rate">요율(%)<input inputMode="decimal" value={String(insRate)} onChange={(e) => { const v = e.target.value.replace(/[^\d.]/g, ''); update({ ...project, insuranceRate: Math.min(30, Number(v) || 0) }); }} /></label>}
+        {/* 단위(%)는 입력칸 뒤에 둔다 — "요율(%) [11]"보다 "요율 [11] %"가 읽는 순서와 같다. */}
+        {includeInsurance && <label className="labor-rate">요율<input aria-label="4대보험 요율(%)" inputMode="decimal" value={String(insRate)} onChange={(e) => { const v = e.target.value.replace(/[^\d.]/g, ''); update({ ...project, insuranceRate: Math.min(30, Number(v) || 0) }); }} /><b>%</b></label>}
         <label className="share-toggle"><input type="checkbox" checked={includeSeverance} onChange={(e) => update({ ...project, laborIncludeSeverance: e.target.checked })} /><span><strong>퇴직금 기본값</strong> — 새로 추가하는 인력의 기본 설정 (1년 이상 근무자만 계상 가능해 개인별로 조정하세요)</span></label>
       </div>
       {(() => {
