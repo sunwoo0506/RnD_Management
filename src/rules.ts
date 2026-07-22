@@ -154,26 +154,41 @@ export const documentsFor = (category: PackCategory, payment: PaymentMethod): st
 // 정작 증빙을 챙기는 자리에서 보이지 않았다. 셋을 한자리에 모으되 출처를 섞지 않는다 —
 // 규정 증빙은 "10만원 초과/이하"처럼 조건이 갈리는 것이 있어 자동으로 체크리스트에 넣으면
 // 서로 어긋나는 서류를 함께 요구하게 된다. 조건과 근거를 보여주고 고르게 한다.
-export interface CategoryEvidence {
-  template: string[];                                                   // 앱 예시 기본값 (결제수단 반영)
-  rules: { name: string; documents: string[]; source: PackSource }[];    // 규정DB 조건부 증빙
-  items: { name: string; evidence: string }[];                           // 규정DB 인정 항목별 증빙
-  guideline?: string;                                                   // 규정 증빙의 출처 지침명
+export interface EvidenceSet {
+  rules: { name: string; documents: string[]; source: PackSource }[];   // 조건부 증빙 규칙
+  items: { name: string; evidence: string }[];                          // 인정 항목별 증빙
+}
+export interface CategoryEvidence extends EvidenceSet {
+  template: string[];                                     // 앱 예시 기본값 (결제수단 반영)
+  guideline?: string;                                     // 이 사업 규정의 지침명
+  base?: EvidenceSet & { guideline: string };             // 상위 규정에서 물려받은 증빙
 }
 
-export const evidenceGuide = (pack: RulePack, category: PackCategory, payment: PaymentMethod): CategoryEvidence => {
-  // 공고 팩에 기준이 없으면(AI 추출 팩·예시 팩) 이름으로 찾은 공통 규정 기준을 쓴다 — 기준 패널과 같은 방식.
-  const hasOwn = !!(category.evidenceRules?.length || category.allowedItems?.some((item) => item.evidence));
-  const reference = hasOwn ? null : referenceStandardFor(category.name, pack.id);
-  const std = reference?.category ?? category;
-  const rules = (std.evidenceRules ?? []).filter((rule) => rule.documents.length);
-  const items = (std.allowedItems ?? [])
+const evidenceSetOf = (category?: PackCategory): EvidenceSet => ({
+  rules: (category?.evidenceRules ?? []).filter((rule) => rule.documents.length),
+  items: (category?.allowedItems ?? [])
     .filter((item): item is PackAllowedItem & { evidence: string } => !!item.evidence)
-    .map((item) => ({ name: item.name, evidence: item.evidence }));
+    .map((item) => ({ name: item.name, evidence: item.evidence })),
+});
+
+export const evidenceGuide = (pack: RulePack, category: PackCategory, payment: PaymentMethod): CategoryEvidence => {
+  const own = evidenceSetOf(category);
+  // 공고·지침이 증빙을 따로 정하지 않은 부분은 상위 규정을 따른다 (디딤돌 → 국가연구개발비 사용 기준).
+  // 상위 규정을 밝히지 않은 팩(AI 추출 팩·예시 팩)은 예전처럼 이름으로 찾은 공통 규정 기준을 쓴다.
+  const standard = baseStandardFor(pack, category.id)
+    ?? (own.rules.length || own.items.length ? null : referenceStandardFor(category.name, pack.id));
+  const inherited = standard ? evidenceSetOf(standard.category) : null;
+  const base = inherited && {
+    guideline: standard!.pack.guideline,
+    // 이 사업이 같은 이름으로 따로 정한 것은 상위 규정 쪽에서 뺀다 — 같은 요구가 두 번 나오면 안 된다.
+    rules: inherited.rules.filter((rule) => !own.rules.some((mine) => mine.name === rule.name)),
+    items: inherited.items.filter((item) => !own.items.some((mine) => mine.name === item.name)),
+  };
   return {
     template: documentsFor(category, payment),
-    rules, items,
-    guideline: rules.length || items.length ? (reference?.pack ?? pack).guideline : undefined,
+    rules: own.rules, items: own.items,
+    guideline: own.rules.length || own.items.length ? pack.guideline : undefined,
+    ...(base && (base.rules.length || base.items.length) ? { base } : {}),
   };
 };
 

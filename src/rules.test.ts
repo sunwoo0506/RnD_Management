@@ -269,6 +269,25 @@ describe('집행 증빙 안내', () => {
   });
 });
 
+describe('디딤돌 증빙 (상위 규정 상속)', () => {
+  it('공고가 정하지 않은 증빙은 국가연구개발비 사용 기준에서 물려받는다', () => {
+    // 디딤돌 관리지침은 "공통지침에 따라 운영함을 원칙"이라 증빙 표가 없다.
+    const pack = getPack('didimdol2026');
+    const guide = evidenceGuide(pack, categoryOf(pack, 'DIRECT_ACTIVITY'), 'card');
+    expect(guide.base?.guideline).toContain('국가연구개발사업 연구개발비 사용 기준');
+    expect(guide.base?.rules.map((rule) => rule.name)).toContain('10만원 초과 회의비 기본 증빙');
+    expect(guide.base?.items.length).toBeGreaterThan(10);
+    // 이 사업이 따로 정한 것은 그대로 남고, 상위 규정 쪽에서 중복되지 않는다
+    const own = evidenceGuide(pack, categoryOf(pack, 'DIRECT_ACTIVITY'), 'card').rules.map((rule) => rule.name);
+    expect(guide.base?.rules.every((rule) => !own.includes(rule.name))).toBe(true);
+  });
+
+  it('상위 규정을 밝히지 않은 팩은 자기 증빙만 쓴다', () => {
+    const pack = getPack('prestartup2026');
+    expect(evidenceGuide(pack, categoryOf(pack, 'PRE_FEE'), 'card').base).toBeUndefined();
+  });
+});
+
 describe('예비창업패키지 증빙', () => {
   it('통합관리지침 제36조 표의 비목별 증빙이 인정 항목마다 실린다', () => {
     const pack = getPack('prestartup2026');

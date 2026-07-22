@@ -1347,20 +1347,29 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
         const toggleDoc = (doc: string) => setExtraDocs((prev) => { const next = new Set(prev); if (next.has(doc)) next.delete(doc); else next.add(doc); return next; });
         return <>
           <div className="auto-docs"><strong><FileCheck2 /> 자동 안내 증빙 <em>앱 기본 예시</em></strong><div>{guide.template.map((doc) => <span key={doc}><Check />{doc}</span>)}{[...extraDocs].map((doc) => <span key={doc} className="added"><Check />{doc}</span>)}</div></div>
-          {/* 규정DB에서 온 증빙. 조건이 갈리는 것이 있어(10만원 초과/이하) 자동으로 넣지 않고 골라 담게 한다. */}
-          {guide.rules.length > 0 && <div className="reg-docs">
-            <strong><BookOpenCheck /> 규정이 요구하는 증빙 <em>{guide.guideline}</em></strong>
-            {guide.rules.map((rule) => <div className="reg-doc-rule" key={rule.name}>
+          {/* 규정DB에서 온 증빙. 조건이 갈리는 것이 있어(10만원 초과/이하) 자동으로 넣지 않고 골라 담게 한다.
+              공고가 정하지 않은 부분은 상위 규정을 따르므로, 그쪽 증빙도 출처를 밝혀 함께 보여준다. */}
+          {[
+            { set: { rules: guide.rules, items: guide.items }, guideline: guide.guideline, inherited: false },
+            ...(guide.base ? [{ set: guide.base, guideline: guide.base.guideline, inherited: true }] : []),
+          ].filter((group) => group.set.rules.length > 0).map((group) => <div className="reg-docs" key={group.guideline}>
+            <strong><BookOpenCheck /> {group.inherited ? '상위 규정이 요구하는 증빙' : '규정이 요구하는 증빙'} <em>{group.guideline}</em></strong>
+            {group.inherited && <small>이 사업 공고·지침이 따로 정하지 않은 부분은 이 기준을 따릅니다.</small>}
+            {group.set.rules.map((rule) => <div className="reg-doc-rule" key={rule.name}>
               <span>{rule.name} <em>({rule.source.ref})</em></span>
               <div className="doc-chips">{rule.documents.map((doc) => <button type="button" key={doc} className={extraDocs.has(doc) ? 'on' : ''} onClick={() => toggleDoc(doc)}>
                 {extraDocs.has(doc) ? <Check /> : <Plus />}{doc}
               </button>)}</div>
             </div>)}
             <small>해당하는 조건의 증빙을 눌러 이 집행건의 체크리스트에 넣으세요.</small>
-          </div>}
-          {guide.items.length > 0 && <details className="item-docs"><summary>{selectedCategory.name} 세부 항목별 증빙 {guide.items.length}건</summary>
-            {guide.items.map((item) => <p key={item.name}><b>{item.name}</b> {item.evidence}</p>)}
-          </details>}
+          </div>)}
+          {(() => {
+            const items = [...guide.items, ...(guide.base?.items ?? [])];
+            if (!items.length) return null;
+            return <details className="item-docs"><summary>{selectedCategory.name} 세부 항목별 증빙 {items.length}건</summary>
+              {items.map((item) => <p key={item.name}><b>{item.name}</b> {item.evidence}</p>)}
+            </details>;
+          })()}
         </>;
       })()}<div className="form-actions"><button type="button" className="secondary" onClick={closeForm}>취소</button><button className="primary" type="submit">{editingId ? '수정 저장' : isOver ? '확인 후 등록' : '집행 등록'}</button></div></form>}
     <div className="template-strip"><div><FileText /><div><strong>자주 쓰는 증빙 템플릿</strong><span>집행 기록에 필요한 기본 항목을 담았습니다.</span></div></div><div>{(['품의서', '회의록', '출장보고서'] as const).map((type) => <button key={type} onClick={() => withExporters((m) => m.downloadTemplate(type))}><Download /> {type}</button>)}</div></div>
