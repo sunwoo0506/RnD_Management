@@ -253,10 +253,12 @@ label { display: grid; gap: 6px; color: #4d586c; font-size: 13px; font-weight: 7
 .labor-sev input { width: auto; margin: 0; flex: none; }
 .labor-rates { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; align-items: center; }
 .labor-rates label { position: relative; }
-.labor-rates label input { padding-right: 19px; text-align: right; }
-.labor-rates label b { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 10.5px; color: var(--muted); }
-/* 스피너가 %% 표시를 덮는다 — 숫자만 남긴다 */
-.labor-rates input::-webkit-outer-spin-button, .labor-rates input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+/* .labor-row input[type='number']보다 특이도가 높아야 padding-right가 살아남는다 — 안 그러면 %가 숫자를 덮는다 */
+.labor-rates label input[type='number'] { padding: 6px 21px 6px 7px; text-align: right; }
+.labor-rates label b { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); font-size: 10.5px; color: var(--muted); pointer-events: none; }
+/* 스피너가 % 표시를 덮는다 — 숫자만 남긴다 (Firefox는 appearance: textfield) */
+.labor-rates input::-webkit-outer-spin-button, .labor-rates input::-webkit-inner-spin-button { -webkit-appearance: none; appearance: none; margin: 0; }
+.labor-rates input[type='number'] { -moz-appearance: textfield; appearance: textfield; }
 .labor-rates .sum { font-size: 12px; color: #4d586c; font-weight: 700; }
 .labor-rates .sum.over { color: #d6453d; }
 .labor-total { display: grid; text-align: right; cursor: help; }
