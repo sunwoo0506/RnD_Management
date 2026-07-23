@@ -494,6 +494,10 @@ label { display: grid; gap: 6px; color: #4d586c; font-size: 13px; font-weight: 7
 .program-row .program-inactive { font-style: normal; font-size: 10px; padding: 1px 6px; border-radius: 99px; background: #eef1f7; color: #5b667b; }
 .program-row small { font-size: 11px; color: #5b667b; }
 .program-row button { flex: none; }
+/* 편성 확정 버튼 — 비목별 편성 머리로 이동 (제목 상단이 아니라 편성표 곁에서 누른다) */
+.editor-confirm-row { display: block; margin: 4px 0 6px; }
+.editor-confirm-row button { font-size: 12px; padding: 7px 14px; }
+
 /* ---- R&D 총괄 대시보드 (한눈에 보기 ①) ---- */
 /* 기본 .panel은 패딩이 없다(panel-head만 있음) — 총괄 패널들은 본문에 좌우 여백과 세로 리듬을 준다. */
 .portfolio-panel, .portfolio-charts, .portfolio-todos, .portfolio-people { display: grid; row-gap: 16px; padding-bottom: 22px; }
