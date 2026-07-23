@@ -143,6 +143,26 @@ export interface RulePack {
   referenceCategories?: PackCategory[];
 }
 
+// ---- 연구자 명부 (연구자 관리 화면) ----
+// 과제가 아니라 회사에 속하는 인사 정보 — 모든 과제가 이름으로 이 명부를 참조한다.
+// 예산 편성의 인건비 산정에서 이름을 입력하면 여기 등록된 월급여·퇴직금 계상 가능 여부를 자동으로 가져온다.
+// 고용형태 — 인건비 계상 방식이 갈린다. 정규직·계약직은 내부 인건비(4대보험·퇴직금 대상),
+// 외부인력은 용역·자문 성격이라 퇴직급여충당금을 계상하지 않는다.
+export type EmploymentType = 'fulltime' | 'contract' | 'external';
+
+export interface Researcher {
+  id: string;
+  name: string;
+  employmentType?: EmploymentType; // 미입력 시 정규직으로 본다
+  annualSalary: number;    // 연봉(원) — 월급여는 연봉÷12로 자동 계산해 저장하지 않는다
+  joinDate: string;        // 입사일 — 퇴직급여충당금 계상 가능 여부(계속근로 1년)의 기준
+  leaveDate?: string;      // 퇴사일 — 입력하면 참여 과제의 인건비를 퇴사일 기준으로 재계산해 반영한다
+  revisedSalary?: number;  // 수정연봉(원) — 연봉 인상·조정분
+  revisedFrom?: string;    // 수정연봉 적용일 — 이 날부터 월급여가 수정연봉÷12로 바뀐다 (미입력 시 즉시 적용)
+  note?: string;
+  createdAt: string;
+}
+
 // ---- 과제 데이터 ----
 
 // 비목 안의 세목 — "외부 전문기술 활용비" 안의 기술도입비·전문가활용비처럼 나눠 편성할 때 쓴다.
@@ -321,4 +341,4 @@ export interface Project {
   createdAt: string;
 }
 
-export type Screen = 'overview' | 'budget' | 'spending' | 'change' | 'team' | 'settings';
+export type Screen = 'overview' | 'researchers' | 'budget' | 'spending' | 'change' | 'team' | 'settings';

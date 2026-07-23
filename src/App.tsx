@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle, ArrowDownRight, ArrowRight, ArrowUpRight, Banknote, Bell, BookOpenCheck,
   Building2, CalendarDays, Check, CheckCircle2, ChevronRight, CircleDollarSign, CloudUpload,
-  Download, Eye, FileCheck2, FileClock, FileSearch, FileText, HandCoins, Landmark, LayoutDashboard, Mail, Package,
+  Download, Eye, FileCheck2, FileClock, FileSearch, FileText, GraduationCap, HandCoins, Landmark, LayoutDashboard, Mail, Package,
   Pencil, Plus, RefreshCw, ScanLine, Settings as SettingsIcon, ShieldCheck, Sparkles, Trash2, Upload, UserPlus, Users, WalletCards,
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
@@ -14,8 +14,9 @@ import ThousandWon from './ThousandWon';
 import PortfolioPeople from './PortfolioPeople';
 import PortfolioTodos from './PortfolioTodos';
 import { detailFieldsFor } from './spendingForms';
-import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
-import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, getEvidence, getProjectDocument, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
+import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, loadResearchers, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal, saveResearchersLocal } from './storage';
+import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, fetchCloudResearchers, getEvidence, getProjectDocument, saveCloudProject, saveCloudResearchers, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
+import { effectiveMonthly, EMPLOYMENT_LABEL, employmentStatus, monthlyOf, researcherByName, resignationTargets, severanceEligible, tenureText } from './researchers';
 import { isCloudEnabled, supabase } from './supabase';
 import { DOCUMENT_TYPE_LABEL, downloadRegistryDocument, getProgramById, guessDocumentType, matchDocToSource, myPendingSubmissions, projectRegistryId, registryEnabled, searchDocumentsByProgram, searchRegistry, submitRegistryShare, submitRegulationPackage, type DocumentEntry, type DocumentType, type RegistryEntry } from './registry';
 import { annotateVerification, buildCustomPack, fundingScheduleAmountWon, runExtraction, suggestedFundingRates, type Extraction } from './llmExtract';
@@ -24,13 +25,18 @@ import { buildRegulationPackage } from './regulationPackage';
 import { diffExtraction, overlayRulesFrom, summarizeDiff, type PackDiff } from './packDiff';
 import SetupWizard from './SetupWizard';
 import type { BudgetBasis, CautionItem, CategoryCap, CategoryMin, ReferenceStandard, SubItemChoice, SubItemChoices } from './rules';
-import type { BudgetCategoryId, BudgetItem, BudgetSubItem, Evidence, Expense, FundingSource, PackAllowedItem, PackArticle, PackCategory, PackRule, Participant, PaymentMethod, Project, ProjectDocumentLink, RulePack, SavedRulePack, Screen } from './types';
+import type { BudgetCategoryId, BudgetItem, BudgetSubItem, EmploymentType, Evidence, Expense, FundingSource, PackAllowedItem, PackArticle, PackCategory, PackRule, Participant, PaymentMethod, Project, ProjectDocumentLink, Researcher, RulePack, SavedRulePack, Screen } from './types';
 
 // 문서 생성 라이브러리(docx·excel)는 무거워서 첫 화면 번들에서 제외하고 버튼 클릭 시에만 불러온다.
 const withExporters = async (run: (mod: typeof import('./exporters')) => Promise<void>) => {
   try { await run(await import('./exporters')); }
   catch { alert('문서 생성에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해주세요.'); }
 };
+
+// 규정DB의 limitText에는 "별도 총액 상한 없음"처럼 상한이 없다는 사실만 적힌 값이 온다.
+// 편성표의 허용 상한 칸에서는 이런 값을 비워둔다 — 적어두면 상한이 걸린 줄과 무게가 같아 보인다.
+const NO_CAP_TEXT = /^\s*(별도\s*)?(총액\s*)?(상한|제한)\s*(액)?\s*(없음|없다|미설정)\s*\.?\s*$/;
+const capTextOrNone = (text?: string): string | undefined => (text && !NO_CAP_TEXT.test(text)) ? text : undefined;
 
 const uid = () => crypto.randomUUID();
 const today = () => new Date().toISOString().slice(0, 10);
@@ -59,9 +65,13 @@ function Sidebar({ screen, setScreen, project, projects, onSelect, onAdd, onRese
   const [menuOpen, setMenuOpen] = useState(false);
   return <aside className="sidebar">
     <div className="logo"><div className="brand-mark"><Check /></div><span>과제온</span><b>beta</b></div>
-    <nav><button className={screen === 'overview' ? 'active' : ''} onClick={() => setScreen('overview')}><LayoutDashboard />한눈에 보기</button></nav>
+    {/* 과제와 무관한 전사 화면들 — 총괄 대시보드와 연구자 명부(모든 과제가 이름으로 참조) */}
+    <nav>
+      <button className={screen === 'overview' ? 'active' : ''} onClick={() => setScreen('overview')}><LayoutDashboard />한눈에 보기</button>
+      <button className={screen === 'researchers' ? 'active' : ''} onClick={() => setScreen('researchers')}><GraduationCap />연구자 관리</button>
+    </nav>
     <button type="button" className="project-chip" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}><Building2 /><div>
-      {screen === 'overview'
+      {screen === 'overview' || screen === 'researchers'
         ? <><small>전체 {projects.length}개 과제</small><strong>과제 선택</strong></>
         : <><small>현재 과제 {projects.length > 1 ? `(${projects.length}개 중)` : ''}</small><strong>{project.name}</strong></>}
     </div><ChevronRight style={{ transform: menuOpen ? 'rotate(90deg)' : undefined }} /></button>
@@ -75,13 +85,14 @@ function Sidebar({ screen, setScreen, project, projects, onSelect, onAdd, onRese
   </aside>;
 }
 
-// 한눈에 보기는 과제와 무관한 메인 페이지라 상단도 특정 과제를 말하지 않는다.
+// 한눈에 보기·연구자 관리는 과제와 무관한 전사 페이지라 상단도 특정 과제를 말하지 않는다.
 function Header({ project, projects, screen }: { project: Project; projects: Project[]; screen: Screen }) {
-  const overview = screen === 'overview';
   return <header className="topbar"><div>
-    {overview
+    {screen === 'overview'
       ? <><h1>R&D 총괄 대시보드</h1><p>{project.companyName} · 과제 {projects.length}개</p></>
-      : <><h1>{project.name}</h1><p>{project.agency} · {project.startDate} — {project.endDate}</p></>}
+      : screen === 'researchers'
+        ? <><h1>연구자 관리</h1><p>{project.companyName} · 회사 공통 연구자 명부</p></>
+        : <><h1>{project.name}</h1><p>{project.agency} · {project.startDate} — {project.endDate}</p></>}
   </div><div className="header-actions"><button className="icon-button" aria-label="알림"><Bell /></button><div className="avatar">{project.members[0]?.name.slice(0, 1) || '관'}</div><div className="user-meta"><strong>{project.members[0]?.name}</strong><span>{project.companyName}</span></div></div></header>;
 }
 
@@ -113,12 +124,17 @@ function PortfolioOverview({ projects, activeId, onSelect }: { projects: Project
           <span className="cell-program">{row.programName ?? packFor(row).name}</span>
           <span className="cell-name"><strong>{row.name}</strong><small>{row.summary?.trim() || '요약 미입력 — 과제 설정에서 무엇을 개발하는지 적어주세요'}</small></span>
           <span>{row.agency.trim() || '기관 미입력'}</span>
-          <span className="cell-period"><small>{row.startDate} ~ {row.endDate}</small><span className="progress"><i style={{ width: `${progress}%` }} /></span></span>
+          {/* 날짜 속 하이픈에서 끊기지 않게 날짜를 통짜로 묶는다 — 줄바꿈은 ~ 앞뒤에서만 */}
+          <span className="cell-period"><small><span>{row.startDate}</span> ~ <span>{row.endDate}</span></small><span className="progress"><i style={{ width: `${progress}%` }} /></span></span>
           <span className="cell-money"><ThousandWon value={row.totalBudget} /></span>
           <span className="cell-money"><ThousandWon value={row.subsidyAmount ?? row.totalBudget} /></span>
           <span className="cell-money">{matchingCell(funding.matchingCash)}</span>
           <span className="cell-money">{matchingCell(funding.matchingInKind)}</span>
-          <span>{ended ? <em className="status-badge ended">종료</em> : <em className="status-badge">진행 중 · 정산 {dday >= 0 ? `D-${dday}` : `D+${Math.abs(dday)}`}</em>}</span>
+          {/* 진행 상태와 정산 기한은 서로 다른 정보라 칩을 분리한다 — 정산 칩은 임박(30일)·경과를 색으로 구분 */}
+          <span className="cell-status">
+            <em className={`status-badge ${ended ? 'ended' : ''}`}>{ended ? '종료' : '진행 중'}</em>
+            {!ended && <em className={`status-badge settle ${dday < 0 ? 'over' : dday <= 30 ? 'soon' : ''}`}>정산 {dday >= 0 ? `D-${dday}` : `D+${Math.abs(dday)}`}</em>}
+          </span>
         </button>;
       })}
       {rows.length === 0 && <p className="field-hint">이 조건에 맞는 과제가 없습니다.</p>}
@@ -130,7 +146,7 @@ function PortfolioOverview({ projects, activeId, onSelect }: { projects: Project
 // 목록에서 과제를 누르면 그 과제의 화면(집행·증빙)으로 이동한다.
 function Overview({ project, projects, onSelectProject, setScreen }: { project: Project; projects: Project[]; onSelectProject: (id: string) => void; setScreen: (s: Screen) => void }) {
   const openProject = (id: string) => { onSelectProject(id); setScreen('spending'); };
-  return <div className="page-content">
+  return <div className="page-content overview-page">
     <section className="welcome"><div><span>{new Date().getHours() < 12 ? '좋은 아침이에요' : '오늘도 수고 많으셨어요'}, {project.members[0]?.name}님</span><h2>R&D 전체 현황을 확인해보세요.</h2></div></section>
     <PortfolioOverview projects={projects} activeId={project.id} onSelect={openProject} />
     {/* 편성 구성과 확인할 일은 나란히 — 도넛 오른쪽의 빈 자리를 살린다 (좁은 화면에선 세로로). */}
@@ -833,10 +849,11 @@ function SourceDocsPanel({ source }: { source: ReturnType<typeof useSourceDocs> 
 // 색은 비목의 "팩 내 순서"에 고정 배정한다(금액 순위가 아니라) — 금액이 바뀌어도 비목 색이 따라 바뀌지 않는다.
 // 색 슬롯은 8개까지: 9번째 이후 비목은 회색 "기타"로 묶는다 (색을 더 만들면 색약 구분이 깨진다).
 // 팔레트는 색약 시뮬레이션 검증을 통과한 순서 그대로다 — 순서를 바꾸면 인접 조각 구분이 깨진다.
-const CAT_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948'];
+// 1·7번 슬롯만 DESIGN-slack.md 브랜드 오버진(#611f69)과 딥 오버진(#4a154b)으로 앵커 — 색상 위치·명도 관계는 유지.
+const CAT_COLORS = ['#611f69', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a154b', '#e34948'];
 const COMP_SLOTS = CAT_COLORS.length;
 const ETC_COLOR = '#8f98a9';
-const FREE_COLOR = '#e4e9f1';
+const FREE_COLOR = '#e6e6e6';
 
 function BudgetComposition({ pack, project, cats, bases }: { pack: RulePack; project: Project; cats: PackCategory[]; bases: BudgetBasis[] }) {
   const slotOf = new Map(pack.categories.filter((c) => c.allowed).map((c, i) => [c.id, i]));
@@ -848,14 +865,18 @@ function BudgetComposition({ pack, project, cats, bases }: { pack: RulePack; pro
   // 아직 아무것도 편성하지 않아 도넛을 그릴 수 없어도 기준 금액은 보여준다.
   const basisBlock = bases.length === 0 ? null : <div className="basis-strip">
     <span className="basis-title">상한 계산의 기준 금액</span>
-    <div className="basis-items">{bases.map((basis) => <div className="basis-item" key={basis.basis} title={basis.basis}>
+    {/* 계산식과 규정 문구는 "왜 이 금액이 안 움직이지"를 풀 때만 필요하다 — 카드에 늘 펼쳐두면
+        기준 금액 자체가 안 읽혀서, 마우스를 올렸을 때만(키보드는 포커스) 툴팁으로 보여준다. */}
+    <div className="basis-items">{bases.map((basis) => <div className="basis-item" key={basis.basis} tabIndex={0}>
       <span>{basis.label}</span>
       <strong>{formatWon(basis.amount)}</strong>
-      {/* 계산식을 보여줘야 "왜 이 금액이 안 움직이지"가 풀린다 — 직접비 기준은 간접비·위탁을 바꿔야 움직인다. */}
-      <small className="basis-formula">{basis.formula}</small>
       <small>{basis.categories.join(' · ')} 상한의 기준</small>
+      <div className="basis-pop" role="tooltip">
+        <b>계산식</b><span className="basis-formula">{basis.formula}</span>
+        <b>규정 기준</b><span>{basis.basis}</span>
+      </div>
     </div>)}</div>
-    <p className="basis-note">계산식에 있는 비목의 편성 금액을 바꿔야 기준 금액이 움직입니다. 이름 위에 마우스를 올리면 규정 문구 그대로 볼 수 있어요.</p>
+    <p className="basis-note">계산식에 있는 비목의 편성 금액을 바꿔야 기준 금액이 움직입니다. 카드 위에 마우스를 올리면 계산식과 규정 문구를 그대로 볼 수 있어요.</p>
   </div>;
   if (!project.totalBudget || planned === 0) return basisBlock && <div className="budget-comp">{basisBlock}</div>;
   const folded = entries.filter((e) => e.slot >= COMP_SLOTS);
@@ -902,12 +923,159 @@ function BudgetComposition({ pack, project, cats, bases }: { pack: RulePack; pro
   </div>;
 }
 
+// ---- 연구자 관리 (전사 화면) ----
+// 회사 공통 인사 명부 — 연봉·입사일·퇴사일을 여기서 관리하고, 예산 편성의 인건비 산정이
+// 이름으로 이 명부를 참조해 월급여·퇴직금 계상 가능 여부를 자동으로 가져온다.
+// 퇴사일을 입력하면 참여 중인 과제의 인건비를 퇴사일 기준으로 재계산해 보여주고,
+// "예산에 반영하기"가 각 과제의 참여 종료일을 고친다 (비목별 편성 금액은 예산 편성 화면에서 확정).
+function ResearchersScreen({ researchers, setResearchers, projects, applyProjects, onOpenBudget }: {
+  researchers: Researcher[]; setResearchers: (list: Researcher[]) => void;
+  projects: Project[]; applyProjects: (updated: Project[]) => void; onOpenBudget: (projectId: string) => void;
+}) {
+  const todayStr = today();
+  const [draft, setDraft] = useState<{ name: string; employmentType: EmploymentType; annual: string; joinDate: string }>({ name: '', employmentType: 'fulltime', annual: '', joinDate: '' });
+  // 퇴사 반영 직후 안내 — 대상 과제로 바로 이동할 수 있게 반영 결과를 잠시 보여준다.
+  const [applied, setApplied] = useState<{ researcherId: string; projects: { id: string; name: string }[] } | null>(null);
+  const setR = (id: string, patch: Partial<Researcher>) => setResearchers(researchers.map((r) => r.id === id ? { ...r, ...patch } : r));
+  const removeR = (r: Researcher) => {
+    if (!confirm(`"${r.name}" 연구자를 명부에서 삭제할까요? 과제에 이미 등록된 참여 정보는 지워지지 않습니다.`)) return;
+    setResearchers(researchers.filter((x) => x.id !== r.id));
+  };
+  const addResearcher = (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = draft.name.trim();
+    if (!name || !draft.annual || !draft.joinDate) { alert('이름·연봉·입사일을 입력해주세요. 월급여(연봉÷12)와 퇴직금 계상 가능 여부는 자동으로 계산돼요.'); return; }
+    setResearchers([...researchers, { id: uid(), name, employmentType: draft.employmentType, annualSalary: Number(draft.annual), joinDate: draft.joinDate, createdAt: today() }]);
+    setDraft({ name: '', employmentType: 'fulltime', annual: '', joinDate: '' });
+  };
+  // 과제별 인건비 계산 조건 — 인건비 산정 패널과 같은 값을 써야 "기존 합계"가 화면과 일치한다.
+  const laborOptsOf = (p: Project) => ({ startDate: p.startDate, endDate: p.endDate, insuranceRate: p.insuranceRate ?? DEFAULT_INSURANCE_RATE, includeInsurance: p.laborIncludeInsurance ?? true, includeSeverance: p.laborIncludeSeverance ?? true });
+  const applyResignation = (r: Researcher) => {
+    const targets = resignationTargets(projects, r);
+    if (!targets.length) return;
+    const lines = targets.map((t) => {
+      const opts = laborOptsOf(t.project);
+      const before = laborCostFor(t.participant, opts).total;
+      const after = laborCostFor({ ...t.participant, laborEnd: t.newEnd }, opts).total;
+      return `· ${t.project.name}: ${formatWon(before)} → ${formatWon(after)} (${formatWon(after - before)})`;
+    }).join('\n');
+    if (!confirm(`퇴사일 ${r.leaveDate} 기준으로 참여 종료일을 반영할까요?\n각 과제의 인건비 산정 섹션 합계가 아래처럼 바뀝니다.\n${lines}\n\n반영 후 예산 편성 화면에서 금액을 확인하고 "예산 편성에 반영"을 눌러야 비목별 편성 금액이 바뀝니다.`)) return;
+    // 같은 과제에 대상이 여러 명일 수 있어 과제 단위로 모아 한 번에 고친다.
+    const byProject = new Map<string, Project>();
+    for (const t of targets) {
+      const base = byProject.get(t.project.id) ?? t.project;
+      byProject.set(t.project.id, { ...base, participants: base.participants.map((p) => p.id === t.participant.id ? { ...p, laborEnd: t.newEnd } : p) });
+    }
+    applyProjects([...byProject.values()]);
+    setApplied({ researcherId: r.id, projects: targets.map((t) => ({ id: t.project.id, name: t.project.name })) });
+  };
+  const sorted = [...researchers].sort((a, b) => {
+    // 재직자를 위로, 같은 상태면 이름순 — 퇴사자가 목록 위를 차지하지 않게
+    const rank = (r: Researcher) => employmentStatus(r, todayStr) === '퇴사' ? 1 : 0;
+    return rank(a) - rank(b) || a.name.localeCompare(b.name, 'ko');
+  });
+  return <div className="page-content">
+    <section className="panel researchers-panel">
+      <div className="panel-head"><div><span className="section-kicker">HR</span><h3>연구자 명부</h3>
+        <p>연봉·입사일을 등록해두면 예산 편성의 인건비 산정에서 이름만 입력해도 월급여(연봉÷12)와 퇴직금 포함 여부(입사 1년 경과)를 자동으로 채워요. 명부는 회사 공통이라 모든 과제에서 함께 씁니다.</p></div></div>
+      <div className="researcher-table"><div className="researcher-head">
+        <span>이름</span><span>고용형태</span><span>입사일 · 퇴사일</span><span>연봉 → 월급여</span><span>수정연봉 → 수정월급여</span><span>상태 · 근속</span><span>참여 과제</span><span />
+      </div>{sorted.map((r) => {
+        const status = employmentStatus(r, todayStr);
+        const eligible = severanceEligible(r, todayStr);
+        const revisedActive = !!r.revisedSalary && (!r.revisedFrom || r.revisedFrom <= todayStr);
+        const involved = projects.filter((p) => p.participants.some((pp) => pp.name.trim() === r.name.trim()));
+        const targets = resignationTargets(projects, r);
+        return <Fragment key={r.id}>
+          <div className={`researcher-row ${status === '퇴사' ? 'left' : ''}`}>
+            <div className="labor-person"><div className="avatar">{r.name[0]}</div><div className="researcher-id">
+              <input aria-label="이름" value={r.name} onChange={(e) => setR(r.id, { name: e.target.value })} />
+            </div></div>
+            <select aria-label={`${r.name} 고용형태`} value={r.employmentType ?? 'fulltime'} onChange={(e) => setR(r.id, { employmentType: e.target.value as EmploymentType })} title="외부인력(용역·자문)은 퇴직급여충당금 계상 대상이 아니에요">
+              {Object.entries(EMPLOYMENT_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            <div className="researcher-dates">
+              <input type="date" aria-label={`${r.name} 입사일`} value={r.joinDate} onChange={(e) => setR(r.id, { joinDate: e.target.value })} />
+              <input type="date" aria-label={`${r.name} 퇴사일`} value={r.leaveDate ?? ''} onChange={(e) => setR(r.id, { leaveDate: e.target.value || undefined })} title="퇴사일을 입력하면 참여 과제의 인건비를 퇴사일 기준으로 재계산해요" />
+            </div>
+            <div className="researcher-pay">
+              <label className="money-input"><input inputMode="numeric" aria-label={`${r.name} 연봉`} value={withCommas(String(r.annualSalary || ''))} placeholder="연봉" onChange={(e) => setR(r.id, { annualSalary: Number(digitsOnly(e.target.value)) })} /><b>원</b></label>
+              <small className={revisedActive ? 'muted-out' : ''}>월 {formatWon(monthlyOf(r.annualSalary))}</small>
+            </div>
+            <div className="researcher-pay">
+              <label className="money-input"><input inputMode="numeric" aria-label={`${r.name} 수정연봉`} value={withCommas(String(r.revisedSalary ?? ''))} placeholder="수정연봉 (없으면 비움)" onChange={(e) => setR(r.id, { revisedSalary: Number(digitsOnly(e.target.value)) || undefined })} /><b>원</b></label>
+              {r.revisedSalary
+                ? <><input type="date" aria-label={`${r.name} 수정연봉 적용일`} value={r.revisedFrom ?? ''} onChange={(e) => setR(r.id, { revisedFrom: e.target.value || undefined })} title="이 날부터 월급여가 수정연봉÷12로 바뀝니다 (비우면 즉시 적용)" />
+                  <small>월 {formatWon(monthlyOf(r.revisedSalary))}{revisedActive ? ' · 적용 중' : r.revisedFrom ? ` · ${r.revisedFrom}부터` : ''}</small></>
+                : <small className="muted-out">연봉 조정 시 입력</small>}
+            </div>
+            <div className="researcher-status">
+              <em className={`status-badge ${status === '재직' ? '' : 'ended'}`}>{status}</em>
+              <small>근속 {tenureText(r, todayStr)}</small>
+              <small className={eligible ? 'sev-ok' : 'sev-no'}>{eligible ? '퇴직금 계상 가능' : r.employmentType === 'external' ? '퇴직금 불가 (외부인력)' : '퇴직금 불가 (1년 미만)'}</small>
+            </div>
+            <div className="researcher-projects">{involved.length
+              ? involved.map((p) => <button type="button" key={p.id} className="project-tag" title={`${p.name} 예산 편성 열기`} onClick={() => onOpenBudget(p.id)}>{p.name}</button>)
+              : <small className="muted-out">참여 과제 없음</small>}</div>
+            <button type="button" className="person-remove" aria-label={`${r.name} 삭제`} onClick={() => removeR(r)}><Trash2 /></button>
+          </div>
+          {r.leaveDate && targets.length > 0 && <div className="resign-box">
+            <div className="resign-head"><AlertCircle /><strong>퇴사일 {r.leaveDate} 기준 사용 인건비</strong><span>참여 종료일이 퇴사일보다 뒤인 과제 {targets.length}건</span></div>
+            {targets.map((t) => {
+              const opts = laborOptsOf(t.project);
+              const before = laborCostFor(t.participant, opts);
+              const after = laborCostFor({ ...t.participant, laborEnd: t.newEnd }, opts);
+              return <div className="resign-row" key={`${t.project.id}-${t.participant.id}`}>
+                <span>{t.project.name}</span>
+                <small>{t.participant.laborStart ?? t.project.startDate} ~ {t.newEnd} · 월 {formatWon(after.monthly)} × {after.months}개월</small>
+                <b>{formatWon(before.total)} → {formatWon(after.total)} <i>({formatWon(after.total - before.total)})</i></b>
+              </div>;
+            })}
+            <div className="resign-actions"><button type="button" className="primary" onClick={() => applyResignation(r)}><WalletCards /> 예산에 반영하기</button>
+              <small>각 과제의 인건비 산정 섹션에 참여 종료일이 반영돼요. 이후 예산 편성 화면에서 금액을 확인하고 "예산 편성에 반영"을 누르면 비목별 편성 금액이 바뀝니다.</small></div>
+          </div>}
+          {applied?.researcherId === r.id && <div className="resign-box done">
+            <CheckCircle2 /> 인건비 산정에 반영했어요. 예산 편성에서 금액을 확인하세요 —
+            {applied.projects.map((p) => <button type="button" key={p.id} className="ref-link" onClick={() => onOpenBudget(p.id)}>{p.name} 예산 편성 열기 →</button>)}
+          </div>}
+        </Fragment>;
+      })}
+      {researchers.length === 0 && <div className="empty-state compact"><GraduationCap /><h3>등록된 연구자가 없어요</h3><p>아래에서 이름·연봉·입사일을 등록하면 예산 편성에서 이름만으로 인건비가 자동 계산돼요.</p></div>}
+      </div>
+      <form className="researcher-add" onSubmit={addResearcher}>
+        <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="이름" />
+        <select aria-label="고용형태" value={draft.employmentType} onChange={(e) => setDraft({ ...draft, employmentType: e.target.value as EmploymentType })}>
+          {Object.entries(EMPLOYMENT_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+        <label className="money-input"><input inputMode="numeric" value={withCommas(draft.annual)} onChange={(e) => setDraft({ ...draft, annual: digitsOnly(e.target.value) })} placeholder="연봉" /><b>원</b></label>
+        <input type="date" aria-label="입사일" value={draft.joinDate} onChange={(e) => setDraft({ ...draft, joinDate: e.target.value })} />
+        <button className="secondary" type="submit"><UserPlus /> 연구자 등록</button>
+      </form>
+    </section>
+  </div>;
+}
+
 // ---- 참여인력 · 인건비 산정 패널 (예산 편성 화면) ----
 // 참여율 점검과 인건비(4대보험·퇴직금) 자동 계산을 한 뒤 "예산 편성에 반영"으로 인건비 비목을 채운다.
-function ParticipantsPanel({ project, projects, update }: { project: Project; projects: Project[]; update: (p: Project) => void }) {
+// 연구자 관리 명부에 등록된 이름이면 월급여(연봉÷12)와 퇴직금 포함 여부(입사 1년 경과)를 자동으로 채운다.
+function ParticipantsPanel({ project, projects, researchers, update }: { project: Project; projects: Project[]; researchers: Researcher[]; update: (p: Project) => void }) {
   const pack = packFor(project);
   const [person, setPerson] = useState('');
-  const addPerson = (e: React.FormEvent) => { e.preventDefault(); if (!person.trim()) return; update({ ...project, participants: [...project.participants, { id: uid(), name: person.trim(), projectRate: 0, externalRate: 0 }] }); setPerson(''); };
+  const todayStr = today();
+  const addPerson = (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = person.trim();
+    if (!name) return;
+    // 명부에 있으면 월급여·퇴직금 여부를 자동으로 — 퇴사일이 과제 종료 전이면 참여 종료일도 퇴사일로.
+    const reg = researcherByName(researchers, name);
+    const fromRegistry: Partial<Participant> = reg ? {
+      monthlyPay: effectiveMonthly(reg, todayStr) || undefined,
+      includeSeverance: severanceEligible(reg, todayStr),
+      ...(reg.leaveDate && reg.leaveDate < project.endDate ? { laborEnd: reg.leaveDate } : {}),
+    } : {};
+    update({ ...project, participants: [...project.participants, { id: uid(), name, projectRate: 0, externalRate: 0, ...fromRegistry }] });
+    setPerson('');
+  };
   const setRate = (id: string, key: 'projectRate' | 'externalRate', value: number) => update({ ...project, participants: project.participants.map((p) => p.id === id ? { ...p, [key]: Math.max(0, value) } : p) });
   const removePerson = (p: Participant) => {
     if (!confirm(`참여 인력 "${p.name}"을(를) 삭제할까요?`)) return;
@@ -988,6 +1156,16 @@ function ParticipantsPanel({ project, projects, update }: { project: Project; pr
           <div className="labor-pay">
             <label className="money-input"><input inputMode="numeric" aria-label={`${p.name} 월급여`} value={withCommas(String(p.monthlyPay ?? ''))} placeholder="0" onChange={(e) => setP(p.id, { monthlyPay: Number(digitsOnly(e.target.value)) || undefined })} /><b>원</b></label>
             <label className="labor-sev" title="1년 이상 근무자만 퇴직금을 포함할 수 있어요 (월급여의 1/12)"><input type="checkbox" aria-label={`${p.name} 퇴직금 포함`} checked={hasSeverance} onChange={(e) => setP(p.id, { includeSeverance: e.target.checked })} /><span>퇴직금 포함</span></label>
+            {(() => {
+              // 연구자 명부와 어긋나면 알려준다 — 연봉이 수정됐거나 1년을 채워 퇴직금 계상이 가능해진 경우.
+              const reg = researcherByName(researchers, p.name);
+              if (!reg) return null;
+              const regPay = effectiveMonthly(reg, todayStr);
+              const regSev = severanceEligible(reg, todayStr);
+              if (regPay === (p.monthlyPay ?? 0) && regSev === hasSeverance) return null;
+              return <button type="button" className="ref-link labor-sync" title={`연구자 관리 기준: 월급여 ${formatWon(regPay)} · 퇴직금 ${regSev ? '계상 가능' : '불가 (입사 1년 미만)'}`}
+                onClick={() => setP(p.id, { monthlyPay: regPay || undefined, includeSeverance: regSev })}>명부와 다름 — 갱신</button>;
+            })()}
           </div>
           <div className="labor-rates">
             <label><input aria-label={`${p.name} 현재 과제 참여율`} type="number" min="0" value={p.projectRate} onChange={(e) => setRate(p.id, 'projectRate', Number(e.target.value))} /><b>%</b></label>
@@ -1003,7 +1181,9 @@ function ParticipantsPanel({ project, projects, update }: { project: Project; pr
           {/* 계산식은 매번 읽을 것이 아니라 "왜 이 금액이지" 할 때만 필요하다 — 합계 칸에 올리면 보인다. */}
           <div className="labor-total" title={calc}>
             <strong>{formatWon(cost.total)}</strong>
-            <small>현금 {formatWon(cost.cash)} · 현물 {formatWon(cost.inKind)}</small>
+            {/* 현금·현물은 각각 한 줄로 — 한 줄에 붙이면 금액이 길어질 때 아무 데서나 잘려 읽기 어렵다 */}
+            <small>현금 {formatWon(cost.cash)}</small>
+            <small>현물 {formatWon(cost.inKind)}</small>
             <small className="labor-basis">월 {formatWon(cost.monthly)} × {cost.months}개월</small>
           </div>
           <button type="button" className="person-remove" aria-label={`${p.name} 삭제`} onClick={() => removePerson(p)}><Trash2 /></button>
@@ -1011,7 +1191,11 @@ function ParticipantsPanel({ project, projects, update }: { project: Project; pr
         {over && <p className="labor-warn"><AlertCircle /> 참여율 합산이 100%를 초과했습니다. 100% 이하로 조정해주세요.</p>}
       </Fragment>;
     })}</div>
-    <form className="person-add" onSubmit={addPerson}><input value={person} onChange={(e) => setPerson(e.target.value)} placeholder="새 참여 인력 이름" /><button className="secondary" type="submit"><Plus /> 인력 추가</button></form>
+    <form className="person-add" onSubmit={addPerson}>
+      <input list="researcher-name-options" value={person} onChange={(e) => setPerson(e.target.value)} placeholder="새 참여 인력 이름 — 연구자 관리에 등록된 이름이면 월급여·퇴직금이 자동으로 채워져요" />
+      <datalist id="researcher-name-options">{researchers.filter((r) => !project.participants.some((p) => p.name.trim() === r.name.trim())).map((r) => <option key={r.id} value={r.name}>월 {formatWon(effectiveMonthly(r, todayStr))}</option>)}</datalist>
+      <button className="secondary" type="submit"><Plus /> 인력 추가</button>
+    </form>
     {project.participants.length === 0 && <div className="inline-warning"><AlertCircle /> 참여율 데이터가 없어 초과 경고가 작동하지 않습니다. 참여 인력을 추가해주세요.</div>}
     {project.participants.length > 0 && <div className="labor-summary">
       {/* 합계는 표를 다 읽고 나서 바로 눈이 가는 자리(표 바로 아래)에 둔다 —
@@ -1037,12 +1221,13 @@ function ParticipantsPanel({ project, projects, update }: { project: Project; pr
         if (laborInKindTotal > laborFunding.matchingInKind) return <p className="field-error"><AlertCircle /> 인건비 현물 합계({formatWon(laborInKindTotal)})가 재원 구성의 현물 한도({formatWon(laborFunding.matchingInKind)})를 {formatWon(laborInKindTotal - laborFunding.matchingInKind)} 초과했어요. 계상 구분(현금/현물)이나 지원비율·현금 비율을 확인하세요.</p>;
         return null;
       })()}
-      <div className="settings-save"><button type="button" className="primary" onClick={reflectToBudget}><WalletCards /> 예산 편성에 반영</button>{reflected && <span className="save-ok"><CheckCircle2 /> 반영됐어요 — 아래 편성표에서 확인하세요</span>}</div>
+      {/* 반영 버튼은 합계 금액과 같은 오른쪽 끝에 — 확인한 자리에서 바로 누른다 (안내는 버튼 왼쪽) */}
+      <div className="settings-save labor-reflect">{reflected && <span className="save-ok"><CheckCircle2 /> 반영됐어요 — 아래 편성표에서 확인하세요</span>}<button type="button" className="primary" onClick={reflectToBudget}><WalletCards /> 예산 편성에 반영</button></div>
     </div>}
   </section>;
 }
 
-function Budget({ project, projects, update, setScreen }: { project: Project; projects: Project[]; update: (p: Project) => void; setScreen: (s: Screen) => void }) {
+function Budget({ project, projects, researchers, update, setScreen }: { project: Project; projects: Project[]; researchers: Researcher[]; update: (p: Project) => void; setScreen: (s: Screen) => void }) {
   const pack = packFor(project);
   const cats = visibleCategories(pack, project);
   const confirmed = !!project.budgetConfirmed;
@@ -1240,8 +1425,8 @@ function Budget({ project, projects, update, setScreen }: { project: Project; pr
         <p className="cap-alert-basis">{rates.map((check, index) => <span key={check.rule.id}>{index > 0 && ' · '}{check.rule.message} {refLink(check.rule)}</span>)}</p>
       </section>;
     })()}
-    <ParticipantsPanel project={project} projects={projects} update={update} />
-    <section className="panel budget-editor"><div className="editor-head"><div><span className="section-kicker">STEP 2 · 비목별 편성</span><span className="editor-confirm-row"><button type="button" className={confirmed ? 'secondary' : 'primary'} onClick={toggleConfirm}>{confirmed ? <><Pencil /> 편성 수정</> : <><Check /> 편성 확정</>}</button></span><span>전체 사용 가능 예산</span><strong>{formatWon(project.totalBudget)}</strong>{funding.matching > 0 && funding.matchingCashRateKnown && <small className="funding-split-note">현금 {formatWon(funding.subsidy + funding.matchingCash)} (지원금+민간 현금) · 현물 {formatWon(funding.matchingInKind)}</small>}</div><div className="editor-head-sums">{funding.matching > 0 && funding.matchingCashRateKnown
+    <ParticipantsPanel project={project} projects={projects} researchers={researchers} update={update} />
+    <section className="panel budget-editor"><div className="editor-head"><div><span className="section-kicker">STEP 2 · 비목별 편성</span><span>전체 사용 가능 예산</span><strong>{formatWon(project.totalBudget)}</strong>{funding.matching > 0 && funding.matchingCashRateKnown && <small className="funding-split-note">현금 {formatWon(funding.subsidy + funding.matchingCash)} (지원금+민간 현금) · 현물 {formatWon(funding.matchingInKind)}</small>}</div><div className="editor-head-sums"><div className="editor-sum-badges">{funding.matching > 0 && funding.matchingCashRateKnown
         ? (() => {
             // 현금·현물을 각각 검증한다 — 둘 다 맞으면 편성 합계도 자동으로 맞는다.
             const gap = (planned: number, target: number) => planned === target ? '' : ` — ${planned > target ? '초과' : '부족'} ${formatWon(Math.abs(planned - target))}`;
@@ -1255,7 +1440,10 @@ function Budget({ project, projects, update, setScreen }: { project: Project; pr
         : <>
           <div className={total === project.totalBudget ? 'sum-ok' : 'sum-bad'}>{total === project.totalBudget ? <CheckCircle2 /> : <AlertCircle />} 편성 합계 {formatWon(total)} {total !== project.totalBudget && `(차이 ${formatWon(total - project.totalBudget)})`}{confirmed && ' · 편성 확정됨'}</div>
           {funding.matching > 0 && totalInKind > 0 && <div className="sum-bad"><AlertCircle /> 현물 {formatWon(totalInKind)} 편성됨 — 한도 검증을 하려면 과제 설정에서 "민간부담금 중 현금 비율"을 입력하세요</div>}
-        </>}</div></div>
+        </>}</div>
+        {/* 확정 버튼은 맨 오른쪽, 합계 안내를 읽고 나서 누르는 순서 */}
+        <span className="editor-confirm-row"><button type="button" className={confirmed ? 'secondary' : 'primary'} onClick={toggleConfirm}>{confirmed ? <><Pencil /> 편성 수정</> : <><Check /> 편성 확정</>}</button></span>
+      </div></div>
       <BudgetComposition pack={pack} project={project} cats={cats} bases={budgetBases(pack, project.budgets, project.totalBudget, inKind)} />
       <div className="budget-table"><div className="table-head"><span>비목 · 사용 예시</span><span>허용 상한</span><span>편성 금액</span><span>비율</span><span>상태</span><span>기준</span></div>{cats.map((category) => {
         const item = project.budgets.find((b) => b.categoryId === category.id);
@@ -1277,16 +1465,33 @@ function Budget({ project, projects, update, setScreen }: { project: Project; pr
           <button type="button" className="text-button sub-toggle" onClick={() => toggleSub(category.id)}>{hasSubs ? `세목 ${subs.length}개 ${open ? '접기' : '보기'}` : open ? '세목 입력 닫기' : '+ 세목 나누기'}</button>
           {definition && <div className="def-card" role="tooltip"><strong>{category.name}</strong><p>{definition}</p>{!category.definition && <em>{referenceByCategory.get(category.id)?.pack.guideline} 기준</em>}</div>}</div>
         {/* 상한의 근거·조건은 "기준" 패널에 있으므로, 여기서는 금액이 어떻게 나왔는지 계산식만 보여준다. */}
+        {/* 허용 상한 칸은 "얼마까지"만 눈에 남긴다 — 계산식과 안내 문구는 왜 그 금액인지 따질 때만
+            필요하므로 마우스를 올렸을 때(키보드는 포커스) 툴팁으로 보여준다. 모든 상한 형태에 공통. */}
         <div className="cap-cell">{cap
           ? cap.amount != null
-            ? <><strong>{formatWon(cap.amount)}</strong><small className="cap-formula">{cap.basisLabel} {formatWon(cap.basisAmount!)} × {cap.limitPct}%</small>{amount > 0 && cap.amount > 0 && <small className={over ? 'cap-used over' : 'cap-used'}>{over ? `상한 ${formatWon(amount - cap.amount)} 초과` : `여유 ${formatWon(cap.amount - amount)}`}</small>}</>
+            ? <div className="cap-hover" tabIndex={0}>
+                <strong>{formatWon(cap.amount)}</strong>
+                {amount > 0 && cap.amount > 0 && <small className={over ? 'cap-used over' : 'cap-used'}>{over ? `상한 ${formatWon(amount - cap.amount)} 초과` : `여유 ${formatWon(cap.amount - amount)}`}</small>}
+                <div className="cap-pop" role="tooltip"><b>계산식</b><span className="cap-formula">{cap.basisLabel} {formatWon(cap.basisAmount!)} × {cap.limitPct}%</span></div>
+              </div>
             // 세부항목에 걸리는 상한도 금액은 알려준다 — 얼마까지 쓸 수 있는지 알아야 세목을 짠다.
+            // 다만 "이 비목 전체의 상한이 아니다"가 핵심이라 그 꼬리표만 색으로 세운다.
             : cap.referenceAmount != null
-            ? <><strong className="cap-partial">{formatWon(cap.referenceAmount)}</strong><small className="cap-formula">{cap.basisLabel} {formatWon(cap.basisAmount!)} × {cap.limitPct}%</small><small className="cap-db"><em>{cap.rule.item}에 걸리는 상한이에요 — 비목 전체가 아니라 이 세목 합계를 이 금액 안에서 잡으세요.</em></small></>
-            : <small className={cap.inKindOnly && funding.matching > 0 && itemInKind <= 0 ? 'cap-db cap-inkind' : 'cap-db'}>{cap.label}<br /><em>{capHint(cap, itemInKind, funding.matching > 0)}</em></small>
-          : (category.limitText ?? referenceByCategory.get(category.id)?.category.limitText)
-          ? <small className="cap-db">{category.limitText ?? referenceByCategory.get(category.id)?.category.limitText}{!category.limitText && <em> · 공통 규정 기준</em>}</small>
-          : <small className="cap-db muted">규정 상한 없음</small>}{min && <small className="cap-min">{min.label}</small>}</div><div className="amount-cell"><label className="money-input"><input aria-label={`${category.name} 편성 금액`} inputMode="numeric" value={withCommas(String(amount))} disabled={confirmed || hasSubs} onChange={(e) => changeAmount(category.id, Number(digitsOnly(e.target.value)) || 0)} /><b>원</b></label>{funding.matching > 0 && <div className="inkind-row"><span>현물</span><label className="money-input"><input aria-label={`${category.name} 현물 계상액`} inputMode="numeric" disabled={confirmed} placeholder="0" value={withCommas(String(itemInKind || ''))} onChange={(e) => setInKindAmount(category.id, Number(digitsOnly(e.target.value)) || 0)} /><b>원</b></label><small>현금 {formatWon(amount - itemInKind)}</small></div>}{hasSubs && <div className="amount-slider"><small>세목 {subs.length}개 합계 자동</small></div>}{!confirmed && !hasSubs && (() => {
+            ? <div className="cap-hover" tabIndex={0}>
+                <strong className="cap-partial"><em>세부항목</em> {formatWon(cap.referenceAmount)}</strong>
+                <div className="cap-pop" role="tooltip">
+                  <b>계산식</b><span className="cap-formula">{cap.basisLabel} {formatWon(cap.basisAmount!)} × {cap.limitPct}%</span>
+                  <b>적용 범위</b><span>{cap.rule.item}에 걸리는 상한이에요 — 비목 전체가 아니라 이 세목 합계를 이 금액 안에서 잡으세요.</span>
+                </div>
+              </div>
+            : <div className="cap-hover" tabIndex={0}>
+                <small className={cap.inKindOnly && funding.matching > 0 && itemInKind <= 0 ? 'cap-db cap-inkind' : 'cap-db'}>{cap.label}</small>
+                <div className="cap-pop" role="tooltip"><b>안내</b><span>{capHint(cap, itemInKind, funding.matching > 0)}</span></div>
+              </div>
+          : capTextOrNone(category.limitText ?? referenceByCategory.get(category.id)?.category.limitText)
+          ? <small className="cap-db">{capTextOrNone(category.limitText) ?? capTextOrNone(referenceByCategory.get(category.id)?.category.limitText)}{!capTextOrNone(category.limitText) && <em> · 공통 규정 기준</em>}</small>
+          // 상한이 없으면 아무 것도 적지 않는다 — "없음"을 적으면 상한이 있는 줄과 무게가 같아 보인다
+          : null}{min && <small className="cap-min">{min.label}</small>}</div><div className="amount-cell"><label className="money-input"><input aria-label={`${category.name} 편성 금액`} inputMode="numeric" value={withCommas(String(amount))} disabled={confirmed || hasSubs} onChange={(e) => changeAmount(category.id, Number(digitsOnly(e.target.value)) || 0)} /><b>원</b></label>{funding.matching > 0 && <div className="inkind-row"><span>현물</span><label className="money-input"><input aria-label={`${category.name} 현물 계상액`} inputMode="numeric" disabled={confirmed} placeholder="0" value={withCommas(String(itemInKind || ''))} onChange={(e) => setInKindAmount(category.id, Number(digitsOnly(e.target.value)) || 0)} /><b>원</b></label><small>현금 {formatWon(amount - itemInKind)}</small></div>}{hasSubs && <div className="amount-slider"><small>세목 {subs.length}개 합계 자동</small></div>}{!confirmed && !hasSubs && (() => {
           // 막대바 눈금은 총사업비로 고정한다(썸 위치 = 총사업비 대비 비율). 눈금을 "현재 금액+잔액"으로
           // 잡으면 한 비목을 움직일 때마다 잔액이 변해 다른 슬라이더 썸까지 시각적으로 따라 움직인다.
           // 잔액·허용 상한 제한은 드래그된 값에만 적용 — 상한 초과 편성이 필요하면 직접 입력으로 한다.
@@ -1735,7 +1940,7 @@ function ChangeManagement({ project, update }: { project: Project; update: (p: P
   </div>;
 }
 
-function Team({ project, update, setScreen }: { project: Project; update: (p: Project) => void; setScreen: (s: Screen) => void }) {
+function Team({ project, update }: { project: Project; update: (p: Project) => void }) {
   const [member, setMember] = useState({ name: '', email: '' });
   const addMember = (e: React.FormEvent) => { e.preventDefault(); if (project.members.length >= 2 || !member.name || !member.email) return; update({ ...project, members: [...project.members, { id: uid(), name: member.name, email: member.email, role: '담당자' }] }); setMember({ name: '', email: '' }); };
   // 정산 마감이 아니라 집행일 기준이다 — 집행하고 3·7·14·30일이 지나도록 증빙이 비어 있으면 단계별로 알린다.
@@ -1749,7 +1954,6 @@ function Team({ project, update, setScreen }: { project: Project; update: (p: Pr
     update({ ...project, emailLogs: [...project.emailLogs, ...logs] });
   };
   return <div className="page-content"><div className="page-title"><div><span className="eyebrow">운영 설정</span><h2>담당자 · 알림 관리</h2><p>담당자 정보를 기록하고 증빙 누락 알림을 확인합니다.</p></div></div>
-    <div className="notice"><Users /><div><strong>참여 인력 · 인건비 관리는 예산 편성 화면으로 이동했어요</strong><span>참여율 점검과 인건비 계산은 이제 예산 편성의 "STEP 1 · 인건비 산정"에서 합니다. <button type="button" className="ref-link" onClick={() => setScreen('budget')}>예산 편성으로 이동 →</button></span></div></div>
     <div className="team-grid single"><section className="panel"><div className="panel-head"><div><h3>담당자 정보</h3><p>{project.members.length} / 2명 입력됨 · 알림 수신 대상</p></div></div><div className="member-list">{project.members.map((m) => <div key={m.id}><div className="avatar">{m.name[0]}</div><span><strong>{m.name} <b>{m.role}</b></strong><small>{m.email}</small></span><CheckCircle2 /></div>)}</div>{project.members.length < 2 ? <form className="inline-add" onSubmit={addMember}><h4><UserPlus /> 담당자 추가</h4><div className="field-grid"><label>이름<input required value={member.name} onChange={(e) => setMember({ ...member, name: e.target.value })} /></label><label>이메일<input required type="email" value={member.email} onChange={(e) => setMember({ ...member, email: e.target.value })} /></label></div><button className="secondary" type="submit"><Plus /> 두 번째 담당자 추가</button></form> : <div className="limit-note"><ShieldCheck /> 담당자는 최대 2명까지 기록할 수 있습니다. 실제 공동 사용은 서버 버전에서 지원됩니다.</div>}</section>
     </div>
     <section className="panel reminder-panel"><div className="panel-head"><div><h3><Mail /> 증빙 누락 알림 로그</h3><p>집행일로부터 3 · 7 · 14 · 30일이 지나도록 증빙이 비어 있으면 단계별로 알립니다.</p></div><button className="secondary" onClick={refreshReminders}><RefreshCw /> 오늘 기준 확인</button></div>{project.emailLogs.length ? <div className="log-table"><div><strong>발송 시각</strong><strong>수신자</strong><strong>시점</strong><strong>미완료</strong><strong>상태</strong></div>{project.emailLogs.map((log) => <div key={log.id}><span>{new Date(log.sentAt).toLocaleString('ko-KR')}</span><span>{log.recipient}</span><b>+{log.milestone}일</b><span>{log.incompleteCount}개</span><span className="log-status">{log.status}</span></div>)}</div> : <div className="empty-state compact"><Mail /><h3>아직 알림 로그가 없어요</h3><p>집행일로부터 3일이 지난 미완료 증빙이 있으면 제품 내 알림 로그가 생성됩니다.</p></div>}</section>
@@ -2358,6 +2562,10 @@ export default function App() {
   projectsRef.current = projects;
   const projectRef = useRef(project);
   projectRef.current = project;
+  // 연구자 명부 — 과제와 별개의 회사 공통 데이터. 과제와 같은 방식으로 로컬 우선 + 클라우드 병행 저장.
+  const [researchers, setResearchers] = useState<Researcher[]>(() => loadResearchers());
+  const researchersRef = useRef(researchers);
+  researchersRef.current = researchers;
 
   useEffect(() => { saveActiveProjectId(project?.id ?? null); }, [project?.id]);
 
@@ -2394,6 +2602,12 @@ export default function App() {
           if (projectsRef.current.length) setProjects([]); // 이전 계정의 잔재는 치우고 새 과제 등록부터 시작
           setSyncState('synced');
         }
+        // 연구자 명부도 과제와 같은 규칙으로 — 클라우드에 있으면 내려받고, 로그인 없이 만든
+        // 로컬 명부만 이 계정으로 올린다. 테이블 미적용(fetch 실패) 시에는 로컬 그대로 동작한다.
+        const cloudResearchers = await fetchCloudResearchers();
+        if (cloudResearchers?.length) setResearchers(cloudResearchers);
+        else if (researchersRef.current.length && (loadProjectOwner() ?? 'local') === 'local') await saveCloudResearchers(researchersRef.current);
+        else if (cloudResearchers !== null && researchersRef.current.length) setResearchers([]); // 이전 계정의 잔재
       } else setSyncState('local');
       if (initial) setAuthChecked(true);
     };
@@ -2401,7 +2615,7 @@ export default function App() {
     const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
       // 로그아웃하면 이 브라우저의 과제 사본도 치운다 — 데이터는 그 계정 클라우드에 남아 있고,
       // 남겨두면 다음에 로그인하는 다른 계정에 이전 계정 과제가 노출·복사될 수 있다.
-      if (event === 'SIGNED_OUT') setProjects([]);
+      if (event === 'SIGNED_OUT') { setProjects([]); setResearchers([]); }
       if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') apply(next);
     });
     return () => sub.subscription.unsubscribe();
@@ -2425,6 +2639,16 @@ export default function App() {
     }
   }, [projects, session]);
 
+  // 연구자 명부 저장 — 로컬은 즉시, 클라우드는 과제와 같은 0.8초 디바운스.
+  // 테이블 미적용 등으로 실패해도 로컬 저장은 살아 있으므로 동기화 상태 표시는 건드리지 않는다.
+  useEffect(() => {
+    saveResearchersLocal(researchers);
+    if (session) {
+      const timer = setTimeout(() => { saveCloudResearchers(researchers); }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [researchers, session]);
+
   const logout = async () => { await signOutCloud(); setLocalMode(false); };
   if (!authChecked) return <div className="auth-splash"><div className="brand-mark"><Check /></div> 계정 확인 중…</div>;
   if (isCloudEnabled && !session && !localMode) return <AuthScreen onLocal={() => setLocalMode(true)} />;
@@ -2440,6 +2664,12 @@ export default function App() {
     setProjects((list) => list.map((p) => p.id === currentId ? next : p));
     if (next.id !== currentId) setActiveId(next.id); // 백업 복원처럼 과제 id가 바뀌는 경우
   };
+  // 연구자 관리의 퇴사 반영처럼 열려 있지 않은 과제까지 한 번에 고치는 경우.
+  // 저장 효과는 "현재 열린 과제"만 클라우드에 올리므로, 나머지는 여기서 바로 저장한다 (last-write-wins).
+  const applyProjects = (updated: Project[]) => {
+    setProjects((list) => list.map((p) => updated.find((u) => u.id === p.id) ?? p));
+    if (session) for (const u of updated) if (u.id !== project.id) saveCloudProject(u);
+  };
   const reset = async () => {
     if (!confirm(`"${project.name}" 과제를 삭제할까요? ${session ? '클라우드와 이 브라우저에서' : '이 브라우저에서'} 이 과제만 삭제되고 다른 과제는 유지됩니다.${session ? '\n(계정을 바꾸려는 거라면 삭제 대신 "로그아웃"을 사용하세요.)' : ''}`)) return;
     const evidenceIds = collectEvidenceIds(project);
@@ -2453,5 +2683,5 @@ export default function App() {
     // 남으면 엉뚱한 과제의 그 화면이 나온다. 남은 과제가 없으면 등록 화면이 자연히 뜬다.
     setScreen('overview');
   };
-  return <div className="app-shell"><Sidebar screen={screen} setScreen={setScreen} project={project} projects={projects} onSelect={(id) => { setActiveId(id); setScreen('spending'); }} onAdd={() => setAdding(true)} onReset={reset} account={session?.user.email ?? null} sync={syncState} onLogout={logout} /><main className="main"><Header project={project} projects={projects} screen={screen} />{screen === 'overview' && <Overview project={project} projects={projects} onSelectProject={(id) => setActiveId(id)} setScreen={setScreen} />}{screen === 'budget' && <Budget project={project} projects={projects} update={update} setScreen={setScreen} />}{screen === 'spending' && <Spending project={project} update={update} />}{screen === 'change' && <ChangeManagement project={project} update={update} />}{screen === 'team' && <Team project={project} update={update} setScreen={setScreen} />}{screen === 'settings' && <Settings project={project} update={update} onReset={reset} />}</main></div>;
+  return <div className="app-shell"><Sidebar screen={screen} setScreen={setScreen} project={project} projects={projects} onSelect={(id) => { setActiveId(id); setScreen('spending'); }} onAdd={() => setAdding(true)} onReset={reset} account={session?.user.email ?? null} sync={syncState} onLogout={logout} /><main className="main"><Header project={project} projects={projects} screen={screen} />{screen === 'overview' && <Overview project={project} projects={projects} onSelectProject={(id) => setActiveId(id)} setScreen={setScreen} />}{screen === 'researchers' && <ResearchersScreen researchers={researchers} setResearchers={setResearchers} projects={projects} applyProjects={applyProjects} onOpenBudget={(id) => { setActiveId(id); setScreen('budget'); }} />}{screen === 'budget' && <Budget project={project} projects={projects} researchers={researchers} update={update} setScreen={setScreen} />}{screen === 'spending' && <Spending project={project} update={update} />}{screen === 'change' && <ChangeManagement project={project} update={update} />}{screen === 'team' && <Team project={project} update={update} />}{screen === 'settings' && <Settings project={project} update={update} onReset={reset} />}</main></div>;
 }

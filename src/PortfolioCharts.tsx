@@ -9,7 +9,8 @@ import type { Project } from './types';
 
 // 파스텔 톤 팔레트 — validate_palette.js 통과본. 완전히 연한 파스텔은 색약 구분·대비 검사에
 // 실패해서, 채도를 조금 남긴 파스텔로 맞췄다. 대비 부족분은 툴팁·범례·표 뷰가 보완한다.
-const SERIES = ['#6d9bd8', '#e0895c', '#4fb98e', '#d4a83c', '#d685aa', '#77a94f', '#9b8bd6', '#d97676'];
+// 1번 슬롯은 DESIGN-slack.md 브랜드 오버진의 파스텔 톤으로 앵커했고, 파랑은 7번에 유지해 인접 구분을 지켰다.
+const SERIES = ['#b183bd', '#e0895c', '#4fb98e', '#d4a83c', '#d685aa', '#77a94f', '#6d9bd8', '#d97676'];
 const OTHER_COLOR = '#b3bac7';
 const OTHER = '기타';
 

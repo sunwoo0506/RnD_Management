@@ -34,6 +34,18 @@ alter table public.user_projects enable row level security;
 create policy "own projects" on public.user_projects
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- 연구자 명부 — 회사 공통 인사 정보(연봉·입사일·퇴사일). 사용자당 1행, 명부 전체를 JSONB 로
+-- 저장한다 (last-write-wins). 예산편성의 인건비 산정이 이름으로 이 명부를 참조한다.
+create table public.user_researchers (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.user_researchers enable row level security;
+
+create policy "own researchers" on public.user_researchers
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 -- ===========================================================================
 -- 2) 규정DB — 예산편성 화면의 비목이 여기서 온다
 -- ===========================================================================

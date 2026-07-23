@@ -1,10 +1,12 @@
 import { saveAs } from 'file-saver';
-import type { Project } from './types';
+import { parseResearchers } from './researchers';
+import type { Project, Researcher } from './types';
 
 const PROJECT_KEY = 'gwajeon.project.v1';           // 구버전 단일 과제 (마이그레이션 소스로만 사용)
 const PROJECTS_KEY = 'gwajeon.projects.v1';         // 다중 과제 배열
 const ACTIVE_KEY = 'gwajeon.active-project';        // 마지막으로 열어둔 과제 id
 const OWNER_KEY = 'gwajeon.project.owner';
+const RESEARCHERS_KEY = 'gwajeon.researchers.v1';   // 연구자 명부 (회사 공통, 과제와 별개)
 const CORRUPT_BACKUP_KEY = 'gwajeon.project.corrupt-backup';
 const FILE_DB = 'gwajeon-evidence';
 const FILE_STORE = 'files';
@@ -84,6 +86,23 @@ export const saveProjectsLocal = (projects: Project[]): boolean => {
   } catch {
     return false;
   }
+};
+
+// ---- 연구자 명부 저장 ----
+// 과제 배열과 같은 방식(로컬 우선, 로그인 시 클라우드 병행)이지만 회사 공통이라 키가 따로다.
+export const loadResearchers = (): Researcher[] => {
+  try {
+    const raw = localStorage.getItem(RESEARCHERS_KEY);
+    if (!raw) return [];
+    return parseResearchers(JSON.parse(raw)) ?? [];
+  } catch { return []; }
+};
+
+export const saveResearchersLocal = (researchers: Researcher[]): boolean => {
+  try {
+    localStorage.setItem(RESEARCHERS_KEY, JSON.stringify(researchers));
+    return true;
+  } catch { return false; }
 };
 
 export const loadActiveProjectId = (): string | null => {

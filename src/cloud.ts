@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { deleteEvidenceFiles, getEvidenceFile, parseProject, storeEvidenceFile } from './storage';
-import type { Project } from './types';
+import { parseResearchers } from './researchers';
+import type { Project, Researcher } from './types';
 
 // 로그인한 사용자 ID. App의 인증 리스너가 세션 변화에 맞춰 갱신한다.
 let userId: string | null = null;
@@ -69,6 +70,21 @@ export const deleteCloudProject = async (projectId: string): Promise<boolean> =>
     return !legacyError;
   }
   return true;
+};
+
+// 연구자 명부: 사용자당 1행(user_researchers), 명부 전체를 JSONB로 저장한다 (last-write-wins).
+// 테이블이 아직 없으면(supabase/schema.sql 미적용) 조용히 실패하고 로컬 저장만으로 동작한다.
+export const fetchCloudResearchers = async (): Promise<Researcher[] | null> => {
+  if (!cloudActive()) return null;
+  const { data, error } = await supabase!.from('user_researchers').select('data').eq('user_id', userId!).maybeSingle();
+  if (error || !data) return null;
+  return parseResearchers(data.data);
+};
+
+export const saveCloudResearchers = async (researchers: Researcher[]): Promise<boolean> => {
+  if (!cloudActive()) return false;
+  const { error } = await supabase!.from('user_researchers').upsert({ user_id: userId!, data: researchers, updated_at: new Date().toISOString() });
+  return !error;
 };
 
 // 증빙 파일: 로그인 상태면 Storage(사용자별 폴더), 아니면 브라우저 IndexedDB.

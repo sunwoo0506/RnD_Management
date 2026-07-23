@@ -428,7 +428,7 @@ export default function AdminApp() {
               })()
               : <p className="pkg-missing"><AlertCircle /> 규정DB 패키지가 없는 신청입니다 (옛 버전 앱에서 팩만 공유). 조문 원문(source_text)과 검토본이 없어 공통 규격 검토가 불가능하니, 반려하고 다시 신청하도록 안내하세요.</p>}
             {row.program_registry_id && edit.programRegistryId === row.program_registry_id && <p className="doc-empty">사용자 화면에서 이미 사업명에 연결된 과제가 보낸 신청이라 자동으로 연결을 골라뒀어요.</p>}
-            {!edit.programRegistryId && nameMatches.length > 0 && <p className="doc-empty" style={{ color: '#d6453d' }}>같은 이름의 사업이 이미 있어요 — "기존 사업에 연결"에서 골라야 사업명이 중복 등록되지 않아요.</p>}
+            {!edit.programRegistryId && nameMatches.length > 0 && <p className="doc-empty" style={{ color: '#cc4117' }}>같은 이름의 사업이 이미 있어요 — "기존 사업에 연결"에서 골라야 사업명이 중복 등록되지 않아요.</p>}
             <div className="admin-actions">
               <button type="button" className="danger-button" disabled={acting === row.id} onClick={() => rejectPack(row)}><X /> 반려</button>
               <button type="button" className="primary" disabled={acting === row.id} onClick={() => approvePack(row)}><Check /> 승인</button>
@@ -471,7 +471,7 @@ export default function AdminApp() {
                     const versions = [...doc.document_versions].sort((a, b) => b.created_at.localeCompare(a.created_at));
                     const selected = edit.documentId === doc.id;
                     return <div className="source-doc-row" key={doc.id}>
-                      <button type="button" onClick={() => pickVersionTarget(row, doc)} style={selected ? { borderColor: 'var(--blue)', background: '#eef3ff' } : undefined}>
+                      <button type="button" onClick={() => pickVersionTarget(row, doc)} style={selected ? { borderColor: 'var(--primary)', background: '#f9f0ff' } : undefined}>
                         <FileText /><span><strong>{DOCUMENT_TYPE_LABEL[doc.document_type]}</strong><small>{doc.title} · {versions.map((v) => v.version_label || '버전명 없음').join(', ')}</small></span>
                         {selected && <Check />}
                       </button>
