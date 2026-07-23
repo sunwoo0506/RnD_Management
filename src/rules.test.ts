@@ -1077,3 +1077,16 @@ describe('예산편성 비목의 출처', () => {
     expect(isRegulationDbPack(getPack('legacy-rnd'))).toBe(false);
   });
 });
+
+describe('인건비 천원 미만 버림', () => {
+  it('월 인건비는 천원 미만을 버리고, 합계는 버림한 월액 × 개월이다', () => {
+    // 월급여 3,333,333 × 참여율 30% = 999,999.9 → 999,000원 (버림)
+    const cost = laborCostFor(
+      { id: '1', name: '박연구', projectRate: 30, externalRate: 0, monthlyPay: 3_333_333, laborFunding: 'cash' },
+      { startDate: '2026-01-01', endDate: '2026-12-31', includeInsurance: false, includeSeverance: false },
+    );
+    expect(cost.monthly).toBe(999_000);
+    expect(cost.monthly % 1000).toBe(0);
+    expect(cost.total).toBe(999_000 * cost.months);
+  });
+});

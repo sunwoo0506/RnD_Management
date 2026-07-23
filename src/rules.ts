@@ -1137,7 +1137,9 @@ export const laborCostFor = (
   const insurance = (opts.includeInsurance ?? true) ? Math.round(pay * (opts.insuranceRate ?? DEFAULT_INSURANCE_RATE) / 100) : 0;
   const severance = severanceApplies(participant, opts.includeSeverance) ? Math.round(pay / 12) : 0;
   const months = monthsBetween(participant.laborStart ?? opts.startDate, participant.laborEnd ?? opts.endDate);
-  const monthly = Math.round((pay + insurance + severance) * participant.projectRate / 100);
+  // 월 인건비는 천원 미만을 버린다 (사용자 결정) — 정산 관행상 원 단위 꼬리는 편성에 쓰지 않는다.
+  // 합계는 버림한 월액 × 개월이라 자동으로 천원 단위가 유지된다.
+  const monthly = Math.floor((pay + insurance + severance) * participant.projectRate / 100 / 1000) * 1000;
   const total = monthly * months;
   // 계상 구분: 현물(전액)·현금(전액)은 합계를 그대로 따라가고, 혼합만 laborInKind 입력값을 쓴다.
   // laborFunding 미지정 구버전 데이터는 laborInKind 입력이 있으면 혼합, 없으면 현금으로 본다.

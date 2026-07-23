@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { actionSummary, budgetComposition, evidenceGaps, overdueAlerts, fundingUsage, isEnded, overviewOrder, participationTable, periodProgress, planTodos, portfolioTotals, subItemComposition } from './portfolio';
+import { actionSummary, otherProjectsRate, budgetComposition, evidenceGaps, overdueAlerts, fundingUsage, isEnded, overviewOrder, participationTable, periodProgress, planTodos, portfolioTotals, subItemComposition } from './portfolio';
 import type { Project } from './types';
 
 // 총괄 대시보드는 과제 전체를 합쳐 보여준다 — 합계·부처별 수·진행률·정렬이 이 파일의 계약이다.
@@ -190,5 +190,23 @@ describe('목록 정렬', () => {
     ], TODAY);
     expect(ordered.map((p) => p.id)).toEqual(['due-soon', 'due-late', 'ended-recent', 'ended-old']);
     expect(isEnded(ordered[2], TODAY)).toBe(true);
+  });
+});
+
+describe('타 과제 참여율 자동 계산', () => {
+  const three = [
+    project({ id: 'a', name: '과제A', participants: [{ id: '1', name: '박연구', projectRate: 50, externalRate: 0 }] }),
+    project({ id: 'b', name: '과제B', participants: [{ id: '2', name: '박연구', projectRate: 30, externalRate: 0 }] }),
+    project({ id: 'c', name: '과제C', participants: [{ id: '3', name: '박연구', projectRate: 10, externalRate: 0 }] }),
+  ];
+
+  it('다른 등록 과제의 같은 이름 참여율을 합쳐 준다 (전체 − 이 과제)', () => {
+    expect(otherProjectsRate(three, 'a', '박연구')).toBe(40);   // 30 + 10
+    expect(otherProjectsRate(three, 'b', '박연구')).toBe(60);   // 50 + 10
+  });
+
+  it('다른 과제 어디에도 없는 이름이면 null — 수동 입력을 유지한다', () => {
+    expect(otherProjectsRate(three, 'a', '김신입')).toBe(null);
+    expect(otherProjectsRate(three, 'a', '  ')).toBe(null);
   });
 });

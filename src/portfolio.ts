@@ -251,6 +251,24 @@ export const overdueAlerts = (projects: Project[], today: string, limitDays = 14
   return alerts.sort((a, b) => b.days - a.days);
 };
 
+// 같은 이름이 "다른" 등록 과제들에서 갖는 참여율 합 — 인건비 화면의 타 과제 칸을 자동으로 채운다.
+// 다른 과제 어디에도 없는 이름이면 null — 그때는 수동 입력을 유지한다 (앱 밖 과제일 수 있다).
+export const otherProjectsRate = (projects: Project[], currentProjectId: string, name: string): number | null => {
+  const target = name.trim();
+  if (!target) return null;
+  let found = false;
+  let sum = 0;
+  for (const project of projects) {
+    if (project.id === currentProjectId) continue;
+    for (const participant of project.participants) {
+      if (participant.name.trim() !== target) continue;
+      found = true;
+      sum += participant.projectRate;
+    }
+  }
+  return found ? sum : null;
+};
+
 // ---- 연구인력 참여율 현황표 (④-3) ----
 // 사람 합치기는 이름 기준이다 — 과제마다 따로 입력되고 공통 인물 ID가 없다.
 // 표기가 다르면("박연구"/"박연구원") 다른 사람으로 집계되므로 화면이 그 사실을 안내한다.

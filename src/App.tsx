@@ -8,7 +8,7 @@ import {
 import type { Session } from '@supabase/supabase-js';
 import { baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, settlementDeadlineFor, evidenceGuide, evidenceChecklistFor, commonEvidenceRuleNames, primaryEvidence, withAlwaysRequired, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, spendingCautions, subItemStandardFor, transferLimitError, visibleCategories } from './rules';
 import { evidenceAlarms, monthSequence, setMonthlyPlan, spendingMatrix } from './spending';
-import { isEnded, overviewOrder, periodProgress, portfolioTotals } from './portfolio';
+import { isEnded, otherProjectsRate, overviewOrder, periodProgress, portfolioTotals } from './portfolio';
 import PortfolioCharts from './PortfolioCharts';
 import ThousandWon from './ThousandWon';
 import PortfolioPeople from './PortfolioPeople';
@@ -904,7 +904,7 @@ function BudgetComposition({ pack, project, cats, bases }: { pack: RulePack; pro
 
 // ---- 참여인력 · 인건비 산정 패널 (예산 편성 화면) ----
 // 참여율 점검과 인건비(4대보험·퇴직금) 자동 계산을 한 뒤 "예산 편성에 반영"으로 인건비 비목을 채운다.
-function ParticipantsPanel({ project, update }: { project: Project; update: (p: Project) => void }) {
+function ParticipantsPanel({ project, projects, update }: { project: Project; projects: Project[]; update: (p: Project) => void }) {
   const pack = packFor(project);
   const [person, setPerson] = useState('');
   const addPerson = (e: React.FormEvent) => { e.preventDefault(); if (!person.trim()) return; update({ ...project, participants: [...project.participants, { id: uid(), name: person.trim(), projectRate: 0, externalRate: 0 }] }); setPerson(''); };
@@ -966,7 +966,11 @@ function ParticipantsPanel({ project, update }: { project: Project; update: (p: 
     <div className="labor-table"><div className="labor-head">
       <span>인력</span><span>구분</span><span>참여 기간</span><span>월급여</span><span>참여율 (현재 / 타 과제)</span><span>계상 구분</span><span>인건비 합계</span><span />
     </div>{sortedParticipants.map((p, index) => {
-      const total = p.projectRate + p.externalRate; const over = total > 100;
+      // 타 과제 참여율: 다른 등록 과제에 같은 이름이 있으면 그 합을 자동으로 쓴다
+      // (총괄의 전체 참여율 − 이 과제 참여율). 어디에도 없으면 수동 입력을 유지한다.
+      const autoExternal = otherProjectsRate(projects, project.id, p.name);
+      const external = autoExternal ?? p.externalRate;
+      const total = p.projectRate + external; const over = total > 100;
       const cost = laborCostFor(p, laborOpts); const kind = fundingKindOf(p);
       const hasSeverance = severanceApplies(p, includeSeverance);
       const showGroup = index === 0 || fundingKindOf(sortedParticipants[index - 1]) !== kind;
@@ -987,7 +991,9 @@ function ParticipantsPanel({ project, update }: { project: Project; update: (p: 
           </div>
           <div className="labor-rates">
             <label><input aria-label={`${p.name} 현재 과제 참여율`} type="number" min="0" value={p.projectRate} onChange={(e) => setRate(p.id, 'projectRate', Number(e.target.value))} /><b>%</b></label>
-            <label><input aria-label={`${p.name} 타 과제 참여율`} type="number" min="0" value={p.externalRate} onChange={(e) => setRate(p.id, 'externalRate', Number(e.target.value))} /><b>%</b></label>
+            {autoExternal !== null
+              ? <label title="다른 등록 과제에 입력된 이 사람의 참여율 합 — 그쪽에서 고치면 여기도 따라와요"><input aria-label={`${p.name} 타 과제 참여율 (자동)`} type="number" value={autoExternal} readOnly /><b>%</b></label>
+              : <label><input aria-label={`${p.name} 타 과제 참여율`} type="number" min="0" value={p.externalRate} onChange={(e) => setRate(p.id, 'externalRate', Number(e.target.value))} /><b>%</b></label>}
             <b className={over ? 'sum over' : 'sum'}>{total}%</b>
           </div>
           <div className="labor-fund">
@@ -1036,7 +1042,7 @@ function ParticipantsPanel({ project, update }: { project: Project; update: (p: 
   </section>;
 }
 
-function Budget({ project, update, setScreen }: { project: Project; update: (p: Project) => void; setScreen: (s: Screen) => void }) {
+function Budget({ project, projects, update, setScreen }: { project: Project; projects: Project[]; update: (p: Project) => void; setScreen: (s: Screen) => void }) {
   const pack = packFor(project);
   const cats = visibleCategories(pack, project);
   const confirmed = !!project.budgetConfirmed;
@@ -1234,7 +1240,7 @@ function Budget({ project, update, setScreen }: { project: Project; update: (p: 
         <p className="cap-alert-basis">{rates.map((check, index) => <span key={check.rule.id}>{index > 0 && ' · '}{check.rule.message} {refLink(check.rule)}</span>)}</p>
       </section>;
     })()}
-    <ParticipantsPanel project={project} update={update} />
+    <ParticipantsPanel project={project} projects={projects} update={update} />
     <section className="panel budget-editor"><div className="editor-head"><div><span className="section-kicker">STEP 2 · 비목별 편성</span><span>전체 사용 가능 예산</span><strong>{formatWon(project.totalBudget)}</strong>{funding.matching > 0 && funding.matchingCashRateKnown && <small className="funding-split-note">현금 {formatWon(funding.subsidy + funding.matchingCash)} (지원금+민간 현금) · 현물 {formatWon(funding.matchingInKind)}</small>}</div><div className="editor-head-sums">{funding.matching > 0 && funding.matchingCashRateKnown
         ? (() => {
             // 현금·현물을 각각 검증한다 — 둘 다 맞으면 편성 합계도 자동으로 맞는다.
@@ -2438,5 +2444,5 @@ export default function App() {
     // 남으면 엉뚱한 과제의 그 화면이 나온다. 남은 과제가 없으면 등록 화면이 자연히 뜬다.
     setScreen('overview');
   };
-  return <div className="app-shell"><Sidebar screen={screen} setScreen={setScreen} project={project} projects={projects} onSelect={(id) => { setActiveId(id); setScreen('spending'); }} onAdd={() => setAdding(true)} onReset={reset} account={session?.user.email ?? null} sync={syncState} onLogout={logout} /><main className="main"><Header project={project} projects={projects} screen={screen} />{screen === 'overview' && <Overview project={project} projects={projects} onSelectProject={(id) => setActiveId(id)} setScreen={setScreen} />}{screen === 'budget' && <Budget project={project} update={update} setScreen={setScreen} />}{screen === 'spending' && <Spending project={project} update={update} />}{screen === 'change' && <ChangeManagement project={project} update={update} />}{screen === 'team' && <Team project={project} update={update} setScreen={setScreen} />}{screen === 'settings' && <Settings project={project} update={update} onReset={reset} />}</main></div>;
+  return <div className="app-shell"><Sidebar screen={screen} setScreen={setScreen} project={project} projects={projects} onSelect={(id) => { setActiveId(id); setScreen('spending'); }} onAdd={() => setAdding(true)} onReset={reset} account={session?.user.email ?? null} sync={syncState} onLogout={logout} /><main className="main"><Header project={project} projects={projects} screen={screen} />{screen === 'overview' && <Overview project={project} projects={projects} onSelectProject={(id) => setActiveId(id)} setScreen={setScreen} />}{screen === 'budget' && <Budget project={project} projects={projects} update={update} setScreen={setScreen} />}{screen === 'spending' && <Spending project={project} update={update} />}{screen === 'change' && <ChangeManagement project={project} update={update} />}{screen === 'team' && <Team project={project} update={update} setScreen={setScreen} />}{screen === 'settings' && <Settings project={project} update={update} onReset={reset} />}</main></div>;
 }
