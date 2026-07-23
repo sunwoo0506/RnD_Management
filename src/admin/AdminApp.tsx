@@ -5,7 +5,7 @@
 // 문서 승인은 기존 문서에 새 버전을 추가하거나(연결 선택), 새 문서를 만든다 — 이전 버전은
 // 절대 지우지 않는다.
 import { useState } from 'react';
-import { AlertCircle, Check, Download, Eye, FileText, LogOut, RefreshCw, Search, X } from 'lucide-react';
+import { AlertCircle, Check, Download, Eye, FileText, LogOut, RefreshCw, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { adminSupabase } from './adminSupabase';
 import { authErrorKo } from '../cloud';
 import { DOCUMENT_TYPE_LABEL, DOCUMENT_TYPES, type DocumentType } from '../registry';
@@ -36,7 +36,9 @@ interface ProgramDocumentVersion {
   file_assets: { original_filename: string; storage_path: string }[];
 }
 interface ProgramDocument { id: string; title: string; document_type: DocumentType; document_versions: ProgramDocumentVersion[] }
-interface ListResponse { packSubmissions: PackSubmission[]; docSubmissions: DocSubmission[]; existingDocuments: ExistingDocument[]; existingPrograms: ExistingProgram[] }
+// 반려하면 지워지는 대신 휴지통으로 온다. 복원하면 승인 대기로 돌아가고, 영구 삭제는 여기서만 한다.
+interface TrashItem { id: string; kind: 'pack' | 'document'; title: string; submitted_email: string | null; rejected_at: string }
+interface ListResponse { packSubmissions: PackSubmission[]; docSubmissions: DocSubmission[]; existingDocuments: ExistingDocument[]; existingPrograms: ExistingProgram[]; trash?: TrashItem[] }
 
 interface PackEdit { programName: string; year: string; programRegistryId: string }
 interface DocEdit {
@@ -98,6 +100,7 @@ export default function AdminApp() {
   const [docSubmissions, setDocSubmissions] = useState<DocSubmission[]>([]);
   const [existingDocuments, setExistingDocuments] = useState<ExistingDocument[]>([]);
   const [existingPrograms, setExistingPrograms] = useState<ExistingProgram[]>([]);
+  const [trash, setTrash] = useState<TrashItem[]>([]);
   const [packEdits, setPackEdits] = useState<Record<string, PackEdit>>({});
   const [docEdits, setDocEdits] = useState<Record<string, DocEdit>>({});
   const [acting, setActing] = useState<string | null>(null);
@@ -129,6 +132,7 @@ export default function AdminApp() {
       setDocSubmissions(data.docSubmissions ?? []);
       setExistingDocuments(data.existingDocuments ?? []);
       setExistingPrograms(data.existingPrograms ?? []);
+      setTrash(data.trash ?? []);   // Edge Function이 구버전이면 필드가 없다 — 빈 목록으로 둔다
       setAuthed(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : '불러오기에 실패했습니다.');
@@ -170,6 +174,21 @@ export default function AdminApp() {
       await call({ action: 'approvePack', packSubmissionId: row.id, programName: edit.programName.trim(), year: edit.year ? Number(edit.year) : null, programRegistryId: edit.programRegistryId || null });
       await refresh();
     } catch (err) { alert(err instanceof Error ? err.message : '승인에 실패했습니다.'); }
+    finally { setActing(null); }
+  };
+
+  const restoreTrash = async (row: TrashItem) => {
+    setActing(row.id);
+    try { await call({ action: 'restoreTrash', trashId: row.id }); await refresh(); }
+    catch (err) { alert(err instanceof Error ? err.message : '복원에 실패했습니다.'); }
+    finally { setActing(null); }
+  };
+
+  const purgeTrash = async (row: TrashItem) => {
+    if (!confirm(`"${row.title}"을(를) 영구 삭제할까요? 되돌릴 수 없습니다.`)) return;
+    setActing(row.id);
+    try { await call({ action: 'purgeTrash', trashId: row.id }); await refresh(); }
+    catch (err) { alert(err instanceof Error ? err.message : '삭제에 실패했습니다.'); }
     finally { setActing(null); }
   };
 
@@ -464,6 +483,18 @@ export default function AdminApp() {
           </div>;
         })}
       </div>
+    </section>
+
+    <section className="panel admin-card">
+      <div className="panel-head"><div><h3><Trash2 /> 휴지통 ({trash.length})</h3><p>반려한 신청이 보관됩니다. 복원하면 다시 승인 대기로 돌아가고, 영구 삭제해야 실제로 지워집니다.</p></div></div>
+      {trash.length === 0
+        ? <p className="doc-empty">휴지통이 비어 있습니다.</p>
+        : <div className="admin-groups admin-card-fields">{trash.map((row) => <div className="trash-row" key={row.id}>
+          <span className="trash-kind">{row.kind === 'pack' ? '규정 팩' : '문서'}</span>
+          <div><strong>{row.title}</strong><small>{row.submitted_email ?? '알 수 없음'} · 반려 {row.rejected_at.slice(0, 10)}</small></div>
+          <button type="button" className="secondary" disabled={acting === row.id} onClick={() => restoreTrash(row)}><RotateCcw /> 복원</button>
+          <button type="button" className="danger-button" disabled={acting === row.id} onClick={() => purgeTrash(row)}><Trash2 /> 영구 삭제</button>
+        </div>)}</div>}
     </section>
 
     <section className="panel admin-card">

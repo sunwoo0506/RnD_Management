@@ -252,6 +252,21 @@ create policy "pack submission insert own" on public.program_registry_submission
 create policy "pack submission select own" on public.program_registry_submissions
   for select to authenticated using (auth.uid() = submitted_by);
 
+-- 반려 휴지통 — 반려한 신청(규정 팩·문서)을 지우지 않고 옮겨 둔다. 실수로 반려해도
+-- 관리자 화면에서 복원할 수 있고, 필요 없으면 영구 삭제한다.
+-- 문서 신청의 파일은 registry_pending 버킷 안에서 trash/ 접두사로 함께 옮겨진다.
+create table public.registry_trash (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null check (kind in ('pack', 'document')),
+  title text not null,                          -- 사업명(팩) 또는 문서명
+  payload jsonb not null,                       -- 반려 전 신청 행 전체 (복원용)
+  storage_path text,                            -- 문서 파일의 휴지통 위치 (trash/<원래 경로>)
+  submitted_by uuid references auth.users (id),
+  rejected_by uuid references auth.users (id),
+  rejected_at timestamptz not null default now()
+);
+alter table public.registry_trash enable row level security;  -- 정책 없음: Edge Function(service role) 전용
+
 -- ===========================================================================
 -- 5) 검토자 — RLS 만 켜고 정책은 두지 않는다 (Edge Function 의 service role 전용)
 -- ===========================================================================

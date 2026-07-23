@@ -50,11 +50,12 @@ const withEmails = async <T extends { submitted_by: string | null }>(rows: T[]):
 
 const list = async () => {
   const db = service();
-  const [{ data: packs, error: packErr }, { data: docs, error: docErr }, { data: documents }, { data: programs }] = await Promise.all([
+  const [{ data: packs, error: packErr }, { data: docs, error: docErr }, { data: documents }, { data: programs }, { data: trash }] = await Promise.all([
     db.from('program_registry_submissions').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
     db.from('document_submissions').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
     db.from('documents').select('id, title, document_type, issuing_authority, document_number, legal_level, document_programs(program_registry_id)').eq('is_active', true).order('title'),
     db.from('program_registry').select('id, program_name, year').order('program_name'),
+    db.from('registry_trash').select('id, kind, title, submitted_by, rejected_at').order('rejected_at', { ascending: false }),
   ]);
   if (packErr) throw new Error(packErr.message);
   if (docErr) throw new Error(docErr.message);
@@ -63,6 +64,7 @@ const list = async () => {
     docSubmissions: await withEmails(docs ?? []),
     existingDocuments: documents ?? [],
     existingPrograms: programs ?? [],
+    trash: await withEmails(trash ?? []),
   };
 };
 
@@ -133,10 +135,27 @@ const approveDocument = async (input: ApproveDocumentInput, reviewedBy: string) 
   return { documentId, versionId };
 };
 
-const rejectDocument = async (docSubmissionId: string) => {
+// 반려는 지우지 않는다 — 휴지통(registry_trash)으로 옮겨 실수로 반려해도 복원할 수 있게 한다.
+// 파일도 삭제하는 대신 버킷 안 trash/ 접두사로 옮긴다.
+const rejectDocument = async (docSubmissionId: string, rejectedBy: string) => {
   const db = service();
-  const { data: doc } = await db.from('document_submissions').select('storage_path').eq('id', docSubmissionId).single();
-  if (doc) await db.storage.from('registry_pending').remove([doc.storage_path]);
+  const { data: row, error } = await db.from('document_submissions').select('*').eq('id', docSubmissionId).single();
+  if (error || !row) throw new Error('신청 파일을 찾을 수 없습니다.');
+  let trashPath: string | null = null;
+  if (row.storage_path) {
+    trashPath = `trash/${row.storage_path}`;
+    const { error: moveError } = await db.storage.from('registry_pending').move(row.storage_path, trashPath);
+    if (moveError) throw new Error(moveError.message);
+  }
+  const { error: trashError } = await db.from('registry_trash').insert({
+    kind: 'document', title: row.title, payload: row, storage_path: trashPath,
+    submitted_by: row.submitted_by, rejected_by: rejectedBy,
+  });
+  if (trashError) {
+    // 휴지통에 못 넣었으면 파일을 제자리로 되돌린다 — 신청 행이 남아 있으니 다시 시도할 수 있다.
+    if (trashPath) await db.storage.from('registry_pending').move(trashPath, row.storage_path);
+    throw new Error(trashError.message);
+  }
   await db.from('document_submissions').delete().eq('id', docSubmissionId);
 };
 
@@ -160,9 +179,46 @@ const approvePack = async (packSubmissionId: string, programName: string, year: 
   await db.from('program_registry_submissions').delete().eq('id', packSubmissionId);
 };
 
-const rejectPack = async (packSubmissionId: string) => {
+const rejectPack = async (packSubmissionId: string, rejectedBy: string) => {
   const db = service();
+  const { data: row, error } = await db.from('program_registry_submissions').select('*').eq('id', packSubmissionId).single();
+  if (error || !row) throw new Error('신청 규정 팩을 찾을 수 없습니다.');
+  const { error: trashError } = await db.from('registry_trash').insert({
+    kind: 'pack', title: row.program_name, payload: row, submitted_by: row.submitted_by, rejected_by: rejectedBy,
+  });
+  if (trashError) throw new Error(trashError.message);
   await db.from('program_registry_submissions').delete().eq('id', packSubmissionId);
+};
+
+// 휴지통 복원 — 신청 행을 원래 테이블에 되살리고(승인 대기로), 문서 파일은 제자리로 옮긴다.
+const restoreTrash = async (trashId: string) => {
+  const db = service();
+  const { data: item, error } = await db.from('registry_trash').select('*').eq('id', trashId).single();
+  if (error || !item) throw new Error('휴지통 항목을 찾을 수 없습니다.');
+  const payload = { ...(item.payload as Record<string, unknown>), status: 'pending' };
+  if (item.kind === 'document' && item.storage_path) {
+    const original = String((item.payload as Record<string, unknown>).storage_path);
+    const { error: moveError } = await db.storage.from('registry_pending').move(item.storage_path, original);
+    if (moveError) throw new Error(moveError.message);
+  }
+  const table = item.kind === 'pack' ? 'program_registry_submissions' : 'document_submissions';
+  const { error: insertError } = await db.from(table).insert(payload);
+  if (insertError) {
+    if (item.kind === 'document' && item.storage_path) {
+      await db.storage.from('registry_pending').move(String((item.payload as Record<string, unknown>).storage_path), item.storage_path);
+    }
+    throw new Error(insertError.message);
+  }
+  await db.from('registry_trash').delete().eq('id', trashId);
+};
+
+// 휴지통 영구 삭제 — 여기서만 실제로 지운다.
+const purgeTrash = async (trashId: string) => {
+  const db = service();
+  const { data: item } = await db.from('registry_trash').select('*').eq('id', trashId).single();
+  if (!item) return;
+  if (item.kind === 'document' && item.storage_path) await db.storage.from('registry_pending').remove([item.storage_path]);
+  await db.from('registry_trash').delete().eq('id', trashId);
 };
 
 // 이미 승인된 문서(예전 승인분 포함)의 사업명 연결을 나중에도 추가·해제할 수 있게 한다.
@@ -236,9 +292,11 @@ Deno.serve(async (req) => {
       case 'list': return json(await list());
       case 'fileUrl': return json({ url: await fileUrl(body.docSubmissionId) });
       case 'approveDocument': return json(await approveDocument(body as ApproveDocumentInput, admin.id));
-      case 'rejectDocument': await rejectDocument(body.docSubmissionId); return json({ ok: true });
+      case 'rejectDocument': await rejectDocument(body.docSubmissionId, admin.id); return json({ ok: true });
       case 'approvePack': await approvePack(body.packSubmissionId, body.programName ?? '', body.year ?? null, admin.id, body.programRegistryId ?? null); return json({ ok: true });
-      case 'rejectPack': await rejectPack(body.packSubmissionId); return json({ ok: true });
+      case 'rejectPack': await rejectPack(body.packSubmissionId, admin.id); return json({ ok: true });
+      case 'restoreTrash': await restoreTrash(body.trashId); return json({ ok: true });
+      case 'purgeTrash': await purgeTrash(body.trashId); return json({ ok: true });
       case 'linkDocumentProgram': await linkDocumentProgram(body.documentId, body.programRegistryId); return json({ ok: true });
       case 'unlinkDocumentProgram': await unlinkDocumentProgram(body.documentId, body.programRegistryId); return json({ ok: true });
       case 'programDocuments': return json({ documents: await programDocuments(body.programRegistryId) });

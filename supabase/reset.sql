@@ -52,6 +52,7 @@ drop table if exists public.document_submissions cascade;
 drop table if exists public.documents cascade;
 
 drop table if exists public.program_registry_submissions cascade;
+drop table if exists public.registry_trash cascade;
 drop table if exists public.program_registry cascade;
 drop table if exists public.regulation_packages cascade;
 
