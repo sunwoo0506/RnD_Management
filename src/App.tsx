@@ -33,7 +33,13 @@ import type { BudgetCategoryId, BudgetChange, BudgetItem, BudgetSubItem, ChangeT
 // 문서 생성 라이브러리(docx·excel)는 무거워서 첫 화면 번들에서 제외하고 버튼 클릭 시에만 불러온다.
 const withExporters = async (run: (mod: typeof import('./exporters')) => Promise<void>) => {
   try { await run(await import('./exporters')); }
-  catch { alert('문서 생성에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해주세요.'); }
+  catch (error) {
+    // 청크 로드 실패(배포 직후 옛 청크가 사라진 경우)는 main.tsx가 새로고침으로 처리한다.
+    // 여기 걸린 것은 문서 생성 자체의 오류이므로, 새로고침 안내를 함께 준다.
+    const message = String((error as { message?: string })?.message ?? '');
+    if (/dynamically imported|module script failed|Failed to fetch/.test(message)) return;   // 새로고침이 곧 일어난다
+    alert('문서 생성에 실패했습니다. 페이지를 새로고침(Ctrl+Shift+R)한 뒤 다시 시도해주세요.');
+  }
 };
 
 // 규정DB의 limitText에는 "별도 총액 상한 없음", "비목 간 비율 제한 없음"처럼
