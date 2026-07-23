@@ -753,6 +753,17 @@ describe('사라진 규정 팩 감지', () => {
     expect(packIsMissing(withPack('nrd2026-forprofit'))).toBe(false);
   });
 
+  it('의도적으로 스냅샷을 쓰는 과제에는 개정 경고를 내지 않는다', () => {
+    // 공유 DB에서 고른 팩 — id가 registry:<uuid>라 내장 목록에 없지만 사라진 게 아니다
+    expect(packIsMissing(withPack('registry:3f2a…uuid'))).toBe(false);
+    // AI 추출 팩을 기준으로 만든 과제 — customPack이 곧 기준이다
+    const extractedBase = { ...withPack('custom-global'), customPack: { ...getPack('didimdol2026'), id: 'custom-global', origin: 'extracted' as const } };
+    expect(packIsMissing(extractedBase)).toBe(false);
+    // 스냅샷이 있어도 packId가 다른 내장 팩이면(진짜 개정) 여전히 알린다
+    const legacyMissing = { ...withPack('tips2026'), customPack: { ...getPack('tips2026-general'), id: 'tips2026' } };
+    expect(packIsMissing({ ...legacyMissing, customPack: undefined })).toBe(true);
+  });
+
   it('갈라진 팩의 후보를 id 접두사로 찾아 제안한다', () => {
     expect(replacementPacksFor(withPack('tips2026')).map((pack) => pack.id).sort())
       .toEqual(['tips2026-deeptech', 'tips2026-general']);

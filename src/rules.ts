@@ -68,8 +68,15 @@ export const isRegulationDbPack = (pack: RulePack): boolean => pack.origin === '
 // 규정이 개정되면 팩이 갈리거나(tips2026 → 일반/딥테크) 이름이 바뀐다. 그때 과제에 저장된
 // packId 는 어디에도 없는 id 가 되고, packFor()는 적용 시점 스냅샷(customPack)으로 되돌아간다.
 // 화면은 그대로 동작하지만 새로 생긴 한도·규칙이 반영되지 않으므로, 사용자에게 알려야 한다.
-export const packIsMissing = (project: Project): boolean =>
-  !allPacks().some((pack) => pack.id === project.packId);
+export const packIsMissing = (project: Project): boolean => {
+  // 의도적으로 스냅샷을 기준으로 쓰는 과제는 "개정으로 사라진 규정"이 아니다:
+  //  - 공유 DB에서 고른 팩 (packId가 registry:<uuid>) — 스냅샷이 곧 선택한 규정이다
+  //  - AI 추출 팩을 기준으로 삼은 과제 (customPack.id === packId)
+  // 이들의 id는 애초에 내장 목록에 없어서, 걸러주지 않으면 방금 만든 과제에도 개정 경고가 뜬다.
+  if (project.packId.startsWith('registry:')) return false;
+  if (project.customPack?.id === project.packId) return false;
+  return !allPacks().some((pack) => pack.id === project.packId);
+};
 
 // 사라진 팩을 대신할 후보를 찾는다.
 //
