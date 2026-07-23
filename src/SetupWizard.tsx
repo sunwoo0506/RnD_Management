@@ -23,6 +23,12 @@ interface DocItem {
   error?: string;
 }
 
+// 편성의 기준 팩. 원칙은 "비목은 검증된 규정DB에서만"이지만, 사용자가 추출 팩만 쓰기로 고르면
+// (useExtractedOnly) 그 선택을 따른다 — 규정DB가 없는 사업은 원래부터 추출 팩이 기준이다.
+// 추출 팩 기준은 화면에 "검증 전"으로 표시된다.
+export const basisPackOf = (extractedPack: RulePack | null, useExtractedOnly: boolean, selectedPack: RulePack): RulePack =>
+  extractedPack && (useExtractedOnly || !isRegulationDbPack(selectedPack)) ? extractedPack : selectedPack;
+
 // 추출 없이 공유할 때 신청에 담을 팩. AI 추출 팩은 여기로 오지 않는다 — 팩만 올리면 근거 검토가
 // 불가능하므로, 조문 원문(source_text)과 검토본(Review.xlsx)을 갖춘 규정DB 패키지 신청
 // (submitRegulationPackage)으로 올린다. 공유 DB의 팩을 골랐다면 새 팩을 다시 신청하지 않는다.
@@ -54,6 +60,8 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
   const [acceptedRules, setAcceptedRules] = useState<Set<number>>(new Set());
   const [useDocCats, setUseDocCats] = useState(false);
   const [extractedPack, setExtractedPack] = useState<RulePack | null>(null);
+  // 규정DB 팩이 매칭돼도 추출 팩만으로 편성하고 싶을 때 켠다 (④에서 선택)
+  const [useExtractedOnly, setUseExtractedOnly] = useState(false);
   const [rateSuggestion, setRateSuggestion] = useState<ReturnType<typeof suggestedFundingRates> | null>(null);
   const [rateFilled, setRateFilled] = useState(false);
 
@@ -177,8 +185,8 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
   // 대응하는 규정DB가 아직 없는 사업뿐이다 — 규정DB 팩을 고른 채로 공고문을 추출했다면 그 결과는
   // 보관함에만 담고, 무엇이 달라졌는지는 과제 설정의 "규정 변경사항 확인"에서 검토한다.
   const selectedPack = registryPick?.pack ?? getPack(packId);
-  const extractedIsBase = !!extractedPack && !isRegulationDbPack(selectedPack);
-  const chosenPack: RulePack = extractedIsBase ? extractedPack! : selectedPack;
+  const chosenPack: RulePack = basisPackOf(extractedPack, useExtractedOnly, selectedPack);
+  const extractedIsBase = !!extractedPack && chosenPack === extractedPack;
 
   const create = async () => {
     if (creating) return;
@@ -368,9 +376,20 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
         <div className="wiz-block">
           <h4><BookOpenCheck /> ④ 적용 규정 확정</h4>
           {extractedPack
-            ? <div className={`registry-picked ${aiStale ? 'stale' : ''}`}><Wand2 /><div><strong>{extractedPack.name}</strong><span>{aiStale
-              ? '업로드한 문서가 바뀐 뒤라 이 규정은 지금 문서와 다를 수 있어요 — ③에서 다시 추출해주세요.'
-              : `추출·승인한 규정을 사용합니다 · ${extractedPack.guideline} · 비목 ${extractedPack.categories.length}개, 규칙 ${extractedPack.rules.length}건`}</span></div><button type="button" className="text-button" onClick={() => setExtractedPack(null)}>해제</button></div>
+            ? <>
+              <div className="pack-select" role="radiogroup" aria-label="적용 기준">
+                {isRegulationDbPack(selectedPack) && <button type="button" role="radio" aria-checked={!useExtractedOnly} className={!useExtractedOnly ? 'active' : ''} onClick={() => setUseExtractedOnly(false)}>
+                  <strong>{selectedPack.name}<em className="pack-verified">근거 검증됨</em></strong>
+                  <span>비목·상한은 검증된 규정DB 기준으로 편성하고, 추출한 규칙은 보관함에 담아둡니다.</span>
+                </button>}
+                <button type="button" role="radio" aria-checked={extractedIsBase} className={extractedIsBase ? 'active' : ''} onClick={() => setUseExtractedOnly(true)}>
+                  <strong>{extractedPack.name}<em className="pack-unverified">AI 추출 · 검증 전</em></strong>
+                  <span>추출 팩만 사용 — 문서에서 추출한 비목 {extractedPack.categories.length}개·규칙 {extractedPack.rules.length}건으로 편성합니다.</span>
+                </button>
+              </div>
+              {aiStale && <p className="field-error"><AlertCircle /> 업로드한 문서가 바뀐 뒤의 추출 결과입니다 — ③에서 다시 추출해주세요.</p>}
+              <button type="button" className="text-button" onClick={() => { setExtractedPack(null); setUseExtractedOnly(false); }}>추출 팩 해제</button>
+            </>
             : registryPick
             ? <div className="registry-picked"><CheckCircle2 /><div><strong>{registryPick.programName}</strong><span>공유 DB의 규정 팩을 사용합니다 · {registryPick.pack.guideline}</span></div><button type="button" className="text-button" onClick={() => setRegistryPick(null)}>해제</button></div>
             : <div className="pack-select" role="radiogroup" aria-label="사업 유형">{selectablePacks().map((pack) => <button type="button" key={pack.id} role="radio" aria-checked={packId === pack.id} className={packId === pack.id ? 'active' : ''} onClick={() => setPackId(pack.id)}><strong>{pack.name}{isRegulationDbPack(pack) && <em className="pack-verified">근거 검증됨</em>}</strong><span>{pack.guideline}</span></button>)}</div>}

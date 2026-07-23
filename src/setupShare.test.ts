@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sharePackOf } from './SetupWizard';
+import { basisPackOf, sharePackOf } from './SetupWizard';
 import { buildPackageReadme, buildRegulationPackage, validateRegulationPackage } from './regulationPackage';
 import { getPack } from './rules';
 import type { Extraction } from './llmExtract';
@@ -20,6 +20,29 @@ describe('공유 신청에 담을 팩 고르기 (추출 없음)', () => {
     const payload = sharePackOf(null, base);
     expect(payload).toMatchObject({ origin: 'pack' });
     expect('pack' in payload && payload.pack.id).toBe('didimdol2026');
+  });
+});
+
+// 편성의 기준 팩 — 규정DB가 매칭돼도 사용자가 고르면 추출 팩만으로 편성할 수 있다.
+describe('편성 기준 팩 고르기', () => {
+  const regDb = getPack('didimdol2026');                       // 검증된 규정DB 팩
+  const legacy = getPack('legacy-rnd');                        // 규정DB가 아닌 예시 팩
+  const extracted = { ...regDb, id: 'custom-x', name: '추출 팩', origin: 'extracted' as const };
+
+  it('기본은 검증된 규정DB 기준 — 추출 팩은 보관함으로', () => {
+    expect(basisPackOf(extracted, false, regDb)).toBe(regDb);
+  });
+
+  it('추출 팩만 사용을 고르면 규정DB가 있어도 추출 팩이 기준이 된다', () => {
+    expect(basisPackOf(extracted, true, regDb)).toBe(extracted);
+  });
+
+  it('대응하는 규정DB가 없으면 원래부터 추출 팩이 기준이다', () => {
+    expect(basisPackOf(extracted, false, legacy)).toBe(extracted);
+  });
+
+  it('추출 팩이 없으면 고른 팩 그대로', () => {
+    expect(basisPackOf(null, true, regDb)).toBe(regDb);
   });
 });
 

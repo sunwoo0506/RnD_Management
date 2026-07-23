@@ -944,6 +944,7 @@ input[readonly] { background: #f7f8fa; color: #667087; pointer-events: none; }
 .pkg-counts span { font-size: 12px; color: var(--muted); border: 1px solid var(--line); background: white; border-radius: 8px; padding: 4px 10px; }
 .pkg-counts b { color: #172033; margin-left: 3px; }
 .pack-verified { display: inline-block; font-size: 11px; font-weight: 700; font-style: normal; color: #1f7a4d; background: #e8f6ef; border-radius: 5px; padding: 2px 6px; margin-left: 6px; }
+.pack-unverified { display: inline-block; font-size: 11px; font-weight: 700; font-style: normal; color: #a06514; background: #fff4e2; border-radius: 5px; padding: 2px 6px; margin-left: 6px; }
 .cap-rate-list { display: grid; gap: 8px; margin: 14px 0 12px; }
 .cap-rate { display: flex; align-items: center; gap: 14px; padding: 10px 14px; background: #fbfcfd; border: 1px solid var(--line); border-radius: 9px; flex-wrap: wrap; }
 .cap-rate > div { display: grid; gap: 2px; }
