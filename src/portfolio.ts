@@ -2,6 +2,7 @@
 // 화면(한눈에 보기)은 과제 하나가 아니라 등록된 과제 전체를 본다. 여기의 함수들은
 // 과제 배열을 받아 총괄 숫자를 만드는 순수 계산만 담당한다.
 // 기획: docs/superpowers/specs/2026-07-23-portfolio-dashboard.md
+import { categoryOf, packFor } from './rules';
 import type { Project } from './types';
 
 // 날짜는 모두 'YYYY-MM-DD' 문자열이라 사전순 비교가 곧 날짜 비교다.
@@ -45,6 +46,48 @@ export const periodProgress = (project: Project, today: string): number => {
   if (!Number.isFinite(start) || !Number.isFinite(end) || !Number.isFinite(now) || end <= start) return 0;
   return Math.min(100, Math.max(0, Math.round((now - start) / (end - start) * 100)));
 };
+
+// ---- 편성 구성 (③ 그래프) ----
+// 사업 간 합산은 비목 "이름" 기준이다. 비목 코드는 대체로 통일돼 있지만 예비창업패키지는
+// PRE_* 코드를 써서, 코드로 합치면 같은 인건비가 두 조각으로 갈라진다. 이름(인건비·재료비…)이
+// 사업을 가로지르는 실제 공통 축이다.
+export interface CompositionSlice { name: string; amount: number }
+
+const categoryName = (project: Project, categoryId: string): string =>
+  categoryOf(packFor(project), categoryId).name.trim();
+
+// 과제 하나의 비목별 편성 (금액 0원 비목 제외, 큰 순)
+export const projectComposition = (project: Project): CompositionSlice[] =>
+  project.budgets
+    .filter((item) => item.amount > 0)
+    .map((item) => ({ name: categoryName(project, item.categoryId), amount: item.amount }))
+    .sort((a, b) => b.amount - a.amount);
+
+// 전체 과제의 비목별 편성 합 (큰 순) — 도넛과 색 배정의 기준.
+// 색은 이 순서로 고정 배정한다: 필터로 과제가 빠져도 남은 비목의 색이 바뀌지 않아야 한다.
+export const budgetComposition = (projects: Project[]): CompositionSlice[] => {
+  const sums = new Map<string, number>();
+  for (const project of projects) {
+    for (const slice of projectComposition(project)) {
+      sums.set(slice.name, (sums.get(slice.name) ?? 0) + slice.amount);
+    }
+  }
+  return [...sums].map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount);
+};
+
+// 과제 하나의 세목 구성 (드릴다운). 세목을 나누지 않은 비목은 비목 자체가 한 줄이 된다.
+export interface SubItemSlice { category: string; name: string; amount: number }
+export const subItemComposition = (project: Project): SubItemSlice[] =>
+  project.budgets
+    .filter((item) => item.amount > 0)
+    .flatMap((item) => {
+      const category = categoryName(project, item.categoryId);
+      const subs = (item.subItems ?? []).filter((sub) => sub.amount > 0);
+      return subs.length
+        ? subs.map((sub) => ({ category, name: sub.name, amount: sub.amount }))
+        : [{ category, name: category, amount: item.amount }];
+    })
+    .sort((a, b) => b.amount - a.amount);
 
 // 목록 순서: 진행 중(종료일 가까운 순) → 종료(최근 종료 먼저). 종료 과제는 합계에는 남기고
 // 자리만 뒤로 보낸다.

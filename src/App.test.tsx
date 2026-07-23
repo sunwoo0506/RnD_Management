@@ -344,9 +344,23 @@ describe('R&D 총괄 대시보드 (한눈에 보기)', () => {
     expect(screen.getByText('온디바이스 AI 경량화 모델 개발')).toBeInTheDocument();
     expect(screen.getByText(/요약 미입력/)).toBeInTheDocument();   // 과제B는 아직 요약이 없다
     // 행 클릭 → 현재 과제가 과제B로 바뀐다 (아래 현재 과제 영역이 따라온다)
-    await user.click(screen.getByRole('button', { name: /과제B/ }));
+    // 편성 그래프의 "과제B 세목 보기" 버튼과 겹치지 않게 목록 행에서 찾는다
+    const rowB = [...document.querySelectorAll('.portfolio-table .portfolio-row')].find((row) => row.textContent?.includes('과제B')) as HTMLElement;
+    await user.click(rowB);
     const divider = document.querySelector('.current-divider');
     expect(divider).toHaveTextContent('과제B');
+  });
+
+  it('편성 구성 그래프가 전체 사업 기준 라벨과 함께 뜨고, 과제를 누르면 세목이 열린다', async () => {
+    twoProjects();
+    const user = userEvent.setup(); render(<App />);
+    const panel = document.querySelector('.portfolio-charts')!;
+    expect(panel).toHaveTextContent('전체 사업 기준');   // ② 체크박스와 무관하게 고정임을 화면이 말한다
+    expect(panel.querySelector('.chart-legend')).toHaveTextContent('인건비');
+    // 예전의 비목별 집행현황 패널은 사라졌다 (기획 결정)
+    expect(document.querySelector('.budget-status')).toBeNull();
+    await user.click(screen.getByRole('button', { name: /과제A.*세목 보기/ }));
+    expect(document.querySelector('.drill-panel')).toHaveTextContent('과제A — 세목 구성');
   });
 
   it('부처 칩을 누르면 그 부처 과제만 목록에 남는다', async () => {

@@ -9,6 +9,7 @@ import type { Session } from '@supabase/supabase-js';
 import { baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, settlementDeadlineFor, evidenceGuide, evidenceChecklistFor, commonEvidenceRuleNames, primaryEvidence, withAlwaysRequired, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, spendingCautions, subItemStandardFor, transferLimitError, visibleCategories } from './rules';
 import { evidenceReadiness, monthSequence, setMonthlyPlan, spendingMatrix } from './spending';
 import { agencyCounts, isEnded, overviewOrder, periodProgress, portfolioTotals } from './portfolio';
+import PortfolioCharts from './PortfolioCharts';
 import { detailFieldsFor } from './spendingForms';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
 import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, getEvidence, getProjectDocument, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
@@ -121,7 +122,6 @@ function PortfolioOverview({ projects, activeId, onSelect }: { projects: Project
 
 function Overview({ project, projects, onSelectProject, setScreen }: { project: Project; projects: Project[]; onSelectProject: (id: string) => void; setScreen: (s: Screen) => void }) {
   const pack = packFor(project);
-  const cats = visibleCategories(pack, project);
   const spent = project.expenses.reduce((sum, item) => sum + item.amount, 0);
   const incomplete = project.expenses.reduce((sum, item) => sum + item.evidence.filter((e) => !e.completed).length, 0);
   const complete = project.expenses.length ? Math.round(project.expenses.filter((e) => e.evidence.every((x) => x.completed)).length / project.expenses.length * 100) : 0;
@@ -133,6 +133,7 @@ function Overview({ project, projects, onSelectProject, setScreen }: { project: 
   return <div className="page-content">
     <section className="welcome"><div><span>{new Date().getHours() < 12 ? '좋은 아침이에요' : '오늘도 수고 많으셨어요'}, {project.members[0]?.name}님</span><h2>R&D 전체 현황을 확인해보세요.</h2></div><div className="deadline"><CalendarDays /><div><small>정산 마감까지</small><strong>{dday >= 0 ? `D-${dday}` : `D+${Math.abs(dday)}`}</strong></div></div></section>
     <PortfolioOverview projects={projects} activeId={project.id} onSelect={onSelectProject} />
+    <PortfolioCharts projects={projects} />
     {/* 아래부터는 현재 과제 기준 — 총괄 표에서 행을 누르면 이 영역이 그 과제로 바뀐다. */}
     <div className="current-divider"><span>현재 과제</span><strong>{project.name}</strong></div>
     <div className="metric-grid">
@@ -159,10 +160,7 @@ function Overview({ project, projects, onSelectProject, setScreen }: { project: 
         ? <p className="field-hint">민간부담금 중 현금 비율 {funding.matchingCashRate}% 적용 (과제 설정에서 변경). 공고문 기준 최소 금액이며, 실제 협약 내용을 우선 확인하세요.</p>
         : null}
     </section>
-    <div className="overview-grid">
-      <section className="panel budget-status"><div className="panel-head"><div><span className="section-kicker">BUDGET STATUS</span><h3>비목별 집행 현황</h3></div><button className="text-button" onClick={() => setScreen('budget')}>예산 자세히 <ArrowRight /></button></div>
-        <div className="budget-bars">{cats.map((category) => { const amount = project.budgets.find((b) => b.categoryId === category.id)?.amount ?? 0; const used = project.expenses.filter((e) => e.categoryId === category.id).reduce((s, e) => s + e.amount, 0); const rate = amount ? Math.min(used / amount * 100, 100) : 0; return <div className="budget-row" key={category.id}><div><strong>{category.name}</strong><span>{formatWon(used)} / {formatWon(amount)}</span></div><div className="progress"><i style={{ width: `${rate}%` }} className={rate >= 90 ? 'danger' : ''} /></div><b>{rate.toFixed(0)}%</b></div>; })}</div>
-      </section>
+    <div className="overview-grid single">
       <section className="panel next-actions"><div className="panel-head"><div><span className="section-kicker">NEXT ACTION</span><h3>지금 확인할 일</h3></div></div>
         {incomplete > 0 ? <button onClick={() => setScreen('spending')} className="action-item warning"><AlertCircle /><div><strong>증빙 {incomplete}개가 비어 있어요</strong><span>아래에서 무엇이 빠졌는지 확인하세요</span></div><ChevronRight /></button> : <div className="empty-action"><CheckCircle2 /><strong>증빙이 모두 준비됐어요</strong><span>새 집행건을 등록하면 필요한 서류를 안내해드려요.</span></div>}
         {alerts > 0 && <button onClick={() => setScreen('budget')} className="action-item danger"><AlertCircle /><div><strong>참여율 100% 초과</strong><span>예산 편성의 인건비 산정에서 비율을 조정해주세요</span></div><ChevronRight /></button>}

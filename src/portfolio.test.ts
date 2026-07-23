@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agencyCounts, isEnded, overviewOrder, periodProgress, portfolioTotals } from './portfolio';
+import { agencyCounts, budgetComposition, isEnded, overviewOrder, periodProgress, portfolioTotals, subItemComposition } from './portfolio';
 import type { Project } from './types';
 
 // 총괄 대시보드는 과제 전체를 합쳐 보여준다 — 합계·부처별 수·진행률·정렬이 이 파일의 계약이다.
@@ -51,6 +51,40 @@ describe('기간 진행률', () => {
     expect(periodProgress(project({}), '2025-01-01')).toBe(0);     // 시작 전
     expect(periodProgress(project({}), '2027-06-01')).toBe(100);   // 종료 후
     expect(periodProgress(project({ startDate: '', endDate: '' }), TODAY)).toBe(0);   // 기간 없음
+  });
+});
+
+describe('편성 구성 (③ 그래프)', () => {
+  it('사업 간 합산은 비목 이름 기준이다 — 코드가 다른 팩(PRE_*)도 같은 이름이면 합쳐진다', () => {
+    const composition = budgetComposition([
+      project({ id: 'a', budgets: [
+        { categoryId: 'DIRECT_LABOR', amount: 50_000_000 },
+        { categoryId: 'DIRECT_ACTIVITY', amount: 20_000_000 },
+      ], packId: 'nrd2026-forprofit' }),
+      project({ id: 'b', budgets: [
+        { categoryId: 'PRE_LABOR', amount: 30_000_000 },
+        { categoryId: 'PRE_MATERIAL', amount: 10_000_000 },
+      ], packId: 'prestartup2026' }),
+    ]);
+    expect(composition[0]).toEqual({ name: '인건비', amount: 80_000_000 });   // 두 팩의 인건비가 하나로
+    expect(composition.map((slice) => slice.name)).toContain('재료비');
+    // 0원 비목은 나오지 않고 큰 순으로 정렬된다
+    expect(composition.every((slice) => slice.amount > 0)).toBe(true);
+  });
+
+  it('세목 드릴다운 — 세목이 있으면 세목으로, 없으면 비목 자체로 편다', () => {
+    const subs = subItemComposition(project({
+      packId: 'nrd2026-forprofit',
+      budgets: [
+        { categoryId: 'DIRECT_ACTIVITY', amount: 30_000_000, subItems: [
+          { id: 's1', name: '회의비', amount: 10_000_000 },
+          { id: 's2', name: '출장비', amount: 20_000_000 },
+        ] },
+        { categoryId: 'DIRECT_LABOR', amount: 40_000_000 },
+      ],
+    }));
+    expect(subs.map((slice) => slice.name)).toEqual(['인건비', '출장비', '회의비']);
+    expect(subs.find((slice) => slice.name === '출장비')?.category).toBe('연구활동비');
   });
 });
 
