@@ -353,23 +353,6 @@ describe('R&D 총괄 대시보드 (한눈에 보기)', () => {
     expect(document.querySelector('.portfolio-table')).toBeNull();                           // 대시보드를 떠났다
   });
 
-  it('사업별 사업비 구성 표 — 체크를 끄면 합계에서 빠지고, 미구분 집행은 소급을 안내한다', async () => {
-    const a = { ...fixture('nrd2026-forprofit'), id: 'pa', name: '과제A', totalBudget: 200_000_000, subsidyAmount: 150_000_000,
-      expenses: [
-        { id: 'e1', date: '2026-05-01', categoryId: 'DIRECT_LABOR', amount: 10_000_000, purpose: '급여', vendor: '', evidence: [], createdAt: '', fundingSource: 'subsidy' as const },
-        { id: 'e2', date: '2026-05-02', categoryId: 'DIRECT_LABOR', amount: 3_000_000, purpose: '옛 집행', vendor: '', evidence: [], createdAt: '' },   // 재원 미구분
-      ] };
-    const b = { ...fixture('prestartup2026'), id: 'pb', name: '과제B', totalBudget: 100_000_000 };
-    localStorage.setItem('gwajeon.projects.v1', JSON.stringify([a, b]));
-    localStorage.setItem('gwajeon.active-project', 'pa');
-    const user = userEvent.setup(); render(<App />);
-    const panel = document.querySelector('.portfolio-funding')!;
-    expect(panel).toHaveTextContent('합계 (2개 선택)');
-    expect(panel).toHaveTextContent('재원 소급 입력 필요');   // 미구분 300만원
-    await user.click(screen.getByRole('checkbox', { name: '과제B 합계 포함' }));
-    expect(panel).toHaveTextContent('합계 (1개 선택)');
-  });
-
   it('집행 등록에 재원을 고르면 저장되고, 기본값은 지원금이다', async () => {
     localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture('prestartup2026')));
     const user = userEvent.setup(); render(<App />);
@@ -385,16 +368,22 @@ describe('R&D 총괄 대시보드 (한눈에 보기)', () => {
     expect(saved.expenses[0].fundingSource).toBe('matching_cash');
   });
 
-  it('편성 구성 그래프가 전체 사업 기준 라벨과 함께 뜨고, 과제를 누르면 세목이 열린다', async () => {
+  it('편성 구성 파이 — 상단 칩으로 전체와 사업 하나를 오간다 (파이만, 세목 막대 없음)', async () => {
     twoProjects();
     const user = userEvent.setup(); render(<App />);
     const panel = document.querySelector('.portfolio-charts')!;
-    expect(panel).toHaveTextContent('전체 사업 기준');   // ② 체크박스와 무관하게 고정임을 화면이 말한다
     expect(panel.querySelector('.chart-legend')).toHaveTextContent('인건비');
-    // 예전의 비목별 집행현황 패널은 사라졌다 (기획 결정)
-    expect(document.querySelector('.budget-status')).toBeNull();
-    await user.click(screen.getByRole('button', { name: /과제A.*세목 보기/ }));
-    expect(document.querySelector('.drill-panel')).toHaveTextContent('과제A — 세목 구성');
+    // 도넛은 총사업비가 아니라 편성표 합계다 — 두 과제 모두 1억 초안이라 전체 2억
+    expect(panel.querySelector('.donut-center')).toHaveTextContent('200,000,000원');
+    // 과제A 칩을 누르면 도넛이 그 사업 기준으로 바뀐다 (세목 막대는 없다 — 사용자 결정)
+    await user.click(screen.getByRole('button', { name: '과제A 기준으로 보기' }));
+    expect(panel.querySelector('.donut-center')).toHaveTextContent('100,000,000원');
+    expect(panel.querySelector('.drill-panel')).toBeNull();
+    // 전체로 되돌리기
+    await user.click(screen.getByRole('button', { name: '전체 사업' }));
+    expect(panel.querySelector('.donut-center')).toHaveTextContent('200,000,000원');
+    // 사업별 사업비 구성 표는 없앴다 (사용자 결정)
+    expect(document.querySelector('.portfolio-funding')).toBeNull();
   });
 
   it('지금 확인할 일 — 밀린 월별 계획을 다음달로 미루면 계획이 옮겨진다', async () => {

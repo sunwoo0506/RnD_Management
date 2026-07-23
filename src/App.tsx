@@ -10,7 +10,6 @@ import { baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, DEFAULT
 import { monthSequence, setMonthlyPlan, spendingMatrix } from './spending';
 import { isEnded, overviewOrder, periodProgress, portfolioTotals } from './portfolio';
 import PortfolioCharts from './PortfolioCharts';
-import PortfolioFunding from './PortfolioFunding';
 import PortfolioTodos from './PortfolioTodos';
 import { detailFieldsFor } from './spendingForms';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
@@ -131,7 +130,6 @@ function Overview({ project, projects, onSelectProject, onUpdateProject, setScre
   return <div className="page-content">
     <section className="welcome"><div><span>{new Date().getHours() < 12 ? '좋은 아침이에요' : '오늘도 수고 많으셨어요'}, {project.members[0]?.name}님</span><h2>R&D 전체 현황을 확인해보세요.</h2></div></section>
     <PortfolioOverview projects={projects} activeId={project.id} onSelect={openProject} />
-    <PortfolioFunding projects={projects} />
     <PortfolioCharts projects={projects} />
     <PortfolioTodos projects={projects} currentMonth={today().slice(0, 7)} onUpdate={onUpdateProject}
       onGo={(id, target) => { onSelectProject(id); setScreen(target); }} />
