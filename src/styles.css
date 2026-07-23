@@ -856,8 +856,9 @@ input[type='checkbox'], input[type='radio'] { accent-color: var(--primary); }
 .chart-legend { display: flex; gap: 12px; flex-wrap: wrap; }
 .chart-legend span { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: #4d586c; }
 .chart-legend i { width: 10px; height: 10px; border-radius: 4px; }
-.charts-row { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
-.chart-side { flex: 1; min-width: 180px; display: grid; gap: 14px; align-content: start; }
+/* 도넛과 범례를 한 덩어리로 가운데에 둔다 — 범례를 좁게 잡아 도넛이 왼쪽 끝에 붙지 않게 한다 */
+.charts-row { display: flex; gap: 28px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.chart-side { flex: 0 1 auto; max-width: 320px; min-width: 180px; display: grid; gap: 14px; align-content: start; }
 .scope-chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .scope-chips button { border: 1px solid #eadbf0; background: #fcf8fd; border-radius: 90px; padding: 7px 16px; font-size: 13px; font-weight: 400; color: #4d586c; cursor: pointer; }
 .scope-chips button.active { background: var(--primary); border-color: var(--primary); color: #fff; }
@@ -1443,3 +1444,17 @@ input[type='number'], .labor-rate input { border-radius: var(--r-pill); text-ali
 .change-kind-badge.notification { background: var(--canvas-cream); color: #8a5a12; }
 .change-kind-badge.approval { background: #f3e9f5; color: var(--primary); }
 @media (max-width: 700px) { .change-kind-picks { grid-template-columns: 1fr; } }
+/* 이력 줄의 공문 내려받기 — 줄 오른쪽 끝에 작게 */
+.history-list > div > .text-button { justify-self: end; white-space: nowrap; }
+/* 변경 신청 폼의 두 버튼 — 공문 미리 받기 / 신청하기 */
+.change-submit { display: flex; gap: 8px; align-items: stretch; }
+.change-submit .secondary { flex: none; }
+.change-submit .primary.large { flex: 1; }
+
+/* 직인 업로드 행 — 설명과 버튼을 양쪽 끝으로 벌리고, 라벨/설명은 줄바꿈해 겹치지 않게 */
+.seal-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px dashed var(--line-input); border-radius: var(--r-lg); background: var(--canvas-soft); }
+.seal-row > div:first-child { display: grid; gap: 3px; min-width: 0; }
+.seal-row strong { font-size: 13px; }
+.seal-row strong em { font-style: normal; font-size: 11px; font-weight: 400; color: var(--muted); margin-left: 6px; }
+.seal-row small { display: block; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.seal-actions { display: flex; align-items: center; gap: 6px; flex: none; }

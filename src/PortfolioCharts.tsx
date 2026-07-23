@@ -68,7 +68,7 @@ export default function PortfolioCharts({ projects }: { projects: Project[] }) {
   return <section className="panel portfolio-charts" onMouseLeave={() => setTooltip(null)}>
     <div className="panel-head"><div><span className="section-kicker">COMPOSITION</span>
       <h3>사업비 편성 구성</h3>
-      <p>편성 금액이 어느 비목에 쏠려 있는지 봅니다. 사업을 고르면 도넛이 그 사업 기준으로 바뀝니다.</p></div></div>
+      <p>사업비가 어떤 항목들로 구성이 되어있는지 분석합니다. 사업을 고르면 도넛이 그 사업 기준으로 바뀝니다.</p></div></div>
 
     {/* 집계 범위 — 전체 또는 사업 하나. 도넛이 이 선택을 따라간다. */}
     <div className="scope-chips">
