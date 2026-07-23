@@ -494,6 +494,37 @@ label { display: grid; gap: 6px; color: #4d586c; font-size: 13px; font-weight: 7
 .program-row .program-inactive { font-style: normal; font-size: 10px; padding: 1px 6px; border-radius: 99px; background: #eef1f7; color: #5b667b; }
 .program-row small { font-size: 11px; color: #5b667b; }
 .program-row button { flex: none; }
+/* ---- R&D 총괄 대시보드 (한눈에 보기 ①) ---- */
+.portfolio-panel .metric-grid { margin-bottom: 12px; }
+.agency-chips { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 12px; }
+.agency-chips button { border: 1px solid #dbe3f0; background: #f8fafd; border-radius: 99px; padding: 4px 12px; font-size: 12px; color: #4d586c; cursor: pointer; }
+.agency-chips button b { color: var(--blue); margin-left: 2px; }
+.agency-chips button.active { background: #eaf1ff; border-color: var(--blue); color: var(--blue); }
+.agency-chips button.clear { border-style: dashed; color: #8a94a8; }
+.portfolio-table { display: grid; gap: 6px; }
+.portfolio-row { display: grid; grid-template-columns: 1.1fr 1.6fr 0.9fr 1.2fr 0.9fr 0.9fr 1fr; gap: 10px; align-items: center; text-align: left; padding: 9px 12px; border: 1px solid #e3e8f2; border-radius: 10px; background: #fff; cursor: pointer; font: inherit; }
+.portfolio-row.head { background: none; border: none; padding: 2px 12px; font-size: 11px; color: #8a94a8; cursor: default; }
+.portfolio-row:not(.head):hover { border-color: var(--blue); }
+.portfolio-row.current { border-color: var(--blue); background: #f7faff; }
+.portfolio-row.ended { opacity: 0.62; }
+.portfolio-row .cell-program { font-size: 12px; color: #4d586c; }
+.portfolio-row .cell-name { display: grid; gap: 1px; }
+.portfolio-row .cell-name strong { font-size: 13px; }
+.portfolio-row .cell-name small { font-size: 11px; color: #8a94a8; line-height: 1.4; }
+.portfolio-row .cell-period { display: grid; gap: 4px; }
+.portfolio-row .cell-period small { font-size: 11px; color: #5b667b; }
+.portfolio-row .cell-period .progress { height: 5px; background: #eef1f7; border-radius: 99px; overflow: hidden; display: block; }
+.portfolio-row .cell-period .progress i { display: block; height: 100%; background: var(--blue); border-radius: 99px; }
+.portfolio-row .cell-money { font-size: 12px; font-weight: 700; text-align: right; }
+.portfolio-row .status-badge { font-style: normal; font-size: 11px; padding: 2px 8px; border-radius: 99px; background: #e8f7f1; color: #1d8a5f; white-space: nowrap; }
+.portfolio-row .status-badge.ended { background: #eef1f7; color: #5b667b; }
+.current-divider { display: flex; gap: 8px; align-items: baseline; margin: 6px 2px -6px; }
+.current-divider span { font-size: 11px; color: #8a94a8; letter-spacing: 0.06em; }
+.current-divider strong { font-size: 13px; }
+@media (max-width: 900px) {
+  .portfolio-row { grid-template-columns: 1fr 1fr; }
+  .portfolio-row.head { display: none; }
+}
 .ai-rerun { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 .ai-rerun .wiz-hint { margin: 0; }
 .ai-rerun button { flex: none; margin-left: auto; }

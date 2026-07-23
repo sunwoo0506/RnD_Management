@@ -31,7 +31,7 @@ export const sharePackOf = (registryPick: RegistryEntry | null, chosenPack: Rule
 
 export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project: Project) => void; onCancel?: () => void }) {
   const [step, setStep] = useState<1 | 2>(1);
-  const [form, setForm] = useState({ name: '', subsidy: '100000000', subsidyRate: '', matchingCashRate: '', start: today(), end: '', company: '', owner: '', email: '' });
+  const [form, setForm] = useState({ name: '', summary: '', subsidy: '100000000', subsidyRate: '', matchingCashRate: '', start: today(), end: '', company: '', owner: '', email: '' });
   const [participant, setParticipant] = useState('');
   // ---- 2단계: 규정 선택 ----
   // 기본값을 고정 id로 두면 그 팩이 폐기됐을 때(SUPERSEDED_PACK_IDS) 목록에 없는 팩이 선택된 채로 시작한다.
@@ -213,7 +213,7 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
       const matchingCashRate = form.matchingCashRate === '' ? undefined : Math.min(100, Math.max(0, Number(form.matchingCashRate) || 0));
       const totalBudget = deriveTotalBudget(subsidyAmount, subsidyRate ?? 100);
       onCreate({
-        id: uid(), name: form.name, totalBudget, subsidyAmount, subsidyRate, matchingCashRate, startDate: form.start, endDate: form.end,
+        id: uid(), name: form.name, summary: form.summary.trim() || undefined, totalBudget, subsidyAmount, subsidyRate, matchingCashRate, startDate: form.start, endDate: form.end,
         settlementDeadline: settlementDeadlineFor(form.end), agency: chosenPack.agency.split(' (')[0], companyName: form.company,
         packId: extractedIsBase ? extractedPack!.id : registryPick ? `registry:${registryPick.id}` : packId,
         customPack: extractedIsBase ? extractedPack! : registryPick?.pack,
@@ -244,6 +244,7 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
       {step === 1 && <form className="setup-form" onSubmit={next}>
         <div><span className="step-pill">1 / 2</span><h2>기본 정보부터 알려주세요</h2><p>다음 단계에서 적용 규정을 정합니다.</p></div>
         <label>과제명<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="예: AI 기반 품질검사 시스템 개발" /></label>
+        <label>간략요약 (선택)<input value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} placeholder="이 과제가 무엇을 개발하는지 한 줄로 — 총괄 대시보드에 표시돼요" /></label>
         <div className="field-grid"><label>기업명<input required value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="주식회사 과제온" /></label><label>지원금(정부지원금)<input required inputMode="numeric" value={withCommas(form.subsidy)} onChange={(e) => setForm({ ...form, subsidy: digitsOnly(e.target.value) })} /></label></div>
         <div className="field-grid"><label><span className="label-line">지원비율(%) <b>선택 · 다음 단계 공고문 업로드 시 AI가 자동 입력</b></span><input inputMode="numeric" value={form.subsidyRate} onChange={(e) => setForm({ ...form, subsidyRate: digitsOnly(e.target.value).slice(0, 3) })} placeholder="공고문 확인 후 알면 직접 입력 (예: 75)" /></label>{form.subsidyRate !== '' && Number(form.subsidyRate) < 100 && <label><span className="label-line">민간부담금 중 현금 비율(%) <b>선택</b></span><input inputMode="numeric" value={form.matchingCashRate} onChange={(e) => setForm({ ...form, matchingCashRate: digitsOnly(e.target.value).slice(0, 3) })} placeholder="예: 10 (기업부담금 중 현금 10% 이상)" /></label>}</div>
         <p className="fine-print">{form.subsidyRate === ''

@@ -323,6 +323,44 @@ describe('과제온 핵심 사용자 흐름', () => {
   });
 });
 
+describe('R&D 총괄 대시보드 (한눈에 보기)', () => {
+  beforeEach(() => localStorage.clear());
+
+  const twoProjects = () => {
+    const a = { ...fixture('nrd2026-forprofit'), id: 'pa', name: '과제A', agency: '중소벤처기업부', summary: '온디바이스 AI 경량화 모델 개발', totalBudget: 200_000_000, subsidyAmount: 150_000_000 };
+    const b = { ...fixture('prestartup2026'), id: 'pb', name: '과제B', agency: '산업통상자원부', totalBudget: 100_000_000 };
+    localStorage.setItem('gwajeon.projects.v1', JSON.stringify([a, b]));
+    localStorage.setItem('gwajeon.active-project', 'pa');
+  };
+
+  it('과제 전체의 합계·부처별 수·목록을 보여주고, 행을 누르면 그 과제로 전환된다', async () => {
+    twoProjects();
+    const user = userEvent.setup(); render(<App />);
+    // 합계: 총사업비 3억 · 지원금 2.5억 (과제B는 지원금 미입력 = 전액 지원)
+    expect(screen.getByText('300,000,000원')).toBeInTheDocument();
+    expect(screen.getByText('250,000,000원')).toBeInTheDocument();
+    // 부처별 칩과 간략요약
+    expect(screen.getByRole('button', { name: /중소벤처기업부 1건/ })).toBeInTheDocument();
+    expect(screen.getByText('온디바이스 AI 경량화 모델 개발')).toBeInTheDocument();
+    expect(screen.getByText(/요약 미입력/)).toBeInTheDocument();   // 과제B는 아직 요약이 없다
+    // 행 클릭 → 현재 과제가 과제B로 바뀐다 (아래 현재 과제 영역이 따라온다)
+    await user.click(screen.getByRole('button', { name: /과제B/ }));
+    const divider = document.querySelector('.current-divider');
+    expect(divider).toHaveTextContent('과제B');
+  });
+
+  it('부처 칩을 누르면 그 부처 과제만 목록에 남는다', async () => {
+    twoProjects();
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole('button', { name: /산업통상자원부 1건/ }));
+    const table = document.querySelector('.portfolio-table')!;
+    expect(table).toHaveTextContent('과제B');
+    expect(table).not.toHaveTextContent('과제A');
+    await user.click(screen.getByRole('button', { name: '필터 해제' }));
+    expect(table).toHaveTextContent('과제A');
+  });
+});
+
 describe('집행 화면 예산 대시보드', () => {
   beforeEach(() => localStorage.clear());
 

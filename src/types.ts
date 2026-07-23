@@ -280,6 +280,7 @@ export interface PackOverlay {
 export interface Project {
   id: string;
   name: string;
+  summary?: string;             // 이 과제가 무엇을 개발하는지 한두 문장 — 총괄 대시보드 목록에 표시
   totalBudget: number;
   startDate: string;
   endDate: string;
