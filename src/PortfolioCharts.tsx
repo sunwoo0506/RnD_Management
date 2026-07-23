@@ -3,8 +3,8 @@
 // 색은 전체 편성 큰 순으로 고정 배정한다 — 범위를 바꿔도 비목의 색이 흔들리지 않는다.
 // 차트 규칙은 dataviz 스킬을 따른다: 검증된 팔레트, 세그먼트 틈, 호버 툴팁, 범례, 표 뷰.
 import { useMemo, useState } from 'react';
-import { budgetComposition, projectComposition } from './portfolio';
-import { formatWon } from './rules';
+import { budgetComposition, formatThousandWon, projectComposition } from './portfolio';
+import ThousandWon from './ThousandWon';
 import type { Project } from './types';
 
 // 파스텔 톤 팔레트 — validate_palette.js 통과본. 완전히 연한 파스텔은 색약 구분·대비 검사에
@@ -81,10 +81,10 @@ export default function PortfolioCharts({ projects }: { projects: Project[] }) {
       <div className="donut-wrap">
         <svg viewBox="0 0 200 200" role="img" aria-label="편성 비목 구성 도넛">
           {arcs.map((arc) => <path key={arc.name} d={arcPath(100, 100, 58, 94, arc.start, arc.end)} fill={colors.get(arc.name)}
-            onMouseMove={(event) => move(event, arc.name, `${formatWon(arc.amount)} · ${grand ? (arc.amount / grand * 100).toFixed(1) : 0}%`)}
+            onMouseMove={(event) => move(event, arc.name, `${formatThousandWon(arc.amount)} · ${grand ? (arc.amount / grand * 100).toFixed(1) : 0}%`)}
             onMouseLeave={() => setTooltip(null)} />)}
         </svg>
-        <div className="donut-center"><small>{scoped ? scoped.name : '전체 편성'}</small><strong>{formatWon(grand)}</strong></div>
+        <div className="donut-center"><small>{scoped ? scoped.name : '전체 편성'}</small><strong><ThousandWon value={grand} /></strong></div>
       </div>
 
       <div className="chart-side">
@@ -97,7 +97,7 @@ export default function PortfolioCharts({ projects }: { projects: Project[] }) {
       <summary>표로 보기</summary>
       <div className="log-table">
         <div><strong>비목</strong><strong>편성 합계</strong><strong>비중</strong></div>
-        {donut.map((slice) => <div key={slice.name}><span>{slice.name}</span><span>{formatWon(slice.amount)}</span><span>{grand ? (slice.amount / grand * 100).toFixed(1) : 0}%</span></div>)}
+        {donut.map((slice) => <div key={slice.name}><span>{slice.name}</span><span><ThousandWon value={slice.amount} /></span><span>{grand ? (slice.amount / grand * 100).toFixed(1) : 0}%</span></div>)}
       </div>
     </details>
 

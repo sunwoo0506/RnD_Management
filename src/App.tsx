@@ -10,6 +10,8 @@ import { baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, DEFAULT
 import { monthSequence, setMonthlyPlan, spendingMatrix } from './spending';
 import { isEnded, overviewOrder, periodProgress, portfolioTotals } from './portfolio';
 import PortfolioCharts from './PortfolioCharts';
+import ThousandWon from './ThousandWon';
+import PortfolioPeople from './PortfolioPeople';
 import PortfolioTodos from './PortfolioTodos';
 import { detailFieldsFor } from './spendingForms';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
@@ -91,11 +93,12 @@ function PortfolioOverview({ projects, activeId, onSelect }: { projects: Project
   const rows = overviewOrder(projects, todayStr);
   return <section className="panel portfolio-panel">
     <div className="panel-head"><div><span className="section-kicker">PORTFOLIO</span><h3>전체 R&D 총괄 현황</h3>
-      <p>등록된 과제 전체의 사업비와 상태입니다. 행을 누르면 그 과제의 화면으로 이동합니다.</p></div></div>
+      <p>등록된 과제 전체의 사업비와 상태입니다 (금액은 천원 단위). 행을 누르면 그 과제의 화면으로 이동합니다.</p></div></div>
     <div className="metric-grid">
       <article className="metric-card"><div className="metric-icon blue"><Building2 /></div><div><span>과제 수</span><strong>{totals.active}건 진행 중</strong><small>전체 {totals.projects}건 (종료 포함)</small></div></article>
-      <article className="metric-card"><div className="metric-icon violet"><CircleDollarSign /></div><div><span>전체 사업비</span><strong>{formatWon(totals.totalBudget)}</strong><small>종료 과제 포함 합계</small></div></article>
-      <article className="metric-card"><div className="metric-icon green"><Landmark /></div><div><span>지원금 합계</span><strong>{formatWon(totals.totalSubsidy)}</strong><small>정부지원금 기준</small></div></article>
+      <article className="metric-card"><div className="metric-icon violet"><CircleDollarSign /></div><div><span>전체 사업비</span><strong><ThousandWon value={totals.totalBudget} /></strong><small>종료 과제 포함 합계</small></div></article>
+      <article className="metric-card"><div className="metric-icon green"><Landmark /></div><div><span>지원금 합계</span><strong><ThousandWon value={totals.totalSubsidy} /></strong><small>정부지원금 기준</small></div></article>
+      <article className="metric-card"><div className="metric-icon amber"><HandCoins /></div><div><span>민간부담금 합계</span><strong><ThousandWon value={totals.matching} /></strong><small>현금 <ThousandWon value={totals.matchingCash} /> · 현물 <ThousandWon value={totals.matchingInKind} /></small></div></article>
     </div>
     <div className="portfolio-table">
       <div className="portfolio-row head"><span>사업명</span><span>과제명</span><span>주관기관</span><span>기간</span><span>총사업비</span><span>지원금</span><span>민간 현금</span><span>민간 현물</span><span>상태</span></div>
@@ -105,14 +108,14 @@ function PortfolioOverview({ projects, activeId, onSelect }: { projects: Project
         const dday = daysUntil(row.settlementDeadline);
         const funding = fundingBreakdown(row);
         // 민간부담이 없으면 —, 현금·현물 비율을 아직 안 적었으면 미입력으로 구분한다
-        const matchingCell = (value: number) => funding.matching === 0 ? '—' : funding.matchingCashRateKnown ? formatWon(value) : '비율 미입력';
+        const matchingCell = (value: number) => funding.matching === 0 ? <>—</> : funding.matchingCashRateKnown ? <ThousandWon value={value} /> : <>비율 미입력</>;
         return <button type="button" key={row.id} className={`portfolio-row ${row.id === activeId ? 'current' : ''} ${ended ? 'ended' : ''}`} onClick={() => onSelect(row.id)}>
           <span className="cell-program">{row.programName ?? packFor(row).name}</span>
           <span className="cell-name"><strong>{row.name}</strong><small>{row.summary?.trim() || '요약 미입력 — 과제 설정에서 무엇을 개발하는지 적어주세요'}</small></span>
           <span>{row.agency.trim() || '기관 미입력'}</span>
           <span className="cell-period"><small>{row.startDate} ~ {row.endDate}</small><span className="progress"><i style={{ width: `${progress}%` }} /></span></span>
-          <span className="cell-money">{formatWon(row.totalBudget)}</span>
-          <span className="cell-money">{formatWon(row.subsidyAmount ?? row.totalBudget)}</span>
+          <span className="cell-money"><ThousandWon value={row.totalBudget} /></span>
+          <span className="cell-money"><ThousandWon value={row.subsidyAmount ?? row.totalBudget} /></span>
           <span className="cell-money">{matchingCell(funding.matchingCash)}</span>
           <span className="cell-money">{matchingCell(funding.matchingInKind)}</span>
           <span>{ended ? <em className="status-badge ended">종료</em> : <em className="status-badge">진행 중 · 정산 {dday >= 0 ? `D-${dday}` : `D+${Math.abs(dday)}`}</em>}</span>
@@ -125,14 +128,18 @@ function PortfolioOverview({ projects, activeId, onSelect }: { projects: Project
 
 // 한눈에 보기 = 과제와 무관한 메인 대시보드. 과제별 내용은 여기 두지 않는다 —
 // 목록에서 과제를 누르면 그 과제의 화면(집행·증빙)으로 이동한다.
-function Overview({ project, projects, onSelectProject, onUpdateProject, setScreen }: { project: Project; projects: Project[]; onSelectProject: (id: string) => void; onUpdateProject: (p: Project) => void; setScreen: (s: Screen) => void }) {
+function Overview({ project, projects, onSelectProject, setScreen }: { project: Project; projects: Project[]; onSelectProject: (id: string) => void; setScreen: (s: Screen) => void }) {
   const openProject = (id: string) => { onSelectProject(id); setScreen('spending'); };
   return <div className="page-content">
     <section className="welcome"><div><span>{new Date().getHours() < 12 ? '좋은 아침이에요' : '오늘도 수고 많으셨어요'}, {project.members[0]?.name}님</span><h2>R&D 전체 현황을 확인해보세요.</h2></div></section>
     <PortfolioOverview projects={projects} activeId={project.id} onSelect={openProject} />
-    <PortfolioCharts projects={projects} />
-    <PortfolioTodos projects={projects} currentMonth={today().slice(0, 7)} onUpdate={onUpdateProject}
-      onGo={(id, target) => { onSelectProject(id); setScreen(target); }} />
+    {/* 편성 구성과 확인할 일은 나란히 — 도넛 오른쪽의 빈 자리를 살린다 (좁은 화면에선 세로로). */}
+    <div className="overview-duo">
+      <PortfolioCharts projects={projects} />
+      <PortfolioTodos projects={projects} today={today()}
+        onGo={(id, target) => { onSelectProject(id); setScreen(target); }} />
+    </div>
+    <PortfolioPeople projects={projects} />
   </div>;
 }
 
@@ -2426,5 +2433,5 @@ export default function App() {
     setProjects((list) => list.filter((p) => p.id !== project.id));
     setActiveId(null);
   };
-  return <div className="app-shell"><Sidebar screen={screen} setScreen={setScreen} project={project} projects={projects} onSelect={(id) => { setActiveId(id); setScreen('spending'); }} onAdd={() => setAdding(true)} onReset={reset} account={session?.user.email ?? null} sync={syncState} onLogout={logout} /><main className="main"><Header project={project} projects={projects} screen={screen} />{screen === 'overview' && <Overview project={project} projects={projects} onSelectProject={(id) => setActiveId(id)} onUpdateProject={(next) => setProjects((list) => list.map((p) => p.id === next.id ? next : p))} setScreen={setScreen} />}{screen === 'budget' && <Budget project={project} update={update} setScreen={setScreen} />}{screen === 'spending' && <Spending project={project} update={update} />}{screen === 'change' && <ChangeManagement project={project} update={update} />}{screen === 'team' && <Team project={project} update={update} setScreen={setScreen} />}{screen === 'settings' && <Settings project={project} update={update} onReset={reset} />}</main></div>;
+  return <div className="app-shell"><Sidebar screen={screen} setScreen={setScreen} project={project} projects={projects} onSelect={(id) => { setActiveId(id); setScreen('spending'); }} onAdd={() => setAdding(true)} onReset={reset} account={session?.user.email ?? null} sync={syncState} onLogout={logout} /><main className="main"><Header project={project} projects={projects} screen={screen} />{screen === 'overview' && <Overview project={project} projects={projects} onSelectProject={(id) => setActiveId(id)} setScreen={setScreen} />}{screen === 'budget' && <Budget project={project} update={update} setScreen={setScreen} />}{screen === 'spending' && <Spending project={project} update={update} />}{screen === 'change' && <ChangeManagement project={project} update={update} />}{screen === 'team' && <Team project={project} update={update} setScreen={setScreen} />}{screen === 'settings' && <Settings project={project} update={update} onReset={reset} />}</main></div>;
 }

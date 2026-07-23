@@ -33,7 +33,7 @@ describe('과제온 핵심 사용자 흐름', () => {
     // 2단계: 규정 선택
     await user.click(screen.getByRole('radio', { name: /예비창업패키지/ }));
     await user.click(screen.getByRole('button', { name: /예산 초안 만들기/ }));
-    expect(screen.getAllByText('100,000,000원').length).toBeGreaterThan(0);
+    expect(document.querySelector('.portfolio-panel')).toHaveTextContent('100,000천원');   // 총괄은 천원 단위
     await user.click(screen.getByRole('button', { name: '예산 편성' }));
     expect(screen.getByText('편성 합계 100,000,000원')).toBeInTheDocument();
     expect(screen.getByText('이 사업은 비목 간 비율 제한이 없습니다')).toBeInTheDocument();
@@ -252,7 +252,7 @@ describe('과제온 핵심 사용자 흐름', () => {
     expect(screen.getByText('저장됐어요')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '차세대 배터리 개발' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '한눈에 보기' }));
-    expect(screen.getAllByText('200,000,000원').length).toBeGreaterThan(0);
+    expect(document.querySelector('.portfolio-panel')).toHaveTextContent('200,000천원');   // 총괄은 천원 단위
   });
 
   it('집행 내역 초기화는 집행만 비우고 예산 편성은 유지한다', async () => {
@@ -339,8 +339,8 @@ describe('R&D 총괄 대시보드 (한눈에 보기)', () => {
     // 합계: 총사업비 3억 · 지원금 2.5억 (과제B는 지원금 미입력 = 전액 지원)
     // ② 재원 표에도 같은 합계가 나오므로 ① 총괄 패널 안에서만 찾는다
     const portfolio = document.querySelector('.portfolio-panel')!;
-    expect(portfolio).toHaveTextContent('300,000,000원');
-    expect(portfolio).toHaveTextContent('250,000,000원');
+    expect(portfolio).toHaveTextContent('300,000천원');   // 총괄 화면 금액은 천원 단위
+    expect(portfolio).toHaveTextContent('250,000천원');
     // 간략요약과 민간부담 열
     expect(screen.getByText('온디바이스 AI 경량화 모델 개발')).toBeInTheDocument();
     expect(screen.getByText(/요약 미입력/)).toBeInTheDocument();   // 과제B는 아직 요약이 없다
@@ -374,35 +374,41 @@ describe('R&D 총괄 대시보드 (한눈에 보기)', () => {
     const panel = document.querySelector('.portfolio-charts')!;
     expect(panel.querySelector('.chart-legend')).toHaveTextContent('인건비');
     // 도넛은 총사업비가 아니라 편성표 합계다 — 두 과제 모두 1억 초안이라 전체 2억
-    expect(panel.querySelector('.donut-center')).toHaveTextContent('200,000,000원');
+    expect(panel.querySelector('.donut-center')).toHaveTextContent('200,000천원');
     // 과제A 칩을 누르면 도넛이 그 사업 기준으로 바뀐다 (세목 막대는 없다 — 사용자 결정)
     await user.click(screen.getByRole('button', { name: '과제A 기준으로 보기' }));
-    expect(panel.querySelector('.donut-center')).toHaveTextContent('100,000,000원');
+    expect(panel.querySelector('.donut-center')).toHaveTextContent('100,000천원');
     expect(panel.querySelector('.drill-panel')).toBeNull();
     // 전체로 되돌리기
     await user.click(screen.getByRole('button', { name: '전체 사업' }));
-    expect(panel.querySelector('.donut-center')).toHaveTextContent('200,000,000원');
+    expect(panel.querySelector('.donut-center')).toHaveTextContent('200,000천원');
     // 사업별 사업비 구성 표는 없앴다 (사용자 결정)
     expect(document.querySelector('.portfolio-funding')).toBeNull();
   });
 
-  it('지금 확인할 일 — 밀린 월별 계획을 다음달로 미루면 계획이 옮겨진다', async () => {
-    // 1~12월 과제, 인건비 1,200만 → 월 100만. 집행 0원이라 지난달까지 전부 미달.
+  it('지금 확인할 일 — 사업별 미집행·증빙 요약과 14일 경과 알림만 낸다', async () => {
+    // 1~12월 과제, 인건비 1,200만 → 월 100만. 집행은 옛 집행건 하나(증빙 2건 미완료).
     const a = { ...fixture('nrd2026-forprofit'), id: 'pa', name: '과제A',
-      budgets: [{ categoryId: 'DIRECT_LABOR', amount: 12_000_000 }], startDate: '2026-01-01', endDate: '2026-12-31' };
+      budgets: [{ categoryId: 'DIRECT_LABOR', amount: 12_000_000 }], startDate: '2026-01-01', endDate: '2026-12-31',
+      expenses: [{
+        id: 'e1', date: '2026-05-01', categoryId: 'DIRECT_LABOR', amount: 600_000, purpose: '5월 급여', vendor: '', createdAt: '',
+        evidence: [{ id: 'v1', label: '급여명세서', completed: false }, { id: 'v2', label: '이체증', completed: false }],
+      }] };
     localStorage.setItem('gwajeon.projects.v1', JSON.stringify([a]));
     localStorage.setItem('gwajeon.active-project', 'pa');
     const user = userEvent.setup(); render(<App />);
     const block = document.querySelector('.portfolio-todos')!;
-    expect(block).toHaveTextContent('밀림');   // 지난달 미달분이 사라지지 않는다
-    // 가장 밀린 1월 항목을 다음달로 미룬다
-    await user.click([...block.querySelectorAll('button')].find((b) => b.textContent === '다음달로 미루기')!);
-    const saved: Project = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
-    // 1월 계획은 집행액(0)으로, 2월 계획은 기존 100만 + 이월 100만 = 200만
-    expect(saved.monthlyPlan).toEqual(expect.arrayContaining([
-      expect.objectContaining({ month: '2026-01', amount: 0 }),
-      expect.objectContaining({ month: '2026-02', amount: 2_000_000 }),
-    ]));
+    // 사업별 요약 한 줄 — 상세 목록·미루기 버튼은 없다 (집행·증빙 화면이 담당)
+    expect(block.querySelector('.action-row')).toHaveTextContent('과제A');
+    expect(block.querySelector('.action-row')).toHaveTextContent('증빙 미완료 2건');
+    expect(block).not.toHaveTextContent('다음달로 미루기');
+    // 14일 넘게 밀린 것은 텍스트로 알린다 (지난달 계획 미집행 · 5월 집행 증빙)
+    expect(block.querySelector('.overdue-alerts')).toHaveTextContent('계획 미집행');
+    expect(block.querySelector('.overdue-alerts')).toHaveTextContent('"5월 급여" 증빙 미완료 2건');
+    expect(block.querySelector('.overdue-alerts')).toHaveTextContent('일 경과');
+    // 요약 행을 누르면 그 과제의 집행·증빙 화면으로 간다
+    await user.click(block.querySelector('.action-row') as HTMLElement);
+    expect(screen.getByRole('heading', { name: '집행 · 증빙 관리' })).toBeInTheDocument();
   });
 
   it('지금 확인할 일 — 참여율 현황표가 이름으로 합치고 100% 초과·3책5공을 경고한다', async () => {
@@ -415,7 +421,7 @@ describe('R&D 총괄 대시보드 (한눈에 보기)', () => {
     render(<App />);
     const table = document.querySelector('.people-table')!;
     expect(table).toHaveTextContent('박연구');
-    expect(table).toHaveTextContent('130%');           // 60 + 50 + 외부 20
+    expect(table).toHaveTextContent('110%');           // 60 + 50 — 외부(타 과제) 참여율은 세지 않는다
     expect(table).toHaveTextContent('책임 1 / 전체 2');
     expect(table.querySelector('.person-total.over')).not.toBeNull();   // 100% 초과 경고
   });
