@@ -23,6 +23,7 @@ export interface ReasonDraftInput {
 
 export interface ReasonDraft {
   reason: string;                  // 문서에 그대로 들어갈 본문
+  usagePlan: string;               // 변경 후 사용계획 — 승인 요청 공문의 별도 항목
   status: 'READY' | 'NEEDS_INFORMATION';
   // 아래 둘은 문서에 넣지 않는다 — 사용자 검토 화면에만 띄운다 (본문/검토정보 분리).
   missingInformation: string[];    // 보완하면 좋은 항목
@@ -53,6 +54,7 @@ export const draftChangeReason = async (input: ReasonDraftInput): Promise<Reason
   if (!reason) throw new Error('작성 결과가 비어 있습니다. 다시 시도해주세요.');
   return {
     reason,
+    usagePlan: typeof data?.usagePlan === 'string' ? data.usagePlan.trim() : '',
     status: data?.status === 'NEEDS_INFORMATION' ? 'NEEDS_INFORMATION' : 'READY',
     missingInformation: asList(data?.missingInformation),
     validationWarnings: asList(data?.validationWarnings),

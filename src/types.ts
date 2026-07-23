@@ -285,6 +285,10 @@ export interface BudgetChange {
   // 변경사항을 반영해 제출한 사업계획서 — 신청의 근거 문서다.
   planFileId?: string;
   planFileName?: string;
+  // 변경 후 사용계획 — 승인 요청 공문에만 들어가는 항목. AI 사유 작성에서 함께 뽑는다.
+  usagePlan?: string;
+  // 공문 문서번호 — 신청 시점에 정해 이력에 남긴다. 나중에 다시 뽑아도 번호가 바뀌지 않아야 한다.
+  documentNo?: string;
 }
 
 export interface EmailLog {
@@ -353,6 +357,12 @@ export interface Project {
   customPack?: RulePack;
   packOverlay?: PackOverlay;    // 최신 공고에서 확인해 승인한 변경사항 (검증된 팩 위에 얹는다)
   extractedPacks?: SavedRulePack[]; // AI 추출로 적용했던 규정팩 이력 (최신순, 최대 20개)
+  // ---- 공문 생성에 쓰는 값 (모두 선택) ----
+  // 없으면 공문에서 [확인 필요]로 남긴다 — 지어내지 않는다.
+  agreementNo?: string;         // 협약번호
+  representative?: string;      // 대표자명 — 공문 발신인 자리에 들어간다
+  sealFileId?: string;          // 직인 이미지 (project-documents 버킷) — 공문 발신인 옆에 찍는다
+  sealFileName?: string;
   insuranceRate?: number;       // 4대보험 사업자부담 요율 % (인건비 계산용, 기본 11)
   laborIncludeInsurance?: boolean; // 인건비에 4대보험 포함 여부 — 사업별로 다름 (기본 true)
   laborIncludeSeverance?: boolean; // 인건비에 퇴직금 포함 여부 — 사업별로 다름 (기본 true)

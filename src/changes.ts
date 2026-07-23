@@ -62,12 +62,29 @@ export const hasAgreementDoc = (project: Project, type: AgreementDocType): boole
 export const missingAgreementDocs = (project: Project): AgreementDocType[] =>
   AGREEMENT_DOC_TYPES.filter((type) => !hasAgreementDoc(project, type));
 
+// ---- 공문 문서번호 ----
+// 기관마다 채번 방식이 다르지만, 비워두면 사용자가 매번 손으로 적어야 한다.
+// "{기업약칭}-{연도}-{그 해 일련번호}"로 만들어 두고 필요하면 공문에서 고쳐 쓴다.
+// 번호는 신청 시점에 정해 이력에 남긴다 — 나중에 다시 뽑아도 같은 번호여야 한다.
+const companyAbbrev = (name: string): string => {
+  // "주식회사 테스트랩" → "테스트랩". 법인 형태 표기는 번호에서 군더더기다.
+  const core = name.replace(/\((주|재|사|유|합)\)|주식회사|유한회사|재단법인|사단법인|\s/g, '').trim();
+  return (core || name.trim() || '과제').slice(0, 6);
+};
+
+export const nextDocumentNo = (project: Project, now: string): string => {
+  const year = new Date(now).getFullYear();
+  // 그 해에 이미 번호를 받은 변경 건수 + 1
+  const used = project.changes.filter((change) => change.documentNo?.includes(`-${year}-`)).length;
+  return `${companyAbbrev(project.companyName)}-${year}-${String(used + 1).padStart(3, '0')}`;
+};
+
 // 변경 신청 — 예산은 건드리지 않고 "이렇게 바꾸겠다"는 계획만 기록한다.
 // before/after는 신청 시점의 스냅샷이다. 승인될 때 after를 그대로 적용하지 않고 다시 계산하는데,
 // 신청과 승인 사이에 다른 변경이 승인되면 그 사이 예산이 이미 움직였기 때문이다.
 export const requestChange = (
   project: Project,
-  input: { fromCategoryId: string; toCategoryId: string; amount: number; reasonKey: string; reason: string; changeType?: ChangeType; planFileId?: string; planFileName?: string },
+  input: { fromCategoryId: string; toCategoryId: string; amount: number; reasonKey: string; reason: string; changeType?: ChangeType; usagePlan?: string; planFileId?: string; planFileName?: string },
   now: string,
 ): Project => {
   const before = project.budgets.map((item) => ({ ...item }));
@@ -79,6 +96,8 @@ export const requestChange = (
     before, after,
     createdAt: now, changeType: input.changeType ?? 'approval', status: 'submitted', submittedAt: now,
     planFileId: input.planFileId, planFileName: input.planFileName,
+    usagePlan: input.usagePlan,
+    documentNo: nextDocumentNo(project, now),
   };
   return { ...project, changes: [change, ...project.changes] };
 };

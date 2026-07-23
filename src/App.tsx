@@ -2829,10 +2829,29 @@ function RulePackPanel({ project, update }: { project: Project; update: (p: Proj
 }
 
 function Settings({ project, update, onReset }: { project: Project; update: (p: Project) => void; onReset: () => void }) {
-  const initialForm = (p: Project) => ({ name: p.name, company: p.companyName, subsidy: String(p.subsidyAmount ?? p.totalBudget), subsidyRate: String(p.subsidyRate ?? 100), matchingCashRate: p.matchingCashRate != null ? String(p.matchingCashRate) : '', start: p.startDate, end: p.endDate, programName: p.programName ?? '', summary: p.summary ?? '' });
+  const initialForm = (p: Project) => ({ name: p.name, company: p.companyName, subsidy: String(p.subsidyAmount ?? p.totalBudget), subsidyRate: String(p.subsidyRate ?? 100), matchingCashRate: p.matchingCashRate != null ? String(p.matchingCashRate) : '', start: p.startDate, end: p.endDate, programName: p.programName ?? '', summary: p.summary ?? '', agreementNo: p.agreementNo ?? '', representative: p.representative ?? '' });
   const [form, setForm] = useState(initialForm(project));
   const [saved, setSaved] = useState(false);
+  const [sealBusy, setSealBusy] = useState(false);
   const sourceDocs = useSourceDocs(project, update);
+  // 직인 이미지 — 공문 발신인 옆에 찍는다. 없으면 공문에 "(직인)" 글자만 남는다.
+  const uploadSeal = async (file?: File) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { alert('직인은 이미지 파일(PNG·JPG)만 올릴 수 있어요. 배경이 없는 PNG를 권합니다.'); return; }
+    if (file.size > 2 * 1024 * 1024) { alert('직인 이미지는 2MB 이하로 올려주세요.'); return; }
+    setSealBusy(true);
+    try {
+      const fileId = uid();
+      await storeProjectDocument(fileId, file);
+      update({ ...project, sealFileId: fileId, sealFileName: file.name });
+    } catch { alert('업로드에 실패했습니다. 다시 시도해주세요.'); }
+    finally { setSealBusy(false); }
+  };
+  const removeSeal = async () => {
+    if (!confirm('직인 이미지를 지울까요? 공문에는 "(직인)" 글자만 남습니다.')) return;
+    if (project.sealFileId) { try { await deleteProjectDocuments([project.sealFileId]); } catch { /* 파일 삭제 실패해도 연결은 끊는다 */ } }
+    update({ ...project, sealFileId: undefined, sealFileName: undefined });
+  };
   useEffect(() => { setForm(initialForm(project)); }, [project]);
   const subsidyAmount = Number(form.subsidy) || 0;
   const subsidyRate = Math.min(100, Math.max(1, Number(form.subsidyRate) || 100));
@@ -2844,7 +2863,7 @@ function Settings({ project, update, onReset }: { project: Project; update: (p: 
     if (form.end < form.start) { alert('종료일이 시작일보다 빠릅니다. 날짜를 확인해주세요.'); return; }
     // 비워두면 "확인됨(0 등)"으로 단정해 저장하지 않고 비워둔다 — 한눈에 보기에서 "확인 필요"로 표시된다.
     const storedMatchingCashRate = form.matchingCashRate === '' ? undefined : matchingCashRate;
-    update({ ...project, name: form.name.trim(), companyName: form.company.trim(), totalBudget: previewTotal, subsidyAmount, subsidyRate, matchingCashRate: storedMatchingCashRate, startDate: form.start, endDate: form.end, settlementDeadline: settlementDeadlineFor(form.end), programName: form.programName.trim() || undefined, summary: form.summary.trim() || undefined });
+    update({ ...project, agreementNo: form.agreementNo.trim() || undefined, representative: form.representative.trim() || undefined, name: form.name.trim(), companyName: form.company.trim(), totalBudget: previewTotal, subsidyAmount, subsidyRate, matchingCashRate: storedMatchingCashRate, startDate: form.start, endDate: form.end, settlementDeadline: settlementDeadlineFor(form.end), programName: form.programName.trim() || undefined, summary: form.summary.trim() || undefined });
     setSaved(true); setTimeout(() => setSaved(false), 2500);
   };
   const importBackup = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2880,6 +2899,23 @@ function Settings({ project, update, onReset }: { project: Project; update: (p: 
         <div className="field-grid"><label>사업명 <input value={form.programName} onChange={(e) => setForm({ ...form, programName: e.target.value })} placeholder={`비워두면 규정 팩 이름(${packFor(project).name}) 사용`} /></label>
           {/* 총괄 대시보드 과제 목록의 간략요약 — 무엇을 개발하는 과제인지 */}
           <label>간략요약 (무엇을 개발하나요?)<input value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} placeholder="예: 온디바이스 AI 반도체 경량화 모델 개발" /></label></div>
+        {/* 공문에 들어가는 값들 — 없으면 공문에서 [확인 필요]로 남는다. 지어내지 않는다. */}
+        <div className="field-grid">
+          <label><span className="label-line">협약번호 <b>선택 · 공문에 표시</b></span>
+            <input value={form.agreementNo} onChange={(e) => setForm({ ...form, agreementNo: e.target.value })} placeholder="예: S2026-1234" /></label>
+          <label><span className="label-line">대표자명 <b>선택 · 공문 발신인</b></span>
+            <input value={form.representative} onChange={(e) => setForm({ ...form, representative: e.target.value })} placeholder="예: 김대표" /></label>
+        </div>
+        <div className="seal-row">
+          <div><strong>직인 이미지 <em>선택</em></strong>
+            <small>{project.sealFileName ? project.sealFileName : '올려두면 공문의 발신인 옆에 찍혀 나옵니다 — 배경이 없는 PNG를 권합니다'}</small></div>
+          <div className="seal-actions">
+            <label className="upload-button">{sealBusy ? '올리는 중…' : project.sealFileId ? '다시 올리기' : '직인 올리기'}
+              <input type="file" accept="image/*" disabled={sealBusy}
+                onChange={(event) => { uploadSeal(event.target.files?.[0]); event.target.value = ''; }} /></label>
+            {project.sealFileId && <button type="button" className="danger-button" onClick={removeSeal}><Trash2 /></button>}
+          </div>
+        </div>
         <div className="field-grid"><label>시작일<input required type="date" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} /></label><label>종료일<input required type="date" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} /></label></div>
         {/* 정산 마감일은 따로 받지 않는다 — 종료일에서 셈해야 사업기간을 고쳤을 때 함께 따라온다. */}
         <p className="field-hint">정산 마감일은 <strong>{settlementDeadlineFor(form.end) || '종료일을 정하면 계산됩니다'}</strong>{settlementDeadlineFor(form.end) ? ' (사업 종료 후 1개월)' : ''} — 증빙 누락 알림은 집행일 기준 3·7·14·30일 경과로 알립니다.</p>

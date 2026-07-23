@@ -30,10 +30,11 @@ const json = (body: unknown, status = 200) =>
 const REASON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['status', 'reason', 'missing_information', 'validation_warnings'],
+  required: ['status', 'reason', 'usage_plan', 'missing_information', 'validation_warnings'],
   properties: {
     status: { type: 'string', enum: ['READY', 'NEEDS_INFORMATION'] },
     reason: { type: 'string', description: '변경 사유 문단 — 문서에 그대로 들어갈 본문' },
+    usage_plan: { type: 'string', description: '변경 후 사용계획 한두 문장 — 승인 요청 공문의 별도 항목' },
     missing_information: {
       type: 'array', description: '보완하면 좋은 항목 (검토용, 문서에 넣지 않음)',
       items: { type: 'string' },
@@ -78,8 +79,11 @@ VERIFIED와 USER_PROVIDED만 확정 사실로 씁니다. MISSING은 지어내지
 - 사용자가 적은 구어체 메모는 의미를 바꾸지 않는 범위에서 행정문서 표현으로 다듬습니다.
 
 [출력]
-정해진 스키마의 네 항목을 채웁니다.
+정해진 스키마의 다섯 항목을 채웁니다.
 - reason: 변경 사유 문단. 문서에 그대로 들어갈 본문입니다.
+- usage_plan: 변경 후 사용계획. 승인 요청 공문의 별도 항목이라 사유와 겹치지 않게 한두 문장으로
+  "받는 비목을 무엇에 쓸 것인지"만 씁니다. 입력에 쓸 곳이 안 적혀 있으면 지어내지 말고
+  받는 비목의 일반적 용도 범위에서 서술하되, missing_information에 그 사실을 적습니다.
 - missing_information: 보완하면 좋은 항목 (사용자 검토용, 문서에는 넣지 않음)
 - validation_warnings: 금액·사실관계에서 확인이 필요한 점 (사용자 검토용)
 status는 핵심 사실(변경 대상 비목·금액·사정)이 갖춰졌으면 READY,
@@ -145,6 +149,7 @@ Deno.serve(async (req) => {
     return json({
       reason,
       status: parsed.status === 'NEEDS_INFORMATION' ? 'NEEDS_INFORMATION' : 'READY',
+      usagePlan: typeof parsed.usage_plan === 'string' ? parsed.usage_plan.trim() : '',
       missingInformation: list(parsed.missing_information),
       validationWarnings: list(parsed.validation_warnings),
     });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agreementDocsOf, applyTransfer, approveChange, missingAgreementDocs, pendingChanges, projectedBudgets, rejectChange, requestChange, statusOf, typeOf } from './changes';
+import { agreementDocsOf, applyTransfer, approveChange, missingAgreementDocs, nextDocumentNo, pendingChanges, projectedBudgets, rejectChange, requestChange, statusOf, typeOf } from './changes';
 import type { Project, ProjectDocumentLink } from './types';
 
 // 변경은 신청해서 승인을 받아야 효력이 생긴다 — 예산이 언제 움직이는지가 이 파일의 계약이다.
@@ -64,6 +64,33 @@ describe('변경 신청', () => {
     expect(projected.find((item) => item.categoryId === 'DIRECT_LABOR')?.amount).toBe(50_000_000);
     expect(projected.find((item) => item.categoryId === 'DIRECT_ACTIVITY')?.amount).toBe(50_000_000);
     expect(pendingChanges(after)).toHaveLength(1);
+  });
+});
+
+describe('공문 문서번호', () => {
+  it('기업약칭-연도-일련번호로 만든다 — 법인 형태 표기는 뺀다', () => {
+    const p = project({ companyName: '주식회사 테스트랩' });
+    expect(nextDocumentNo(p, NOW)).toBe('테스트랩-2026-001');
+  });
+
+  it('그 해에 이미 번호를 받은 건수만큼 이어진다', () => {
+    const first = requestChange(project({ companyName: '테스트랩' }), transfer, NOW);
+    expect(first.changes[0].documentNo).toBe('테스트랩-2026-001');
+    const second = requestChange(first, transfer, NOW);
+    expect(second.changes[0].documentNo).toBe('테스트랩-2026-002');
+  });
+
+  it('해가 바뀌면 번호가 다시 001부터 — 연도별로 센다', () => {
+    const y2026 = requestChange(project({ companyName: '테스트랩' }), transfer, NOW);
+    const y2027 = requestChange(y2026, transfer, '2027-02-01T00:00:00.000Z');
+    expect(y2027.changes[0].documentNo).toBe('테스트랩-2027-001');
+  });
+
+  it('한 번 정해진 번호는 승인·반려로 바뀌지 않는다', () => {
+    const requested = requestChange(project({ companyName: '테스트랩' }), transfer, NOW);
+    const no = requested.changes[0].documentNo;
+    const approved = approveChange(requested, requested.changes[0].id, NOW);
+    expect(approved.changes[0].documentNo).toBe(no);
   });
 });
 
