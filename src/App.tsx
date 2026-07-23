@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, settlementDeadlineFor, evidenceGuide, evidenceChecklistFor, commonEvidenceRuleNames, primaryEvidence, withAlwaysRequired, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, spendingCautions, subItemStandardFor, transferLimitError, visibleCategories } from './rules';
-import { monthSequence, setMonthlyPlan, spendingMatrix } from './spending';
+import { evidenceAlarms, monthSequence, setMonthlyPlan, spendingMatrix } from './spending';
 import { isEnded, overviewOrder, periodProgress, portfolioTotals } from './portfolio';
 import PortfolioCharts from './PortfolioCharts';
 import ThousandWon from './ThousandWon';
@@ -1723,19 +1723,21 @@ function ChangeManagement({ project, update }: { project: Project; update: (p: P
 function Team({ project, update, setScreen }: { project: Project; update: (p: Project) => void; setScreen: (s: Screen) => void }) {
   const [member, setMember] = useState({ name: '', email: '' });
   const addMember = (e: React.FormEvent) => { e.preventDefault(); if (project.members.length >= 2 || !member.name || !member.email) return; update({ ...project, members: [...project.members, { id: uid(), name: member.name, email: member.email, role: '담당자' }] }); setMember({ name: '', email: '' }); };
+  // 정산 마감이 아니라 집행일 기준이다 — 집행하고 3·7·14·30일이 지나도록 증빙이 비어 있으면 단계별로 알린다.
   const refreshReminders = () => {
-    const milestone = daysUntil(project.settlementDeadline);
-    if (![30, 14, 7].includes(milestone)) { alert(`현재 정산 마감은 D-${milestone}입니다. 알림은 D-30, D-14, D-7에 생성됩니다.`); return; }
-    const incomplete = project.expenses.reduce((s, e) => s + e.evidence.filter((x) => !x.completed).length, 0);
-    if (!incomplete) { alert('미완료 증빙이 없어 알림을 생성하지 않았습니다.'); return; }
-    if (project.emailLogs.some((l) => l.milestone === milestone)) { alert('해당 마감 알림 로그가 이미 있습니다.'); return; }
-    update({ ...project, emailLogs: [...project.emailLogs, ...project.members.map((m) => ({ id: uid(), sentAt: new Date().toISOString(), recipient: m.email, milestone: milestone as 30 | 14 | 7, status: '제품 내 알림' as const, incompleteCount: incomplete }))] });
+    const alarms = evidenceAlarms(project, today());
+    if (!alarms.length) { alert('집행일로부터 3일이 지난 미완료 증빙이 없습니다.'); return; }
+    const logs = alarms.flatMap((alarm) => project.members.map((m) => ({
+      id: uid(), sentAt: new Date().toISOString(), recipient: m.email,
+      milestone: alarm.stage, status: '제품 내 알림' as const, incompleteCount: alarm.missingDocs,
+    })));
+    update({ ...project, emailLogs: [...project.emailLogs, ...logs] });
   };
   return <div className="page-content"><div className="page-title"><div><span className="eyebrow">운영 설정</span><h2>담당자 · 알림 관리</h2><p>담당자 정보를 기록하고 증빙 누락 알림을 확인합니다.</p></div></div>
     <div className="notice"><Users /><div><strong>참여 인력 · 인건비 관리는 예산 편성 화면으로 이동했어요</strong><span>참여율 점검과 인건비 계산은 이제 예산 편성의 "STEP 1 · 인건비 산정"에서 합니다. <button type="button" className="ref-link" onClick={() => setScreen('budget')}>예산 편성으로 이동 →</button></span></div></div>
     <div className="team-grid single"><section className="panel"><div className="panel-head"><div><h3>담당자 정보</h3><p>{project.members.length} / 2명 입력됨 · 알림 수신 대상</p></div></div><div className="member-list">{project.members.map((m) => <div key={m.id}><div className="avatar">{m.name[0]}</div><span><strong>{m.name} <b>{m.role}</b></strong><small>{m.email}</small></span><CheckCircle2 /></div>)}</div>{project.members.length < 2 ? <form className="inline-add" onSubmit={addMember}><h4><UserPlus /> 담당자 추가</h4><div className="field-grid"><label>이름<input required value={member.name} onChange={(e) => setMember({ ...member, name: e.target.value })} /></label><label>이메일<input required type="email" value={member.email} onChange={(e) => setMember({ ...member, email: e.target.value })} /></label></div><button className="secondary" type="submit"><Plus /> 두 번째 담당자 추가</button></form> : <div className="limit-note"><ShieldCheck /> 담당자는 최대 2명까지 기록할 수 있습니다. 실제 공동 사용은 서버 버전에서 지원됩니다.</div>}</section>
     </div>
-    <section className="panel reminder-panel"><div className="panel-head"><div><h3><Mail /> 증빙 누락 알림 로그</h3><p>정산 마감 D-30 / D-14 / D-7에 미완료 증빙을 확인합니다.</p></div><button className="secondary" onClick={refreshReminders}><RefreshCw /> 오늘 기준 확인</button></div>{project.emailLogs.length ? <div className="log-table"><div><strong>발송 시각</strong><strong>수신자</strong><strong>시점</strong><strong>미완료</strong><strong>상태</strong></div>{project.emailLogs.map((log) => <div key={log.id}><span>{new Date(log.sentAt).toLocaleString('ko-KR')}</span><span>{log.recipient}</span><b>D-{log.milestone}</b><span>{log.incompleteCount}개</span><span className="log-status">{log.status}</span></div>)}</div> : <div className="empty-state compact"><Mail /><h3>아직 알림 로그가 없어요</h3><p>마감 기준일에 미완료 증빙이 있으면 제품 내 알림 로그가 생성됩니다.</p></div>}</section>
+    <section className="panel reminder-panel"><div className="panel-head"><div><h3><Mail /> 증빙 누락 알림 로그</h3><p>집행일로부터 3 · 7 · 14 · 30일이 지나도록 증빙이 비어 있으면 단계별로 알립니다.</p></div><button className="secondary" onClick={refreshReminders}><RefreshCw /> 오늘 기준 확인</button></div>{project.emailLogs.length ? <div className="log-table"><div><strong>발송 시각</strong><strong>수신자</strong><strong>시점</strong><strong>미완료</strong><strong>상태</strong></div>{project.emailLogs.map((log) => <div key={log.id}><span>{new Date(log.sentAt).toLocaleString('ko-KR')}</span><span>{log.recipient}</span><b>+{log.milestone}일</b><span>{log.incompleteCount}개</span><span className="log-status">{log.status}</span></div>)}</div> : <div className="empty-state compact"><Mail /><h3>아직 알림 로그가 없어요</h3><p>집행일로부터 3일이 지난 미완료 증빙이 있으면 제품 내 알림 로그가 생성됩니다.</p></div>}</section>
   </div>;
 }
 
@@ -2259,7 +2261,7 @@ function Settings({ project, update, onReset }: { project: Project; update: (p: 
           <label>간략요약 (무엇을 개발하나요?)<input value={form.summary} onChange={(e) => setForm({ ...form, summary: e.target.value })} placeholder="예: 온디바이스 AI 반도체 경량화 모델 개발" /></label></div>
         <div className="field-grid"><label>시작일<input required type="date" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} /></label><label>종료일<input required type="date" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} /></label></div>
         {/* 정산 마감일은 따로 받지 않는다 — 종료일에서 셈해야 사업기간을 고쳤을 때 함께 따라온다. */}
-        <p className="field-hint">정산 마감일은 <strong>{settlementDeadlineFor(form.end) || '종료일을 정하면 계산됩니다'}</strong>{settlementDeadlineFor(form.end) ? ' (사업 종료 후 1개월)' : ''} — 증빙 누락 알림이 이 날짜의 D-30 · D-14 · D-7에 뜹니다.</p>
+        <p className="field-hint">정산 마감일은 <strong>{settlementDeadlineFor(form.end) || '종료일을 정하면 계산됩니다'}</strong>{settlementDeadlineFor(form.end) ? ' (사업 종료 후 1개월)' : ''} — 증빙 누락 알림은 집행일 기준 3·7·14·30일 경과로 알립니다.</p>
         <p className="field-hint">{subsidyRate >= 100
           ? `자기부담 없이 전액 지원 — 총사업비 ${formatWon(previewTotal)}`
           : form.matchingCashRate === ''

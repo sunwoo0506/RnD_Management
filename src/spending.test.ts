@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { categorySpending, evidenceReadiness, monthSequence, spendingMatrix, splitEvenly, spendingTotals } from './spending';
+import { evidenceAlarms, categorySpending, evidenceReadiness, monthSequence, spendingMatrix, splitEvenly, spendingTotals } from './spending';
 import { getPack } from './rules';
 import type { Expense, Project } from './types';
 
@@ -405,5 +405,35 @@ describe('spendingMatrix', () => {
     const matrix = spendingMatrix(pack, simple({ startDate: '', endDate: '' }), []);
     expect(matrix.totals.cells).toEqual([]);
     expect(matrix.totals.budget).toBe(12_000_000);
+  });
+});
+// 증빙 누락 알림 — 정산 마감이 아니라 집행일 경과(3·7·14·30일) 기준이다 (사용자 결정).
+describe('증빙 누락 알림 단계', () => {
+  const expenseAt = (id: string, date: string, missing: number, done = 0) => ({
+    id, date, categoryId: 'LABOR', amount: 1, purpose: id, vendor: '', createdAt: '',
+    evidence: [
+      ...Array.from({ length: missing }, (_, i) => ({ id: `${id}-m${i}`, label: '서류', completed: false })),
+      ...Array.from({ length: done }, (_, i) => ({ id: `${id}-d${i}`, label: '서류', completed: true })),
+    ],
+  });
+  const projectWith = (expenses: ReturnType<typeof expenseAt>[]): Project => project({ expenses });
+
+  it('집행일로부터 지난 일수로 단계를 나누고, 가장 높은 단계 하나로만 센다', () => {
+    const alarms = evidenceAlarms(projectWith([
+      expenseAt('e2', '2026-07-21', 1),        // 2일 — 아직 알림 아님
+      expenseAt('e3', '2026-07-20', 2),        // 3일 → 3일 단계
+      expenseAt('e8', '2026-07-15', 1),        // 8일 → 7일 단계
+      expenseAt('e40', '2026-06-13', 3),       // 40일 → 30일 단계 (14·7·3에 중복으로 안 센다)
+      expenseAt('ok', '2026-06-01', 0, 2),     // 증빙 완료 — 제외
+    ]), '2026-07-23');
+    expect(alarms).toEqual([
+      { stage: 30, expenses: 1, missingDocs: 3 },
+      { stage: 7, expenses: 1, missingDocs: 1 },
+      { stage: 3, expenses: 1, missingDocs: 2 },
+    ]);
+  });
+
+  it('3일이 지나지 않은 미완료 증빙은 알림을 만들지 않는다', () => {
+    expect(evidenceAlarms(projectWith([expenseAt('fresh', '2026-07-22', 5)]), '2026-07-23')).toEqual([]);
   });
 });

@@ -285,3 +285,27 @@ export const setMonthlyPlan = (project: Project, leaf: PlanSelection, month: str
     !(entry.categoryId === leaf.categoryId && entry.subItemId === leaf.subItemId && entry.month === month));
   return { ...project, monthlyPlan: [...rest, { categoryId: leaf.categoryId, subItemId: leaf.subItemId, month, amount }] };
 };
+
+// ---- 증빙 누락 알림 (집행일 경과 기준) ----
+// 정산 마감 D-30·14·7이 아니라 집행일로부터의 경과일이 기준이다 (사용자 결정).
+// 증빙은 집행 직후가 가장 모으기 쉽고 오래될수록 어려워진다 — 3·7·14·30일에 단계적으로 알린다.
+// 한 집행건은 지금까지 지난 단계 중 가장 높은 단계 하나로만 센다.
+export const EVIDENCE_ALARM_STAGES = [30, 14, 7, 3] as const;
+export type EvidenceAlarmStage = (typeof EVIDENCE_ALARM_STAGES)[number];
+export interface EvidenceAlarm { stage: EvidenceAlarmStage; expenses: number; missingDocs: number }
+
+export const evidenceAlarms = (project: Project, today: string): EvidenceAlarm[] => {
+  const stages = new Map<EvidenceAlarmStage, { expenses: number; missingDocs: number }>();
+  for (const expense of project.expenses) {
+    const missing = expense.evidence.filter((item) => !item.completed).length;
+    if (!missing) continue;
+    const days = Math.floor((Date.parse(today) - Date.parse(expense.date)) / 86_400_000);
+    const stage = EVIDENCE_ALARM_STAGES.find((threshold) => days >= threshold);
+    if (!stage) continue;
+    const entry = stages.get(stage) ?? { expenses: 0, missingDocs: 0 };
+    entry.expenses += 1;
+    entry.missingDocs += missing;
+    stages.set(stage, entry);
+  }
+  return [...stages].map(([stage, counts]) => ({ stage, ...counts })).sort((a, b) => b.stage - a.stage);
+};

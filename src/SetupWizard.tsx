@@ -269,7 +269,7 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
             })()}</p>
         {/* 정산 마감일은 따로 받지 않는다 — 종료일에서 셈해야 사업기간을 고쳤을 때 함께 따라온다. */}
         <div className="field-grid"><label>시작일<input required type="date" value={form.start} onChange={(e) => setForm({ ...form, start: e.target.value })} /></label><label>종료일<input required type="date" value={form.end} onChange={(e) => setForm({ ...form, end: e.target.value })} /></label></div>
-        {form.end && <p className="wiz-hint">정산 마감일은 <strong>{settlementDeadlineFor(form.end)}</strong>로 잡습니다 (사업 종료 후 1개월). 증빙 누락 알림이 이 날짜의 D-30 · D-14 · D-7에 뜹니다.</p>}
+        {form.end && <p className="wiz-hint">정산 마감일은 <strong>{settlementDeadlineFor(form.end)}</strong>로 잡습니다 (사업 종료 후 1개월). 증빙 누락 알림은 집행일 기준 3·7·14·30일 경과로 알립니다.</p>}
         <div className="field-grid"><label>대표자 이름<input required value={form.owner} onChange={(e) => setForm({ ...form, owner: e.target.value })} /></label><label>알림 이메일<input required type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label></div>
         <label><span className="label-line">참여 인력 <b>선택</b></span><input value={participant} onChange={(e) => setParticipant(e.target.value)} placeholder="첫 참여 인력 이름" /></label>
         <button className="primary large" type="submit">다음 — 적용 규정 정하기 <ArrowRight /></button>

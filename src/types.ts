@@ -242,7 +242,7 @@ export interface EmailLog {
   id: string;
   sentAt: string;
   recipient: string;
-  milestone: 30 | 14 | 7;
+  milestone: 30 | 14 | 7 | 3;   // 집행일로부터 지난 일수 단계 (구버전 로그는 정산 D-값)
   status: '발송 완료' | '재시도 완료' | '제품 내 알림';
   incompleteCount: number;
 }
