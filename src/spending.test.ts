@@ -298,6 +298,20 @@ describe('spendingMatrix', () => {
     expect(row.planTotal).toBe(24_000_000);
   });
 
+  it('잔액은 고친 달 이후로만 배분된다 — 이전 달은 원래 균등분할 그대로', () => {
+    // 예산 1,200만 · 12개월(7월 시작). 10월을 500만으로 고치면:
+    // 7~9월은 100만 그대로, 11월~이듬해 6월(8개월)이 남은 400만을 나눠 가진다.
+    const matrix = spendingMatrix(pack, simple({
+      monthlyPlan: [{ categoryId: 'DIRECT_ACTIVITY', month: '2026-10', amount: 5_000_000 }],
+    }), ALL);
+    const row = activityOf(matrix) as ReturnType<typeof spendingMatrix>['rows'][number];
+    expect(row.cells[0].plan).toBe(1_000_000);   // 7월 — 수정 이전이라 그대로
+    expect(row.cells[2].plan).toBe(1_000_000);   // 9월
+    expect(row.cells[3].plan).toBe(5_000_000);   // 10월 — 수기
+    expect(row.cells[4].plan).toBe(500_000);     // 11월 — (1,200 − 300 − 500)만 / 8
+    expect(row.planTotal).toBe(12_000_000);      // 합계는 예산 그대로
+  });
+
   it('수기 합이 예산을 넘으면 남은 달은 0이 되고 planTotal이 초과를 드러낸다', () => {
     const matrix = spendingMatrix(pack, simple({
       monthlyPlan: [{ categoryId: 'DIRECT_ACTIVITY', month: '2026-07', amount: 15_000_000 }],
