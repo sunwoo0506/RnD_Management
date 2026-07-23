@@ -20,6 +20,11 @@ const CORS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
+// 추출 캐시의 세대 번호. 프롬프트나 스키마를 고치면 이 값을 올린다 — 캐시 키에 섞여 있어
+// 올리는 순간 모든 문서가 새 규칙으로 다시 추출된다. 안 올리면 같은 문서는 옛 결과가
+// 캐시에서 그대로 나와, 프롬프트를 고쳐도 반영되지 않는다 (실제로 겪은 함정).
+const PROMPT_VERSION = '2026-07-23';
+
 // OpenAI 구조화 출력(strict) 권장 방식: anyOf가 아니라 type 배열로 nullable을 표현한다.
 const nullable = (type: string) => ({ type: [type, 'null'] });
 
@@ -211,7 +216,7 @@ Deno.serve(async (req) => {
 
     // Edge Function 실행 시간 제한을 고려해 입력을 자른다 (공고 앞부분에 핵심 규정이 몰려 있다)
     const clipped = text.slice(0, 60_000);
-    const hash = await sha256(`${clipped}|${packId ?? ''}`);
+    const hash = await sha256(`${clipped}|${packId ?? ''}|${PROMPT_VERSION}`);
 
     const service = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
     const { data: cached } = await service.from('extraction_cache').select('result').eq('hash', hash).maybeSingle();
