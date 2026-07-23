@@ -260,6 +260,13 @@ export interface Member {
 // 값이 없는 구버전 이력은 저장 즉시 예산에 반영됐으므로 approved로 읽는다.
 export type ChangeStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
 
+// 협약변경은 두 갈래다. 어느 쪽인지에 따라 제출 서류와 효력 시점이 달라진다.
+//   notification(통보) : 기관이 자체 결정하고 전문기관에 알린다. 통보 후 집행할 수 있다.
+//   approval(승인)     : 전문기관의 사전 승인이 있어야 효력이 생긴다. 승인 전에는 집행할 수 없다.
+// 어느 쪽에 해당하는지는 사업 공고·협약서·규정이 정하므로 앱이 단정하지 않고 사용자가 고른다.
+// 미지정(구버전 이력)은 승인으로 본다 — 둘 중 더 엄격한 쪽이라 잘못 봐도 손해가 없다.
+export type ChangeType = 'notification' | 'approval';
+
 export interface BudgetChange {
   id: string;
   fromCategoryId: BudgetCategoryId;
@@ -270,6 +277,7 @@ export interface BudgetChange {
   before: BudgetItem[];
   after: BudgetItem[];
   createdAt: string;
+  changeType?: ChangeType;
   status?: ChangeStatus;
   submittedAt?: string;
   decidedAt?: string;      // 승인·반려된 날

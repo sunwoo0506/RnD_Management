@@ -13,6 +13,16 @@ const fixture = (packId = 'legacy-rnd'): Project => ({
   budgets: makeDraftBudgets(getPack(packId), 100_000_000), expenses: [], changes: [], emailLogs: [], createdAt: new Date().toISOString(),
 });
 
+// 변경 신청은 협약서·사업계획서가 등록돼 있어야 할 수 있다 — 그 전제를 갖춘 과제.
+const withAgreement = (packId = 'legacy-rnd'): Project => ({
+  ...fixture(packId),
+  documents: (['AGREEMENT', 'PLAN'] as const).map((type) => ({
+    id: `doc-${type}`, kind: 'upload' as const, fileId: `f-${type}`, fileName: `${type}.pdf`,
+    documentType: type, title: type, applicationType: 'AGREEMENT' as const,
+    isConfirmed: true, createdAt: '2026-07-01T00:00:00.000Z',
+  })),
+});
+
 describe('과제온 핵심 사용자 흐름', () => {
   beforeEach(() => localStorage.clear());
 
@@ -302,43 +312,91 @@ describe('과제온 핵심 사용자 흐름', () => {
     expect(screen.getByText(/100% 이하로 조정해주세요/)).toBeInTheDocument();
   });
 
-  it('비목 간 이동을 저장하면 변경 전후 비교표와 문서 버튼을 표시한다', async () => {
+  it('협약 문서를 안 올려도 변경을 신청할 수 있다 — 보관은 선택이다', async () => {
     localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture()));
     const user = userEvent.setup(); render(<App />);
     await user.click(screen.getByRole('button', { name: '변경 관리' }));
-    const amount = screen.getByPlaceholderText('0');
-    fireEvent.change(amount, { target: { value: '1000000' } });
-    await user.click(screen.getByRole('button', { name: /변경 비교표 생성/ }));
-    // 비교표 증감 2곳 + 변경 이력 1곳
-    expect(screen.getAllByText('1,000,000원')).toHaveLength(3);
+    expect(screen.getByText(/등록하지 않아도 변경 신청은 가능합니다/)).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText('0'), { target: { value: '1000000' } });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await user.click(screen.getByRole('button', { name: /변경 신청하기/ }));
+    const saved: Project = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
+    expect(saved.changes).toHaveLength(1);
+    vi.restoreAllMocks();
+  });
+
+  it('변경을 신청해도 예산은 그대로고, 승인해야 반영된다', async () => {
+    localStorage.setItem('gwajeon.project.v1', JSON.stringify(withAgreement()));
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole('button', { name: '변경 관리' }));
+    const before: Project = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
+    fireEvent.change(screen.getByPlaceholderText('0'), { target: { value: '1000000' } });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await user.click(screen.getByRole('button', { name: /변경 신청하기/ }));
+
+    // 신청 상태 — 예산은 아직 그대로다
+    const requested: Project = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
+    expect(requested.changes).toHaveLength(1);
+    expect(requested.changes[0].status).toBe('submitted');
+    expect(requested.budgets).toEqual(before.budgets);
+    expect(screen.getByRole('heading', { name: /진행 중인 변경 1건/ })).toBeInTheDocument();
+
+    // 승인하면 그때 예산이 움직인다
+    vi.spyOn(window, 'prompt').mockReturnValue('');
+    await user.click(screen.getByRole('button', { name: /승인 — 예산 반영/ }));
+    const approved: Project = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
+    expect(approved.changes[0].status).toBe('approved');
+    expect(approved.budgets).not.toEqual(before.budgets);
+    expect(approved.budgetConfirmed).toBe(false);   // 편성이 바뀌었으니 확정은 풀린다
     expect(screen.getByRole('button', { name: /비교표 Word/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /중기부 공문 Word/ })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /변경 이력 1건/ })).toBeInTheDocument();
+    vi.restoreAllMocks();
   });
 
-  it('변경을 두 번 저장하면 이력이 누적되고 이전 기록이 남는다', async () => {
-    localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture()));
+  it('반려하면 예산은 그대로 두고 사유를 이력에 남긴다', async () => {
+    localStorage.setItem('gwajeon.project.v1', JSON.stringify(withAgreement()));
     const user = userEvent.setup(); render(<App />);
     await user.click(screen.getByRole('button', { name: '변경 관리' }));
-    const amount = screen.getByPlaceholderText('0');
-    fireEvent.change(amount, { target: { value: '1000000' } });
-    await user.click(screen.getByRole('button', { name: /변경 비교표 생성/ }));
-    fireEvent.change(amount, { target: { value: '2000000' } });
-    await user.click(screen.getByRole('button', { name: /변경 비교표 생성/ }));
+    const before: Project = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
+    fireEvent.change(screen.getByPlaceholderText('0'), { target: { value: '1000000' } });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await user.click(screen.getByRole('button', { name: /변경 신청하기/ }));
+    vi.spyOn(window, 'prompt').mockReturnValue('사업계획서 미비');
+    await user.click(screen.getByRole('button', { name: '반려됨' }));
+    const rejected: Project = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
+    expect(rejected.changes[0].status).toBe('rejected');
+    expect(rejected.changes[0].decisionNote).toBe('사업계획서 미비');
+    expect(rejected.budgets).toEqual(before.budgets);
+    expect(screen.getByText(/사업계획서 미비/)).toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+
+  it('변경을 두 번 신청·승인하면 이력이 누적된다', async () => {
+    localStorage.setItem('gwajeon.project.v1', JSON.stringify(withAgreement()));
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole('button', { name: '변경 관리' }));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.spyOn(window, 'prompt').mockReturnValue('');
+    for (const value of ['1000000', '500000']) {
+      fireEvent.change(screen.getByPlaceholderText('0'), { target: { value } });
+      await user.click(screen.getByRole('button', { name: /변경 신청하기/ }));
+      await user.click(screen.getAllByRole('button', { name: /승인 — 예산 반영/ })[0]);
+    }
     expect(screen.getByRole('heading', { name: /변경 이력 2건/ })).toBeInTheDocument();
-    // 첫 번째 변경(100만 원)이 이력에 그대로 남아 있다
-    expect(screen.getAllByText('1,000,000원').length).toBeGreaterThan(0);
+    const saved: Project = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
+    expect(saved.changes.map((change) => change.amount)).toEqual([500_000, 1_000_000]);
+    vi.restoreAllMocks();
   });
 
-  it('받는 비목이 변경 후 허용 상한을 초과하면 저장을 차단한다', async () => {
-    localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture()));
+  it('받는 비목이 변경 후 허용 상한을 초과하면 신청을 차단한다', async () => {
+    localStorage.setItem('gwajeon.project.v1', JSON.stringify(withAgreement('nrd2026-forprofit')));
     const user = userEvent.setup(); render(<App />);
     await user.click(screen.getByRole('button', { name: '변경 관리' }));
-    // 인건비 초안 4,500만 원 + 1,000만 원 이동 = 5,500만 원 > 상한 5,000만 원(총 사업비의 50%)
-    const amount = screen.getByPlaceholderText('0');
-    fireEvent.change(amount, { target: { value: '10000000' } });
-    expect(screen.getByText(/허용 상한 .*초과합니다/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /변경 비교표 생성/ })).toBeDisabled();
+    await user.selectOptions(screen.getByLabelText(/보내는 비목/), 'DIRECT_LABOR');
+    await user.selectOptions(screen.getByLabelText('받는 비목'), 'INDIRECT');
+    fireEvent.change(screen.getByPlaceholderText('0'), { target: { value: '30000000' } });
+    expect(screen.getByText(/신청할 수 없습니다/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /변경 신청하기/ })).toBeDisabled();
   });
 });
 

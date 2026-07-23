@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agreementDocsOf, applyTransfer, approveChange, canRequestChange, missingAgreementDocs, pendingChanges, projectedBudgets, rejectChange, requestChange, statusOf } from './changes';
+import { agreementDocsOf, applyTransfer, approveChange, missingAgreementDocs, pendingChanges, projectedBudgets, rejectChange, requestChange, statusOf, typeOf } from './changes';
 import type { Project, ProjectDocumentLink } from './types';
 
 // 변경은 신청해서 승인을 받아야 효력이 생긴다 — 예산이 언제 움직이는지가 이 파일의 계약이다.
@@ -23,23 +23,24 @@ const NOW = '2026-09-01T00:00:00.000Z';
 const transfer = { fromCategoryId: 'DIRECT_LABOR', toCategoryId: 'DIRECT_ACTIVITY', amount: 10_000_000, reasonKey: 'k', reason: '사유' };
 const amountOf = (p: Project, id: string) => p.budgets.find((item) => item.categoryId === id)?.amount ?? 0;
 
-describe('협약 문서 전제조건', () => {
-  it('협약서와 사업계획서가 모두 있어야 변경을 신청할 수 있다', () => {
-    expect(canRequestChange(project())).toBe(true);
+describe('협약 문서 보관 (선택)', () => {
+  it('아직 안 올린 문서를 짚어준다 — 알려만 주고 막지는 않는다', () => {
     expect(missingAgreementDocs(project())).toEqual([]);
+    expect(missingAgreementDocs(project({ documents: [doc({ documentType: 'AGREEMENT' })] }))).toEqual(['PLAN']);
+    expect(missingAgreementDocs(project({ documents: [] }))).toEqual(['AGREEMENT', 'PLAN']);
   });
 
-  it('빠진 문서를 짚어준다 — 무엇을 준비해야 하는지 알려야 한다', () => {
-    const onlyAgreement = project({ documents: [doc({ documentType: 'AGREEMENT' })] });
-    expect(canRequestChange(onlyAgreement)).toBe(false);
-    expect(missingAgreementDocs(onlyAgreement)).toEqual(['PLAN']);
-    expect(missingAgreementDocs(project({ documents: [] }))).toEqual(['AGREEMENT', 'PLAN']);
+  it('문서가 하나도 없어도 변경은 신청된다 — 기록만 남기려는 경우까지 막을 이유가 없다', () => {
+    const bare = project({ documents: [] });
+    const after = requestChange(bare, transfer, NOW);
+    expect(after.changes).toHaveLength(1);
+    expect(statusOf(after.changes[0])).toBe('submitted');
   });
 
   it('협약 문서만 골라낸다 — 참고자료로 올린 문서는 세지 않는다', () => {
     const mixed = project({ documents: [doc({ documentType: 'AGREEMENT' }), { ...doc({ documentType: 'PLAN' }), applicationType: 'REFERENCE' }] });
     expect(agreementDocsOf(mixed)).toHaveLength(1);
-    expect(canRequestChange(mixed)).toBe(false);
+    expect(missingAgreementDocs(mixed)).toEqual(['PLAN']);
   });
 });
 
@@ -63,6 +64,31 @@ describe('변경 신청', () => {
     expect(projected.find((item) => item.categoryId === 'DIRECT_LABOR')?.amount).toBe(50_000_000);
     expect(projected.find((item) => item.categoryId === 'DIRECT_ACTIVITY')?.amount).toBe(50_000_000);
     expect(pendingChanges(after)).toHaveLength(1);
+  });
+});
+
+describe('통보 · 승인 구분', () => {
+  it('고른 구분이 기록된다 — 통보와 승인은 효력이 생기는 시점이 다르다', () => {
+    const notify = requestChange(project(), { ...transfer, changeType: 'notification' }, NOW);
+    expect(typeOf(notify.changes[0])).toBe('notification');
+    const approval = requestChange(project(), { ...transfer, changeType: 'approval' }, NOW);
+    expect(typeOf(approval.changes[0])).toBe('approval');
+  });
+
+  it('구분을 고르지 않으면 승인으로 본다 — 둘 중 엄격한 쪽이라 잘못 봐도 손해가 없다', () => {
+    const after = requestChange(project(), transfer, NOW);
+    expect(typeOf(after.changes[0])).toBe('approval');
+    // 구버전 이력(필드 자체가 없음)도 마찬가지
+    const legacy = project({ changes: [{ id: 'old', fromCategoryId: 'A', toCategoryId: 'B', amount: 1, reasonKey: 'k', reason: 'r', before: [], after: [], createdAt: NOW }] });
+    expect(typeOf(legacy.changes[0])).toBe('approval');
+  });
+
+  it('통보든 승인이든 제출만으로는 예산이 움직이지 않는다', () => {
+    // 통보도 실제로 공문을 보내야 효력이 생긴다 — 화면에서 "통보 완료"를 눌러야 반영된다.
+    const notify = requestChange(project(), { ...transfer, changeType: 'notification' }, NOW);
+    expect(amountOf(notify, 'DIRECT_LABOR')).toBe(60_000_000);
+    const settled = approveChange(notify, notify.changes[0].id, NOW);
+    expect(amountOf(settled, 'DIRECT_LABOR')).toBe(50_000_000);
   });
 });
 

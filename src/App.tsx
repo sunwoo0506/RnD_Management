@@ -14,6 +14,8 @@ import ThousandWon from './ThousandWon';
 import PortfolioPeople from './PortfolioPeople';
 import PortfolioTodos from './PortfolioTodos';
 import { detailFieldsFor } from './spendingForms';
+import { draftChangeReason } from './changeReason';
+import { CHANGE_ACTION_LABEL, CHANGE_TYPE_GUIDE, CHANGE_TYPE_LABEL, typeOf, AGREEMENT_DOC_LABEL, AGREEMENT_DOC_TYPES, agreementDocsOf, approveChange, pendingChanges, projectedBudgets, rejectChange, requestChange, STATUS_LABEL, statusOf, type AgreementDocType } from './changes';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, loadResearchers, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal, saveResearchersLocal } from './storage';
 import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, fetchCloudResearchers, getProjectDocument, saveCloudProject, saveCloudResearchers, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeProjectDocument } from './cloud';
 import { effectiveMonthly, EMPLOYMENT_LABEL, employmentStatus, monthlyOf, researcherByName, resignationTargets, severanceEligible, tenureText } from './researchers';
@@ -25,7 +27,7 @@ import { buildRegulationPackage } from './regulationPackage';
 import { diffExtraction, overlayRulesFrom, summarizeDiff, type PackDiff } from './packDiff';
 import SetupWizard from './SetupWizard';
 import type { BudgetBasis, CautionItem, CategoryCap, CategoryMin, ReferenceStandard, SubItemChoice, SubItemChoices } from './rules';
-import type { BudgetCategoryId, BudgetItem, BudgetSubItem, EmploymentType, Evidence, Expense, FundingSource, FundingSplit, PackAllowedItem, PackArticle, PackCategory, PackRule, Participant, PaymentMethod, Project, ProjectDocumentLink, Researcher, RulePack, SavedRulePack, Screen } from './types';
+import type { BudgetCategoryId, BudgetChange, BudgetItem, BudgetSubItem, ChangeType, EmploymentType, Evidence, Expense, FundingSource, FundingSplit, PackAllowedItem, PackArticle, PackCategory, PackRule, Participant, PaymentMethod, Project, ProjectDocumentLink, Researcher, RulePack, SavedRulePack, Screen } from './types';
 
 // 문서 생성 라이브러리(docx·excel)는 무거워서 첫 화면 번들에서 제외하고 버튼 클릭 시에만 불러온다.
 const withExporters = async (run: (mod: typeof import('./exporters')) => Promise<void>) => {
@@ -2086,22 +2088,256 @@ function EvidenceAdder({ onAdd }: { onAdd: (label: string) => void }) {
   </div>;
 }
 
+// 협약 문서 등록 — 변경 신청의 전제다. 무엇을 어떻게 바꾸는지 견줄 기준이 있어야 신청이 성립한다.
+function AgreementDocs({ project, update }: { project: Project; update: (p: Project) => void }) {
+  const [busy, setBusy] = useState<AgreementDocType | null>(null);
+  const docs = agreementDocsOf(project);
+  const upload = async (type: AgreementDocType, file?: File) => {
+    if (!file) return;
+    setBusy(type);
+    try {
+      const fileId = uid();
+      await storeProjectDocument(fileId, file);
+      const entry: ProjectDocumentLink = {
+        id: uid(), kind: 'upload', fileId, fileName: file.name, documentType: type,
+        title: AGREEMENT_DOC_LABEL[type], applicationType: 'AGREEMENT', isConfirmed: true,
+        createdAt: new Date().toISOString(),
+      };
+      // 같은 종류를 다시 올리면 갈아끼운다 — 협약 변경으로 문서가 새로 나오는 일이 잦다.
+      const rest = (project.documents ?? []).filter((doc) => !(doc.applicationType === 'AGREEMENT' && doc.documentType === type));
+      update({ ...project, documents: [...rest, entry] });
+    } catch { alert('업로드에 실패했습니다. 잠시 후 다시 시도해주세요.'); }
+    finally { setBusy(null); }
+  };
+  const removeDoc = async (doc: ProjectDocumentLink) => {
+    if (!confirm(`"${doc.title}"을(를) 삭제할까요? 변경 신청을 하려면 다시 올려야 합니다.`)) return;
+    if (doc.fileId) { try { await deleteProjectDocuments([doc.fileId]); } catch { /* 파일 삭제 실패해도 목록에서는 뺀다 */ } }
+    update({ ...project, documents: (project.documents ?? []).filter((item) => item.id !== doc.id) });
+  };
+  return <section className="panel agreement-panel">
+    <div className="panel-head"><div><span className="section-kicker">협약 문서 보관 (선택)</span><h3>협약서 · 사업계획서</h3>
+      <p>변경사항 관리와 파일 보관을 이 화면에서 한 번에 할 수 있어요. 등록하지 않아도 변경 신청은 가능합니다.</p></div></div>
+    <div className="agreement-list">{AGREEMENT_DOC_TYPES.map((type) => {
+      const found = docs.find((doc) => doc.documentType === type);
+      return <div className={found ? 'agreement-row done' : 'agreement-row'} key={type}>
+        <div>{found ? <CheckCircle2 /> : <FileClock />}<div>
+          <strong>{AGREEMENT_DOC_LABEL[type]}</strong>
+          <small>{found ? found.fileName : '아직 등록되지 않았어요'}</small>
+        </div></div>
+        <div className="agreement-actions">
+          <label className="upload-button">{busy === type ? '올리는 중…' : found ? '다시 올리기' : '파일 올리기'}
+            <input type="file" accept="application/pdf,.hwp,.hwpx,.doc,.docx,image/*" disabled={busy !== null}
+              onChange={(event) => { upload(type, event.target.files?.[0]); event.target.value = ''; }} /></label>
+          {found && <button type="button" className="danger-button" onClick={() => removeDoc(found)}><Trash2 /></button>}
+        </div>
+      </div>;
+    })}</div>
+  </section>;
+}
+
 function ChangeManagement({ project, update }: { project: Project; update: (p: Project) => void }) {
   const pack = packFor(project);
   const cats = visibleCategories(pack, project);
+  // 기본값은 승인 — 둘 중 엄격한 쪽이라 잘못 골라도 손해가 없다. 통보로 착각해 집행하면 문제가 된다.
+  const [changeType, setChangeType] = useState<ChangeType>('approval');
   const [form, setForm] = useState({ from: cats[1]?.id ?? cats[0]?.id ?? '', to: cats[0]?.id ?? '', amount: '', reasonKey: REASON_TEMPLATES[0].key, reason: REASON_TEMPLATES[0].text });
+  const [planFile, setPlanFile] = useState<{ id: string; name: string } | null>(null);
+  const [uploadingPlan, setUploadingPlan] = useState(false);
+  // 공문 사유는 격식을 갖춰 써야 해서 부담이 크다 — 한두 줄만 적으면 연구행정 문체로 늘려 쓴다.
+  // 결과는 아래 사유칸에 그대로 들어가므로 사용자가 이어서 고칠 수 있다.
+  const [aiHint, setAiHint] = useState('');       // 사용자가 적는 한두 줄
+  const [aiFeedback, setAiFeedback] = useState(''); // 재작성 주문
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiDrafted, setAiDrafted] = useState(false);   // 한 번이라도 AI가 쓴 뒤인지 (재작성 UI 노출 기준)
+  const [aiError, setAiError] = useState<string | null>(null);
+  // 문서에는 넣지 않고 검토 화면에만 띄우는 정보 — 무엇을 보완하면 좋은지가 재작성 판단의 근거다.
+  const [aiReview, setAiReview] = useState<{ missing: string[]; warnings: string[] } | null>(null);
   const source = project.budgets.find((b) => b.categoryId === form.from)?.amount ?? 0;
   const amount = Number(form.amount) || 0;
   const limitError = form.from !== form.to ? transferLimitError(pack, project.budgets, project.totalBudget, form.to, amount, fundingBreakdown(project).matchingInKind) : null;
   const valid = form.from !== form.to && amount > 0 && amount <= source && !limitError && form.reason.trim();
-  const save = (event: React.FormEvent) => { event.preventDefault(); if (!valid) return; const before = project.budgets.map((b) => ({ ...b })); const after: BudgetItem[] = before.map((b) => b.categoryId === form.from ? { ...b, amount: b.amount - amount } : b.categoryId === form.to ? { ...b, amount: b.amount + amount } : b); update({ ...project, budgets: after, changes: [{ id: uid(), fromCategoryId: form.from, toCategoryId: form.to, amount, reasonKey: form.reasonKey, reason: form.reason, before, after, createdAt: new Date().toISOString() }, ...project.changes] }); };
-  const change = project.changes[0];
-  return <div className="page-content"><div className="page-title"><div><span className="eyebrow">모듈 3</span><h2>예산 변경 관리</h2><p>비목 간 이동을 기록하고 비교표와 공문 초안을 생성하세요.</p></div></div>
-    <div className="change-layout"><form className="panel change-form" onSubmit={save}><div className="form-title"><div><h3>비목 간 금액 이동</h3><p>저장 시 현재 예산에 바로 반영되고 변경 이력에 누적 기록됩니다.</p></div></div><div className="transfer-row"><label>보내는 비목<select value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })}>{cats.map((c) => <option value={c.id} key={c.id}>{c.name}</option>)}</select><small>현재 {formatWon(source)}</small></label><div className="transfer-icon"><ArrowRight /></div><label>받는 비목<select value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })}>{cats.map((c) => <option value={c.id} key={c.id}>{c.name}</option>)}</select></label></div><label>이동 금액<div className="money-input wide"><input required inputMode="numeric" value={withCommas(form.amount)} onChange={(e) => setForm({ ...form, amount: digitsOnly(e.target.value) })} placeholder="0" /><b>원</b></div></label>{form.from === form.to && <p className="field-error"><AlertCircle /> 서로 다른 비목을 선택해주세요.</p>}{limitError && <p className="field-error"><AlertCircle /> {limitError} 저장할 수 없습니다.</p>}
-      <label>변경 사유 템플릿<select value={form.reasonKey} onChange={(e) => { const template = REASON_TEMPLATES.find((t) => t.key === e.target.value)!; setForm({ ...form, reasonKey: template.key, reason: template.text }); }}>{REASON_TEMPLATES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}</select></label><label>공문에 들어갈 사유<textarea rows={6} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} /></label><button disabled={!valid} className="primary large" type="submit"><RefreshCw /> 변경 비교표 생성</button></form>
-      <section className="panel comparison"><div className="form-title"><div><h3>변경 전 · 후 비교</h3><p>{change ? `${new Date(change.createdAt).toLocaleString('ko-KR')} 생성` : '변경을 저장하면 자동으로 생성됩니다.'}</p></div></div>{!change ? <div className="empty-state compact"><RefreshCw /><h3>아직 변경 내역이 없어요</h3><p>왼쪽에서 이동할 비목과 금액을 입력해주세요.</p></div> : <><div className="comparison-table"><div className="comp-head"><span>비목</span><span>변경 전</span><span>변경 후</span><span>증감</span></div>{cats.map((category) => { const before = change.before.find((b) => b.categoryId === category.id)?.amount ?? 0; const after = change.after.find((b) => b.categoryId === category.id)?.amount ?? 0; const delta = after - before; return <div className={delta ? 'comp-row changed' : 'comp-row'} key={category.id}><strong>{category.name}</strong><span>{formatWon(before)}</span><span>{formatWon(after)}</span><span className={delta > 0 ? 'up' : delta < 0 ? 'down' : ''}>{delta > 0 ? <ArrowUpRight /> : delta < 0 ? <ArrowDownRight /> : null}{delta ? formatWon(Math.abs(delta)) : '-'}</span></div>; })}</div><div className="reason-box"><span>변경 사유</span><p>{change.reason}</p></div><div className="export-buttons"><button onClick={() => withExporters((m) => m.exportChangeDocx(project))}><FileText /> 비교표 Word</button><button className="primary" onClick={() => withExporters((m) => m.exportChangeDocx(project, true))}><Download /> 중기부 공문 Word</button></div></>}</section></div>
-    {project.changes.length > 0 && <section className="panel history-panel"><div className="panel-head"><div><h3><FileClock /> 변경 이력 <b>{project.changes.length}</b>건</h3><p>모든 변경 기록이 순서대로 보관됩니다. 문서는 가장 최근 변경 기준으로 생성됩니다.</p></div></div>
-      <div className="history-list">{project.changes.map((item, index) => <div key={item.id}><span>{new Date(item.createdAt).toLocaleString('ko-KR')}</span><strong>{categoryOf(pack, item.fromCategoryId).name} <ArrowRight /> {categoryOf(pack, item.toCategoryId).name}</strong><b>{formatWon(item.amount)}</b><small>{REASON_TEMPLATES.find((t) => t.key === item.reasonKey)?.label ?? '직접 입력'}{index === 0 && ' · 최신'}</small></div>)}</div>
+  const pending = pendingChanges(project);
+
+  // 변경사항을 반영한 사업계획서 — 신청의 근거 문서다. 없어도 신청은 되지만 전문기관 제출 때 필요하다.
+  const uploadPlan = async (file?: File) => {
+    if (!file) return;
+    setUploadingPlan(true);
+    try { const fileId = uid(); await storeProjectDocument(fileId, file); setPlanFile({ id: fileId, name: file.name }); }
+    catch { alert('업로드에 실패했습니다. 다시 시도해주세요.'); }
+    finally { setUploadingPlan(false); }
+  };
+
+  const runDraft = async (rewrite: boolean) => {
+    const summary = aiHint.trim();
+    if (!summary) { setAiError('어떤 사정으로 바꾸는지 한 줄이라도 적어주세요.'); return; }
+    setAiBusy(true); setAiError(null); setAiReview(null);
+    try {
+      const draft = await draftChangeReason({
+        summary,
+        projectName: project.name,
+        fromCategory: categoryOf(pack, form.from).name,
+        toCategory: categoryOf(pack, form.to).name,
+        amount,
+        reasonTemplate: REASON_TEMPLATES.find((template) => template.key === form.reasonKey)?.label,
+        // 재작성일 때만 이전 초안을 넘긴다 — 같은 글을 다시 받지 않기 위해서다.
+        previous: rewrite ? form.reason : undefined,
+        feedback: rewrite ? aiFeedback.trim() || undefined : undefined,
+      });
+      setForm((prev) => ({ ...prev, reason: draft.reason }));
+      setAiDrafted(true);
+      setAiFeedback('');
+      setAiReview({ missing: draft.missingInformation, warnings: draft.validationWarnings });
+    } catch (error) { setAiError(error instanceof Error ? error.message : '작성에 실패했습니다.'); }
+    finally { setAiBusy(false); }
+  };
+
+  const submitRequest = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!valid) return;
+    if (!planFile && !confirm('변경사항을 반영한 사업계획서를 첨부하지 않았습니다. 그래도 신청할까요?\n(전문기관 제출 시에는 대개 필요합니다)')) return;
+    update(requestChange(project, {
+      fromCategoryId: form.from, toCategoryId: form.to, amount,
+      reasonKey: form.reasonKey, reason: form.reason, changeType,
+      planFileId: planFile?.id, planFileName: planFile?.name,
+    }, new Date().toISOString()));
+    setForm({ ...form, amount: '' });
+    setPlanFile(null);
+  };
+
+  const approve = (change: BudgetChange) => {
+    const notify = typeOf(change) === 'notification';
+    const note = window.prompt(notify ? '통보 공문 번호나 발송일을 적어두시겠어요? (선택)' : '승인 내용을 적어두시겠어요? (선택 — 승인 공문 번호 등)', '') ?? undefined;
+    if (!confirm(`${categoryOf(pack, change.fromCategoryId).name} → ${categoryOf(pack, change.toCategoryId).name} ${formatWon(change.amount)}\n\n${notify ? '통보를 마친 것으로 처리하면' : '승인 처리하면'} 지금 예산에 반영되고 편성 확정이 풀립니다. 계속할까요?`)) return;
+    update(approveChange(project, change.id, new Date().toISOString(), note || undefined));
+  };
+  const reject = (change: BudgetChange) => {
+    const notify = typeOf(change) === 'notification';
+    const note = window.prompt(notify
+      ? '보완 요청 내용을 적어주세요 — 무엇을 고쳐 다시 통보해야 하는지 남습니다.'
+      : '반려 사유를 적어주세요 — 나중에 같은 변경을 다시 시도할 때 근거가 됩니다.', '');
+    if (note === null) return;
+    update(rejectChange(project, change.id, new Date().toISOString(), note.trim() || '사유 미기재'));
+  };
+
+  // 비교표·공문은 가장 최근 "결정된" 변경을 기준으로 만든다 — 신청 중인 것은 아직 확정이 아니다.
+  const change = project.changes.find((item) => statusOf(item) === 'approved') ?? project.changes[0];
+  const projected = projectedBudgets(project);
+
+  return <div className="page-content"><div className="page-title"><div><span className="eyebrow">모듈 3</span><h2>예산 변경 관리</h2><p>변경을 신청하고 승인되면 예산에 반영합니다. 협약서·사업계획서도 이 화면에서 함께 보관합니다.</p></div></div>
+    <AgreementDocs project={project} update={update} />
+
+    {/* 신청 중인 변경 — 예산에는 아직 안 잡혀 있어서 따로 알리지 않으면 "왜 안 바뀌었지"가 된다 */}
+    {pending.length > 0 && <section className="panel pending-panel">
+      <div className="panel-head"><div><span className="section-kicker">STEP 2 · 결과 반영</span><h3>진행 중인 변경 <b>{pending.length}</b>건</h3>
+        <p>아직 예산에 반영되지 않았습니다. 통보를 마쳤거나 승인 회신을 받으면 아래에서 처리하세요.</p></div></div>
+      <div className="pending-list">{pending.map((item) => <div className="pending-row" key={item.id}>
+        <div className="pending-what">
+          <strong><em className={`change-kind-badge ${typeOf(item)}`}>{CHANGE_TYPE_LABEL[typeOf(item)]}</em>
+            {categoryOf(pack, item.fromCategoryId).name} <ArrowRight /> {categoryOf(pack, item.toCategoryId).name}</strong>
+          <b>{formatWon(item.amount)}</b>
+          <small>{new Date(item.submittedAt ?? item.createdAt).toLocaleDateString('ko-KR')} {typeOf(item) === 'notification' ? '작성' : '신청'}
+            {item.planFileName ? ` · ${item.planFileName}` : ' · 사업계획서 미첨부'}</small>
+        </div>
+        <div className="pending-actions">
+          <button type="button" className="secondary" onClick={() => reject(item)}>{typeOf(item) === 'notification' ? '보완 요청받음' : '반려됨'}</button>
+          <button type="button" className="primary" onClick={() => approve(item)}><Check /> {CHANGE_ACTION_LABEL[typeOf(item)].settle}</button>
+        </div>
+      </div>)}</div>
+      {/* 신청이 다 승인되면 편성이 어떻게 되는지 미리 보여준다 */}
+      <div className="projected-table">
+        <div className="projected-head"><span>비목</span><span>현재 편성</span><span>승인 시</span></div>
+        {cats.map((category) => {
+          const now = project.budgets.find((b) => b.categoryId === category.id)?.amount ?? 0;
+          const next = projected.find((b) => b.categoryId === category.id)?.amount ?? 0;
+          if (now === next) return null;
+          return <div className="projected-row" key={category.id}>
+            <strong>{category.name}</strong><span>{formatWon(now)}</span>
+            <span className={next > now ? 'up' : 'down'}>{next > now ? <ArrowUpRight /> : <ArrowDownRight />}{formatWon(next)}</span>
+          </div>;
+        })}
+      </div>
+    </section>}
+
+    <div className="change-layout"><form className="panel change-form" onSubmit={submitRequest}>
+      <div className="form-title"><div><span className="section-kicker">STEP 1 · 변경 신청</span><h3>비목 간 금액 이동</h3>
+        <p>제출해도 예산은 바로 바뀌지 않습니다. 통보·승인이 끝난 뒤 아래에서 반영 처리를 해야 바뀝니다.</p></div></div>
+      {/* 협약변경은 통보와 승인으로 갈린다 — 효력이 생기는 시점이 달라 먼저 정해야 한다.
+          어느 쪽인지는 사업 공고·협약서가 정하므로 앱이 단정하지 않고 고르게 한다. */}
+      <div className="change-kind">
+        <span className="change-kind-label">변경 구분</span>
+        <div className="change-kind-picks">{(['notification', 'approval'] as const).map((kind) => <button type="button" key={kind}
+          className={changeType === kind ? 'on' : ''} onClick={() => setChangeType(kind)}>
+          {CHANGE_TYPE_LABEL[kind]}<em>{CHANGE_TYPE_GUIDE[kind].short}</em>
+        </button>)}</div>
+        <p className="change-kind-guide">
+          <b>{CHANGE_TYPE_GUIDE[changeType].effect}</b> {CHANGE_TYPE_GUIDE[changeType].examples}
+          {' '}어느 쪽에 해당하는지는 사업 공고·협약서·규정에서 정하므로 반드시 확인하세요.
+        </p>
+      </div>
+      <div className="transfer-row"><label>보내는 비목<select value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })}>{cats.map((c) => <option value={c.id} key={c.id}>{c.name}</option>)}</select><small>현재 {formatWon(source)}</small></label><div className="transfer-icon"><ArrowRight /></div><label>받는 비목<select value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })}>{cats.map((c) => <option value={c.id} key={c.id}>{c.name}</option>)}</select></label></div>
+      <label>이동 금액<div className="money-input wide"><input required inputMode="numeric" value={withCommas(form.amount)} onChange={(e) => setForm({ ...form, amount: digitsOnly(e.target.value) })} placeholder="0" /><b>원</b></div></label>
+      {form.from === form.to && <p className="field-error"><AlertCircle /> 서로 다른 비목을 선택해주세요.</p>}
+      {limitError && <p className="field-error"><AlertCircle /> {limitError} 신청할 수 없습니다.</p>}
+      <label>변경 사유 템플릿<select value={form.reasonKey} onChange={(e) => { const template = REASON_TEMPLATES.find((t) => t.key === e.target.value)!; setForm({ ...form, reasonKey: template.key, reason: template.text }); }}>{REASON_TEMPLATES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}</select></label>
+      {/* 한두 줄 → 공문 문체. 결과는 아래 사유칸에 들어가고 그대로 고칠 수 있다. */}
+      <div className="ai-reason">
+        <div className="ai-reason-head"><Sparkles /><div>
+          <strong>AI로 사유 작성</strong>
+          <small>어떤 사정으로 바꾸는지 한두 줄만 적으면 연구행정 문체로 늘려 씁니다. 금액·비목은 위 입력값을 그대로 씁니다.</small>
+        </div></div>
+        <div className="ai-reason-row">
+          <input aria-label="변경 사정 한 줄 입력" value={aiHint} placeholder="예: 시제품 검증용 계측장비가 필요해졌고 인건비에 여유가 생김"
+            onChange={(event) => setAiHint(event.target.value)}
+            onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); runDraft(false); } }} />
+          <button type="button" className="secondary" disabled={aiBusy || !aiHint.trim()} onClick={() => runDraft(false)}>
+            {aiBusy ? '작성 중…' : <><Sparkles /> 작성</>}
+          </button>
+        </div>
+        {aiDrafted && <div className="ai-reason-row">
+          <input aria-label="재작성 주문" value={aiFeedback} placeholder="다시 쓸 때 주문 (예: 더 짧게, 장비 필요성을 강조) — 비워두면 다른 표현으로"
+            onChange={(event) => setAiFeedback(event.target.value)}
+            onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); runDraft(true); } }} />
+          <button type="button" className="secondary" disabled={aiBusy} onClick={() => runDraft(true)}>
+            {aiBusy ? '작성 중…' : <><RefreshCw /> 다시 작성</>}
+          </button>
+        </div>}
+        {aiError && <p className="field-error"><AlertCircle /> {aiError}</p>}
+        {aiDrafted && !aiError && <p className="ai-reason-note">AI가 쓴 초안입니다. 아래 칸에서 직접 고쳐 쓰세요 — 제출되는 것은 아래 내용입니다.</p>}
+        {/* 문서에는 들어가지 않는 검토용 정보. 무엇을 보완하면 좋은지 알아야 다시 쓸지 판단할 수 있다. */}
+        {aiReview && (aiReview.missing.length > 0 || aiReview.warnings.length > 0) && <div className="ai-review">
+          {aiReview.warnings.length > 0 && <div className="ai-review-group warn">
+            <strong><AlertCircle /> 확인이 필요해요</strong>
+            <ul>{aiReview.warnings.map((item) => <li key={item}>{item}</li>)}</ul>
+          </div>}
+          {aiReview.missing.length > 0 && <div className="ai-review-group">
+            <strong><FileSearch /> 보완하면 좋아요</strong>
+            <ul>{aiReview.missing.map((item) => <li key={item}>{item}</li>)}</ul>
+          </div>}
+          <small>이 안내는 문서에 들어가지 않습니다 — 위 칸에 내용을 더 적고 다시 작성하면 반영됩니다.</small>
+        </div>}
+      </div>
+      <label>공문에 들어갈 사유<textarea rows={6} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} /></label>
+      {/* 변경 신청에는 변경사항을 반영한 사업계획서를 함께 낸다 */}
+      <div className="plan-attach">
+        <div><strong>변경 반영 사업계획서</strong><small>{planFile ? planFile.name : '협약 당시 계획서에 변경사항을 반영해 첨부하세요 (선택)'}</small></div>
+        <label className="upload-button">{uploadingPlan ? '올리는 중…' : planFile ? '다시 올리기' : '파일 올리기'}
+          <input type="file" accept="application/pdf,.hwp,.hwpx,.doc,.docx" disabled={uploadingPlan}
+            onChange={(event) => { uploadPlan(event.target.files?.[0]); event.target.value = ''; }} /></label>
+      </div>
+      <button disabled={!valid} className="primary large" type="submit"><RefreshCw /> {CHANGE_ACTION_LABEL[changeType].submit}</button>
+    </form>
+
+      <section className="panel comparison"><div className="form-title"><div><h3>변경 전 · 후 비교</h3><p>{change ? `${new Date(change.createdAt).toLocaleString('ko-KR')} ${STATUS_LABEL[statusOf(change)]}` : '변경을 신청하면 자동으로 생성됩니다.'}</p></div></div>{!change ? <div className="empty-state compact"><RefreshCw /><h3>아직 변경 내역이 없어요</h3><p>왼쪽에서 이동할 비목과 금액을 입력해주세요.</p></div> : <><div className="comparison-table"><div className="comp-head"><span>비목</span><span>변경 전</span><span>변경 후</span><span>증감</span></div>{cats.map((category) => { const before = change.before.find((b) => b.categoryId === category.id)?.amount ?? 0; const after = change.after.find((b) => b.categoryId === category.id)?.amount ?? 0; const delta = after - before; return <div className={delta ? 'comp-row changed' : 'comp-row'} key={category.id}><strong>{category.name}</strong><span>{formatWon(before)}</span><span>{formatWon(after)}</span><span className={delta > 0 ? 'up' : delta < 0 ? 'down' : ''}>{delta > 0 ? <ArrowUpRight /> : delta < 0 ? <ArrowDownRight /> : null}{delta ? formatWon(Math.abs(delta)) : '-'}</span></div>; })}</div><div className="reason-box"><span>변경 사유</span><p>{change.reason}</p></div><div className="export-buttons"><button onClick={() => withExporters((m) => m.exportChangeDocx(project))}><FileText /> 비교표 Word</button><button className="primary" onClick={() => withExporters((m) => m.exportChangeDocx(project, true))}><Download /> 중기부 공문 Word</button></div></>}</section></div>
+
+    {project.changes.length > 0 && <section className="panel history-panel"><div className="panel-head"><div><h3><FileClock /> 변경 이력 <b>{project.changes.length}</b>건</h3><p>신청·승인·반려가 모두 남습니다. 반려된 기록도 다음 신청의 근거가 되므로 지우지 않습니다.</p></div></div>
+      <div className="history-list">{project.changes.map((item) => <div key={item.id}>
+        <span>{new Date(item.createdAt).toLocaleString('ko-KR')}</span>
+        <strong><em className={`change-kind-badge ${typeOf(item)}`}>{CHANGE_TYPE_LABEL[typeOf(item)]}</em>
+          {categoryOf(pack, item.fromCategoryId).name} <ArrowRight /> {categoryOf(pack, item.toCategoryId).name}</strong>
+        <b>{formatWon(item.amount)}</b>
+        <small><em className={`change-status ${statusOf(item)}`}>{STATUS_LABEL[statusOf(item)]}</em>
+          {item.decisionNote ? ` · ${item.decisionNote}` : ''}</small>
+      </div>)}</div>
     </section>}
   </div>;
 }

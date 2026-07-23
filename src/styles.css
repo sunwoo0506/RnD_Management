@@ -520,7 +520,9 @@ input[type='checkbox'], input[type='radio'] { accent-color: var(--primary); }
 .evidence-add { display: flex; gap: 8px; padding: 0 20px 14px; background: #fbfafc; }
 .evidence-add input { flex: 1; font-size: 13px; }
 .evidence-add button { white-space: nowrap; }
-.change-layout { display: grid; grid-template-columns: .85fr 1.3fr; gap: 15px; align-items: start; }.change-form { display: grid; gap: 15px; }.transfer-row { display: grid; grid-template-columns: 1fr 34px 1fr; gap: 8px; align-items: center; }.transfer-icon { width: 31px; height: 31px; border-radius: 50%; background: #f9eefe; color: var(--primary); display: grid; place-items: center; margin-top: 13px; }.transfer-row label small { color: var(--muted); font-size: 12px; }.field-error { color: #d65e39; margin: -8px 0 0; font-size: 13px; display: flex; gap: 5px; align-items: center; }.comparison { overflow: hidden; }.comparison .form-title { padding: 21px 21px 12px; }.comparison-table { border-top: 1px solid var(--line); }.comp-head, .comp-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr .8fr; gap: 8px; padding: 0 18px; align-items: center; }.comp-head { height: 35px; background: #fbf7fc; color: var(--muted); font-size: 12px; font-weight: 400; }.comp-row { min-height: 43px; border-top: 1px solid #f2edf4; font-size: 13px; }.comp-row.changed { background: #fdf8ff; }.comp-row .up, .comp-row .down { display: flex; align-items: center; font-weight: 400; }.comp-row .up { color: #bf3ace; }.comp-row .down { color: #de6642; }.comp-row svg { width: 12px; }.reason-box { margin: 14px 18px; padding: 12px; background: #faf6fb; border-radius: 8px; }.reason-box span { color: var(--muted); font-size: 12px; font-weight: 400; }.reason-box p { margin: 5px 0 0; font-size: 13px; line-height: 1.6; }.export-buttons { display: flex; gap: 6px; padding: 0 18px 18px; }.export-buttons button { flex: 1; min-height: 35px; border: 1px solid #a8c3de; color: #536078; background: white; border-radius: 6px; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 12px; font-weight: 400; }.export-buttons button.primary { background: var(--primary); color: white; border-color: var(--primary); }
+.change-layout { display: grid; grid-template-columns: .85fr 1.3fr; gap: 15px; align-items: start; }.change-form { display: grid; gap: 15px; }/* 왼쪽 칸에만 "현재 금액" 줄이 붙어 가운데 정렬하면 두 선택칸의 높이가 어긋난다.
+   위쪽 기준으로 맞춰 라벨과 선택칸이 같은 선에 놓이게 하고, 화살표만 선택칸 높이에 맞춰 내린다. */
+.transfer-row { display: grid; grid-template-columns: 1fr 34px 1fr; gap: 8px; align-items: start; }.transfer-icon { width: 31px; height: 31px; border-radius: 50%; background: #f9eefe; color: var(--primary); display: grid; place-items: center; margin-top: 27px; }.transfer-row label small { color: var(--muted); font-size: 12px; }.field-error { color: #d65e39; margin: -8px 0 0; font-size: 13px; display: flex; gap: 5px; align-items: center; }.comparison { overflow: hidden; }.comparison .form-title { padding: 21px 21px 12px; }.comparison-table { border-top: 1px solid var(--line); }.comp-head, .comp-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr .8fr; gap: 8px; padding: 0 18px; align-items: center; }.comp-head { height: 35px; background: #fbf7fc; color: var(--muted); font-size: 12px; font-weight: 400; }.comp-row { min-height: 43px; border-top: 1px solid #f2edf4; font-size: 13px; }.comp-row.changed { background: #fdf8ff; }.comp-row .up, .comp-row .down { display: flex; align-items: center; font-weight: 400; }.comp-row .up { color: #bf3ace; }.comp-row .down { color: #de6642; }.comp-row svg { width: 12px; }.reason-box { margin: 14px 18px; padding: 12px; background: #faf6fb; border-radius: 8px; }.reason-box span { color: var(--muted); font-size: 12px; font-weight: 400; }.reason-box p { margin: 5px 0 0; font-size: 13px; line-height: 1.6; }.export-buttons { display: flex; gap: 6px; padding: 0 18px 18px; }.export-buttons button { flex: 1; min-height: 35px; border: 1px solid #a8c3de; color: #536078; background: white; border-radius: 6px; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 12px; font-weight: 400; }.export-buttons button.primary { background: var(--primary); color: white; border-color: var(--primary); }
 .team-grid { display: grid; grid-template-columns: .8fr 1.2fr; gap: 15px; align-items: start; }.member-list { padding: 0 20px; }.member-list > div { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid var(--line); }.member-list span { display: grid; }.member-list strong { font-size: 13px; }.member-list strong b { margin-left: 4px; font-size: 11px; color: var(--primary); background: #f8ebfe; padding: 2px 5px; border-radius: 4px; }.member-list small { color: var(--muted); font-size: 12px; }.member-list > div > svg { margin-left: auto; color: #2aa176; }.inline-add, .person-add { border-top: 1px solid var(--line); margin-top: 10px; padding: 16px 20px 20px; }.inline-add h4 { margin: 0 0 12px; font-size: 13px; display: flex; gap: 5px; }.inline-add button { margin-top: 10px; width: 100%; }.limit-note, .inline-warning { margin: 12px 20px 18px; background: #faeffe; color: #c753d4; padding: 10px; border-radius: 8px; font-size: 12px; display: flex; gap: 5px; align-items: center; }
 /* 참여인력은 한 명 = 한 줄. 카드로 쌓으면 인원이 늘수록 편성표가 화면 밖으로 밀린다. */
 .labor-table { padding: 0 24px 2px; }
@@ -656,7 +658,15 @@ input[type='checkbox'], input[type='radio'] { accent-color: var(--primary); }
 .registry-results button.active { border-color: var(--primary); background: #fbf5fe; }
 .registry-results strong { font-size: 13px; }
 .registry-results span { font-size: 12px; color: var(--muted); }
-.upload-button.wide { justify-content: center; padding: 10px; font-size: 13px; border-radius: 8px; }
+/* 파일 올리기 — 브라우저 기본 파일칸("파일 선택 / 선택된 파일 없음")은 자리를 크게 먹고
+   버튼처럼 보이지도 않는다. 입력칸은 숨기고 label 자체를 버튼으로 쓴다. */
+.upload-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap;
+  border: 1px solid var(--line-input); background: white; color: var(--primary); border-radius: var(--r-pill);
+  padding: 8px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.upload-button:hover { border-color: var(--primary); background: var(--canvas-soft); }
+.upload-button input[type='file'] { display: none; }
+.upload-button svg { width: 13px; }
+.upload-button.wide { justify-content: center; padding: 10px; font-size: 13px; border-radius: var(--r-pill); }
 .doc-list { display: grid; gap: 6px; }
 .doc-item { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; }
 .doc-item .doc-name { flex: 1; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1102,7 +1112,7 @@ input[readonly] { background: #faf6fb; color: #667087; pointer-events: none; }
 .expense-actions { display: flex; gap: 6px; margin-left: 12px; }.expense-actions button { border: 1px solid #e7daec; background: white; color: #5b667b; width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex: none; }.expense-actions button svg { width: 14px; }.expense-actions button:hover { border-color: var(--primary); color: var(--primary); }.expense-actions button.danger { color: #d6613d; border-color: #f0d7d0; background: #fbfcfe; }.expense-actions button.danger:hover { border-color: #d6613d; color: #b34e2f; }
 .history-panel { margin-top: 15px; }.history-panel h3 b { color: var(--primary); }.history-list { padding: 0 20px 18px; }.history-list > div { display: grid; grid-template-columns: 1.1fr 1.3fr .8fr .9fr; gap: 10px; padding: 11px 8px; border-top: 1px solid var(--line); font-size: 13px; align-items: center; }.history-list span { color: var(--muted); font-size: 12px; }.history-list strong { display: flex; align-items: center; gap: 5px; font-size: 13px; }.history-list strong svg { width: 12px; color: var(--primary); }.history-list b { text-align: right; }.history-list small { color: var(--muted); font-size: 12px; text-align: right; }
 .backup-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 20px 20px; }
-.backup-actions .upload-button { padding: 9px 14px; font-size: 13px; border-radius: 8px; }
+.backup-actions .upload-button { padding: 9px 18px; font-size: 13px; }
 .notice a { color: inherit; font-weight: 400; }
 
 @media (max-width: 900px) {
@@ -1350,3 +1360,86 @@ input[type='number'], .labor-rate input { border-radius: var(--r-pill); text-ali
 /* 잠긴 값(비목·세목)과 그 이유 — 왜 못 고치는지 밝히지 않으면 고장으로 읽힌다 */
 .expense-edit-fixed { margin: 0; font-size: 13px; font-weight: 400; color: var(--ink-2); display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
 .expense-edit-fixed em { font-style: normal; font-size: 11.5px; font-weight: 400; color: var(--muted); }
+
+/* ---- 변경 관리: 협약 문서 → 신청 → 승인 ---- */
+.agreement-panel, .pending-panel { margin-bottom: 18px; }
+.agreement-list { padding: 0 24px 22px; display: grid; gap: 8px; }
+.agreement-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: white; }
+.agreement-row > div:first-child { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.agreement-row > div:first-child > svg { width: 18px; color: #b9b3bd; flex: none; }
+.agreement-row.done { border-color: #cfe9db; background: #f7fdfa; }
+.agreement-row.done > div:first-child > svg { color: #1d7a52; }
+.agreement-row strong { display: block; font-size: 13px; }
+.agreement-row small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; }
+.agreement-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+/* 신청 중인 변경 — 예산에 아직 안 잡혀 있다는 것이 한눈에 보여야 한다 */
+.pending-panel { border-color: #f0e0cd; }
+.pending-list { padding: 0 24px; display: grid; gap: 8px; }
+.pending-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding: 13px 15px; border: 1px solid #f0e0cd; background: #fdf9f3; border-radius: 12px; }
+.pending-what { display: grid; gap: 3px; min-width: 0; }
+.pending-what strong { font-size: 13px; display: flex; align-items: center; gap: 5px; }
+.pending-what strong svg { width: 13px; color: var(--muted); }
+.pending-what b { font-size: 15px; font-weight: 700; }
+.pending-what small { font-size: 12px; color: var(--muted); }
+.pending-actions { display: flex; gap: 7px; flex: none; }
+.pending-actions button { min-height: 34px; font-size: 12.5px; padding: 8px 16px; }
+/* 승인되면 편성이 어떻게 되는지 미리 */
+.projected-table { margin: 14px 24px 22px; border: 1px dashed #e0d6c6; border-radius: 12px; overflow: hidden; }
+.projected-head, .projected-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 12px; padding: 9px 14px; align-items: center; }
+.projected-head { background: var(--canvas-cream); font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.projected-row { border-top: 1px solid #f0e9df; font-size: 13px; }
+.projected-row strong { font-weight: 400; }
+.projected-row span { text-align: right; }
+.projected-row span.up, .projected-row span.down { display: inline-flex; align-items: center; justify-content: flex-end; gap: 3px; font-weight: 700; }
+.projected-row span.up { color: #1d7a52; }
+.projected-row span.down { color: #b4380f; }
+.projected-row span svg { width: 13px; }
+/* 변경 신청에 붙이는 사업계획서 */
+.plan-attach { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border: 1px dashed #d2c9d8; border-radius: 12px; background: var(--canvas-soft); }
+.plan-attach strong { display: block; font-size: 13px; }
+.plan-attach small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+/* 이력의 상태 배지 */
+.change-status { font-style: normal; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 90px; }
+.change-status.submitted { background: #fdf3e9; color: #a8501c; }
+.change-status.approved { background: #e8f7f1; color: #1d7a52; }
+.change-status.rejected { background: #fdeceb; color: #b4380f; }
+.change-status.draft { background: var(--canvas-soft); color: var(--muted); }
+.agreement-hint { margin: 0 24px 12px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+
+/* ---- 변경 사유 AI 작성 ---- */
+.ai-reason { display: grid; gap: 9px; padding: 13px 15px; border: 1px dashed var(--line-input); border-radius: var(--r-lg); background: var(--canvas-soft); }
+.ai-reason-head { display: flex; gap: 10px; align-items: flex-start; }
+.ai-reason-head > svg { width: 16px; color: var(--primary); flex: none; margin-top: 2px; }
+.ai-reason-head strong { display: block; font-size: 13px; }
+.ai-reason-head small { display: block; font-size: 12px; color: var(--muted); line-height: 1.55; margin-top: 2px; }
+.ai-reason-row { display: flex; gap: 8px; }
+.ai-reason-row input { flex: 1; font-size: 13px; }
+.ai-reason-row button { flex: none; min-height: 38px; }
+.ai-reason-note { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.55; }
+.ai-reason .field-error { margin: 0; }
+/* AI 검토 정보 — 문서에는 안 들어가고 화면에만 뜨는 것이라 본문과 다른 톤으로 둔다 */
+.ai-review { display: grid; gap: 8px; padding: 11px 13px; background: white; border: 1px solid var(--line); border-radius: var(--r-md); }
+.ai-review-group strong { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-2); }
+.ai-review-group strong svg { width: 13px; color: var(--muted); }
+.ai-review-group.warn strong { color: #a8501c; }
+.ai-review-group.warn strong svg { color: #a8501c; }
+.ai-review-group ul { margin: 5px 0 0; padding-left: 19px; display: grid; gap: 3px; }
+.ai-review-group li { font-size: 12px; color: var(--muted); line-height: 1.55; }
+.ai-review > small { font-size: 11.5px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 7px; }
+
+/* ---- 협약변경 구분: 통보 / 승인 ---- */
+.change-kind { display: grid; gap: 8px; padding: 13px 15px; background: var(--canvas-soft); border: 1px solid var(--line); border-radius: var(--r-lg); }
+.change-kind-label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.change-kind-picks { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.change-kind-picks button { display: grid; gap: 3px; text-align: left; padding: 10px 13px; border: 1px solid var(--line); background: white; border-radius: var(--r-md); font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.change-kind-picks button em { font-style: normal; font-size: 11.5px; font-weight: 400; color: var(--muted); line-height: 1.45; }
+.change-kind-picks button:hover { border-color: var(--primary-subdued); }
+.change-kind-picks button.on { border-color: var(--primary); background: #faf5fb; color: var(--primary); }
+.change-kind-picks button.on em { color: var(--primary-soft); }
+.change-kind-guide { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.6; }
+.change-kind-guide b { color: var(--ink-2); font-weight: 700; }
+/* 목록에서 어느 갈래인지 한눈에 */
+.change-kind-badge { font-style: normal; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 90px; margin-right: 6px; white-space: nowrap; }
+.change-kind-badge.notification { background: var(--canvas-cream); color: #8a5a12; }
+.change-kind-badge.approval { background: #f3e9f5; color: var(--primary); }
+@media (max-width: 700px) { .change-kind-picks { grid-template-columns: 1fr; } }
