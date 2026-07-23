@@ -349,7 +349,7 @@ describe('과제온 핵심 사용자 흐름', () => {
     expect(approved.budgets).not.toEqual(before.budgets);
     expect(approved.budgetConfirmed).toBe(false);   // 편성이 바뀌었으니 확정은 풀린다
     expect(screen.getByRole('button', { name: /비교표 Word/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /중기부 공문 Word/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /공문 Word/ }).length).toBeGreaterThan(0);
     vi.restoreAllMocks();
   });
 

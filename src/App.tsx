@@ -15,7 +15,8 @@ import PortfolioPeople from './PortfolioPeople';
 import PortfolioTodos from './PortfolioTodos';
 import { detailFieldsFor } from './spendingForms';
 import { draftChangeReason } from './changeReason';
-import { CHANGE_ACTION_LABEL, CHANGE_TYPE_GUIDE, CHANGE_TYPE_LABEL, typeOf, AGREEMENT_DOC_LABEL, AGREEMENT_DOC_TYPES, agreementDocsOf, approveChange, pendingChanges, projectedBudgets, rejectChange, requestChange, STATUS_LABEL, statusOf, type AgreementDocType } from './changes';
+import { exportChangeLetter, sealImageFrom } from './letterDocx';
+import { CHANGE_ACTION_LABEL, CHANGE_TYPE_GUIDE, CHANGE_TYPE_LABEL, typeOf, AGREEMENT_DOC_LABEL, AGREEMENT_DOC_TYPES, agreementDocsOf, applyTransfer, approveChange, nextDocumentNo, pendingChanges, projectedBudgets, rejectChange, requestChange, STATUS_LABEL, statusOf, type AgreementDocType } from './changes';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, loadResearchers, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal, saveResearchersLocal } from './storage';
 import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, fetchCloudResearchers, getProjectDocument, saveCloudProject, saveCloudResearchers, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeProjectDocument } from './cloud';
 import { effectiveMonthly, EMPLOYMENT_LABEL, employmentStatus, monthlyOf, researcherByName, resignationTargets, severanceEligible, tenureText } from './researchers';
@@ -2191,6 +2192,32 @@ function ChangeManagement({ project, update }: { project: Project; update: (p: P
     finally { setAiBusy(false); }
   };
 
+  // 신청하기 전에도 폼 내용 그대로 공문을 받고 싶을 때가 많다 — 공문을 첨부해 신청하기 때문이다.
+  // 지금 폼으로 임시 변경 건을 만들어 공문만 뽑는다 (이력에는 넣지 않는다).
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const downloadPreviewLetter = async () => {
+    if (!valid) return;
+    setPreviewBusy(true);
+    try {
+      const before = project.budgets.map((item) => ({ ...item }));
+      const preview: BudgetChange = {
+        id: uid(), fromCategoryId: form.from, toCategoryId: form.to, amount,
+        reasonKey: form.reasonKey, reason: form.reason,
+        before, after: applyTransfer(before, form.from, form.to, amount),
+        createdAt: new Date().toISOString(), changeType, status: 'submitted',
+        planFileName: planFile?.name, usagePlan: '',
+        documentNo: nextDocumentNo(project, new Date().toISOString()),
+      };
+      let seal = null;
+      if (project.sealFileId) {
+        const file = await getProjectDocument(project.sealFileId);
+        if (file) seal = await sealImageFrom(file, project.sealFileName ?? 'seal.png');
+      }
+      await exportChangeLetter(project, preview, seal);
+    } catch (error) { alert(error instanceof Error ? error.message : '공문을 만들지 못했습니다.'); }
+    finally { setPreviewBusy(false); }
+  };
+
   const submitRequest = (event: React.FormEvent) => {
     event.preventDefault();
     if (!valid) return;
@@ -2219,6 +2246,23 @@ function ChangeManagement({ project, update }: { project: Project; update: (p: P
     update(rejectChange(project, change.id, new Date().toISOString(), note.trim() || '사유 미기재'));
   };
 
+  // 공문은 변경 건마다 따로 만든다 — 문서번호가 그 건에 붙어 있어서다.
+  const [letterBusy, setLetterBusy] = useState<string | null>(null);
+  const downloadLetter = async (item: BudgetChange) => {
+    setLetterBusy(item.id);
+    try {
+      // 직인은 과제 설정에 올려둔 이미지다. 없으면 서식의 "직인" 글자가 그대로 남는다.
+      let seal = null;
+      if (project.sealFileId) {
+        const file = await getProjectDocument(project.sealFileId);
+        if (file) seal = await sealImageFrom(file, project.sealFileName ?? 'seal.png');
+      }
+      await exportChangeLetter(project, item, seal);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '공문을 만들지 못했습니다.');
+    } finally { setLetterBusy(null); }
+  };
+
   // 비교표·공문은 가장 최근 "결정된" 변경을 기준으로 만든다 — 신청 중인 것은 아직 확정이 아니다.
   const change = project.changes.find((item) => statusOf(item) === 'approved') ?? project.changes[0];
   const projected = projectedBudgets(project);
@@ -2239,6 +2283,10 @@ function ChangeManagement({ project, update }: { project: Project; update: (p: P
             {item.planFileName ? ` · ${item.planFileName}` : ' · 사업계획서 미첨부'}</small>
         </div>
         <div className="pending-actions">
+          {/* 제출할 공문은 결과가 나오기 전에 필요하다 — 진행 중인 건에서 바로 내려받는다 */}
+          <button type="button" className="secondary" disabled={letterBusy === item.id} onClick={() => downloadLetter(item)}>
+            <Download /> {letterBusy === item.id ? '만드는 중…' : '공문 Word'}
+          </button>
           <button type="button" className="secondary" onClick={() => reject(item)}>{typeOf(item) === 'notification' ? '보완 요청받음' : '반려됨'}</button>
           <button type="button" className="primary" onClick={() => approve(item)}><Check /> {CHANGE_ACTION_LABEL[typeOf(item)].settle}</button>
         </div>
@@ -2324,10 +2372,15 @@ function ChangeManagement({ project, update }: { project: Project; update: (p: P
           <input type="file" accept="application/pdf,.hwp,.hwpx,.doc,.docx" disabled={uploadingPlan}
             onChange={(event) => { uploadPlan(event.target.files?.[0]); event.target.value = ''; }} /></label>
       </div>
-      <button disabled={!valid} className="primary large" type="submit"><RefreshCw /> {CHANGE_ACTION_LABEL[changeType].submit}</button>
+      <div className="change-submit">
+        <button type="button" className="secondary" disabled={!valid || previewBusy} onClick={downloadPreviewLetter}>
+          <Download /> {previewBusy ? '만드는 중…' : '공문 미리 받기'}
+        </button>
+        <button disabled={!valid} className="primary large" type="submit"><RefreshCw /> {CHANGE_ACTION_LABEL[changeType].submit}</button>
+      </div>
     </form>
 
-      <section className="panel comparison"><div className="form-title"><div><h3>변경 전 · 후 비교</h3><p>{change ? `${new Date(change.createdAt).toLocaleString('ko-KR')} ${STATUS_LABEL[statusOf(change)]}` : '변경을 신청하면 자동으로 생성됩니다.'}</p></div></div>{!change ? <div className="empty-state compact"><RefreshCw /><h3>아직 변경 내역이 없어요</h3><p>왼쪽에서 이동할 비목과 금액을 입력해주세요.</p></div> : <><div className="comparison-table"><div className="comp-head"><span>비목</span><span>변경 전</span><span>변경 후</span><span>증감</span></div>{cats.map((category) => { const before = change.before.find((b) => b.categoryId === category.id)?.amount ?? 0; const after = change.after.find((b) => b.categoryId === category.id)?.amount ?? 0; const delta = after - before; return <div className={delta ? 'comp-row changed' : 'comp-row'} key={category.id}><strong>{category.name}</strong><span>{formatWon(before)}</span><span>{formatWon(after)}</span><span className={delta > 0 ? 'up' : delta < 0 ? 'down' : ''}>{delta > 0 ? <ArrowUpRight /> : delta < 0 ? <ArrowDownRight /> : null}{delta ? formatWon(Math.abs(delta)) : '-'}</span></div>; })}</div><div className="reason-box"><span>변경 사유</span><p>{change.reason}</p></div><div className="export-buttons"><button onClick={() => withExporters((m) => m.exportChangeDocx(project))}><FileText /> 비교표 Word</button><button className="primary" onClick={() => withExporters((m) => m.exportChangeDocx(project, true))}><Download /> 중기부 공문 Word</button></div></>}</section></div>
+      <section className="panel comparison"><div className="form-title"><div><h3>변경 전 · 후 비교</h3><p>{change ? `${new Date(change.createdAt).toLocaleString('ko-KR')} ${STATUS_LABEL[statusOf(change)]}` : '변경을 신청하면 자동으로 생성됩니다.'}</p></div></div>{!change ? <div className="empty-state compact"><RefreshCw /><h3>아직 변경 내역이 없어요</h3><p>왼쪽에서 이동할 비목과 금액을 입력해주세요.</p></div> : <><div className="comparison-table"><div className="comp-head"><span>비목</span><span>변경 전</span><span>변경 후</span><span>증감</span></div>{cats.map((category) => { const before = change.before.find((b) => b.categoryId === category.id)?.amount ?? 0; const after = change.after.find((b) => b.categoryId === category.id)?.amount ?? 0; const delta = after - before; return <div className={delta ? 'comp-row changed' : 'comp-row'} key={category.id}><strong>{category.name}</strong><span>{formatWon(before)}</span><span>{formatWon(after)}</span><span className={delta > 0 ? 'up' : delta < 0 ? 'down' : ''}>{delta > 0 ? <ArrowUpRight /> : delta < 0 ? <ArrowDownRight /> : null}{delta ? formatWon(Math.abs(delta)) : '-'}</span></div>; })}</div><div className="reason-box"><span>변경 사유</span><p>{change.reason}</p></div><div className="export-buttons"><button onClick={() => withExporters((m) => m.exportChangeDocx(project))}><FileText /> 비교표 Word</button>{change && <button className="primary" disabled={letterBusy === change.id} onClick={() => downloadLetter(change)}><Download /> {letterBusy === change.id ? '만드는 중…' : '공문 Word'}</button>}</div></>}</section></div>
 
     {project.changes.length > 0 && <section className="panel history-panel"><div className="panel-head"><div><h3><FileClock /> 변경 이력 <b>{project.changes.length}</b>건</h3><p>신청·승인·반려가 모두 남습니다. 반려된 기록도 다음 신청의 근거가 되므로 지우지 않습니다.</p></div></div>
       <div className="history-list">{project.changes.map((item) => <div key={item.id}>
@@ -2336,7 +2389,11 @@ function ChangeManagement({ project, update }: { project: Project; update: (p: P
           {categoryOf(pack, item.fromCategoryId).name} <ArrowRight /> {categoryOf(pack, item.toCategoryId).name}</strong>
         <b>{formatWon(item.amount)}</b>
         <small><em className={`change-status ${statusOf(item)}`}>{STATUS_LABEL[statusOf(item)]}</em>
+          {item.documentNo ? ` · ${item.documentNo}` : ''}
           {item.decisionNote ? ` · ${item.decisionNote}` : ''}</small>
+        <button type="button" className="text-button" disabled={letterBusy === item.id} onClick={() => downloadLetter(item)}>
+          <Download /> {letterBusy === item.id ? '만드는 중…' : '공문'}
+        </button>
       </div>)}</div>
     </section>}
   </div>;
