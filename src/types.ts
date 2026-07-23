@@ -205,7 +205,9 @@ export interface Evidence {
 }
 
 export type PaymentMethod = 'card' | 'transfer';
-export type FundingSource = 'subsidy' | 'matching_cash' | 'matching_inkind';
+// 집행 입력은 현금/현물 둘로만 구분한다 — 정산이 그 두 갈래로 맞춰지기 때문이다.
+// 'subsidy'·'matching_cash'는 지원금과 민간부담 현금을 따로 묻던 시절의 값으로, 읽을 때 모두 현금으로 친다.
+export type FundingSource = 'cash' | 'inkind' | 'subsidy' | 'matching_cash' | 'matching_inkind';
 
 export interface Expense {
   id: string;
@@ -232,9 +234,13 @@ export interface Expense {
 
 // 월별 집행계획에서 사용자가 직접 고친 칸만 저장한다. 저장되지 않은 달은
 // (예산 ÷ 사업기간 월수) 자동 계산값을 쓰므로, 예산이 바뀌면 알아서 따라간다.
+// 현금·현물로 나뉜 비목은 재원별로 계획을 따로 세운다 (정산을 둘로 나눠 맞춰야 하기 때문).
+export type FundingSplit = 'cash' | 'inkind';
+
 export interface MonthlyPlanEntry {
   categoryId: BudgetCategoryId;
   subItemId?: string;   // 없으면 비목 전체 기준
+  split?: FundingSplit; // 현물이 편성된 비목에서만 — 없으면 비목(또는 세목) 전체 기준
   month: string;        // 'YYYY-MM'
   amount: number;
 }
@@ -246,6 +252,14 @@ export interface Member {
   role: '대표' | '담당자';
 }
 
+// 변경은 신청해서 승인을 받아야 효력이 생긴다 — 예산은 '확정'된 뒤에만 움직인다.
+//   draft     : 작성 중 (아직 제출 전)
+//   submitted : 전문기관에 신청함 — 예산은 그대로다
+//   approved  : 승인됨 — 이때 비목 금액이 바뀐다
+//   rejected  : 반려됨 — 예산은 그대로 두고 기록만 남긴다
+// 값이 없는 구버전 이력은 저장 즉시 예산에 반영됐으므로 approved로 읽는다.
+export type ChangeStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
+
 export interface BudgetChange {
   id: string;
   fromCategoryId: BudgetCategoryId;
@@ -256,6 +270,13 @@ export interface BudgetChange {
   before: BudgetItem[];
   after: BudgetItem[];
   createdAt: string;
+  status?: ChangeStatus;
+  submittedAt?: string;
+  decidedAt?: string;      // 승인·반려된 날
+  decisionNote?: string;   // 반려 사유 등 전문기관 회신 내용
+  // 변경사항을 반영해 제출한 사업계획서 — 신청의 근거 문서다.
+  planFileId?: string;
+  planFileName?: string;
 }
 
 export interface EmailLog {

@@ -48,10 +48,12 @@ describe('재원별 사용액 (②)', () => {
       id: `e${amount}`, date: '2026-05-01', categoryId: 'LABOR', amount, purpose: '', vendor: '',
       evidence: [], ...(fundingSource ? { fundingSource } : {}),
     });
+    // 옛 값(지원금·민간부담 현금)도 현금으로 친다 — 입력은 이제 현금/현물 둘뿐이다
     const usage = fundingUsage(project({
-      expenses: [expense(100, 'subsidy'), expense(30, 'matching_cash'), expense(20, 'matching_inkind'), expense(7)],
+      expenses: [expense(100, 'subsidy'), expense(30, 'matching_cash'), expense(20, 'matching_inkind'),
+        expense(40, 'cash'), expense(10, 'inkind'), expense(7)],
     }));
-    expect(usage).toEqual({ subsidy: 100, matchingCash: 30, matchingInKind: 20, unassigned: 7, total: 157 });
+    expect(usage).toEqual({ cash: 170, inKind: 30, unassigned: 7, total: 207 });
   });
 });
 

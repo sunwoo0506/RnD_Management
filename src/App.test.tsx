@@ -164,7 +164,7 @@ describe('과제온 핵심 사용자 흐름', () => {
     // 이 팩은 자기 증빙이 없어 상위 규정(2순위)을 따른다 — 앱 기본 예시(3순위)는 쓰지 않는다.
     // 규정 증빙은 조건이 갈려 골라 담는 것이라, 아무것도 안 고르면 항상 들어가는 두 건만 남는다.
     // 규정이 요구하는 증빙을 서류 단위로 쪼개 모두 담는다 (지출결의서 + 회의비 조건별 증빙 4건)
-    expect(screen.getByText('0/5 증빙 완료')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /0\/5 증빙/ })).toBeInTheDocument();
     expect(screen.getAllByText('지출결의서').length).toBeGreaterThan(0);
   });
 
@@ -187,7 +187,9 @@ describe('과제온 핵심 사용자 흐름', () => {
     await user.type(screen.getByLabelText('용도'), '국외 학회 출장');
     await user.type(screen.getByLabelText('거래처'), '항공사');
     await user.click(screen.getByRole('button', { name: '집행 등록' }));
-    expect(screen.getByText('0/8 증빙 완료')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /0\/8 증빙/ })).toBeInTheDocument();
+    // 등록 뒤 체크리스트는 접혀 있다 — 펼쳐야 항목이 보인다
+    await user.click(screen.getByRole('button', { name: /0\/8 증빙 펼치기/ }));
     expect(screen.getByText('국외출장계획서')).toBeInTheDocument();
   });
 
@@ -216,11 +218,12 @@ describe('과제온 핵심 사용자 흐름', () => {
     await user.type(screen.getByLabelText('거래처'), '회의공간');
     await user.click(screen.getByRole('button', { name: '집행 등록' }));
     await user.click(screen.getByRole('button', { name: '정기 회의 수정' }));
-    expect(screen.getByLabelText('비목')).toBeDisabled();
-    expect(screen.getByLabelText('결제수단')).toBeDisabled();
-    const amount = screen.getByLabelText(/공급가액/);
+    // 등록 폼으로 올라가지 않고 카드 안에서 바로 고친다
+    const card0 = within(screen.getAllByRole('article')[0]);
+    expect(card0.getByText(/비목·세목의 변경은 여기서 바꿀 수 없어요/)).toBeInTheDocument();
+    const amount = card0.getByLabelText(/공급가액/);
     await user.clear(amount); await user.type(amount, '90000');
-    await user.click(screen.getByRole('button', { name: '수정 저장' }));
+    await user.click(card0.getByRole('button', { name: '수정 저장' }));
     const card = within(screen.getAllByRole('article')[0]);
     expect(card.getByText('90,000원')).toBeInTheDocument();
     expect(card.queryByText('80,000원')).toBeNull();
@@ -262,8 +265,8 @@ describe('과제온 핵심 사용자 흐름', () => {
     localStorage.setItem('gwajeon.projects.v1', JSON.stringify([a, b]));
     localStorage.setItem('gwajeon.active-project', 'pa');
     const user = userEvent.setup(); render(<App />);
-    await user.click(screen.getByRole('button', { name: '과제 설정' }));   // 삭제 직전 화면이 설정이어도
-    await user.click(document.querySelector('.reset-button') as HTMLElement);   // 사이드바의 과제 삭제
+    await user.click(screen.getByRole('button', { name: '과제 설정' }));
+    await user.click(screen.getByRole('button', { name: '과제 삭제' }));   // 과제 설정 화면의 삭제
     // 등록 화면이 아니라 총괄 대시보드로 — 남은 과제가 목록에 있다
     expect(document.querySelector('.portfolio-table')).not.toBeNull();
     expect(document.querySelector('.portfolio-table')).toHaveTextContent('남은과제');
@@ -369,19 +372,94 @@ describe('R&D 총괄 대시보드 (한눈에 보기)', () => {
     expect(document.querySelector('.portfolio-table')).toBeNull();                           // 대시보드를 떠났다
   });
 
-  it('집행 등록에 재원을 고르면 저장되고, 기본값은 지원금이다', async () => {
+  it('증빙은 파일을 올리지 않고 체크로 준비 여부만 표시한다', async () => {
+    localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture()));
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole('button', { name: '집행 · 증빙' }));
+    await user.type(screen.getByLabelText(/공급가액/), '80000');
+    await user.type(screen.getByLabelText('용도'), '정기 회의');
+    await user.type(screen.getByLabelText('거래처'), '회의공간');
+    await user.click(screen.getByRole('button', { name: '집행 등록' }));
+    await user.click(screen.getByRole('button', { name: /증빙 .*펼치기/ }));
+    const check = screen.getByLabelText('품의서 준비 완료');
+    expect(check).not.toBeChecked();
+    await user.click(check);
+    const saved: Project = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
+    expect(saved.expenses[0].evidence.find((item) => item.label === '품의서')?.completed).toBe(true);
+  });
+
+  it('등록한 뒤에도 증빙 항목을 더 넣고 뺄 수 있다', async () => {
+    localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture()));
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole('button', { name: '집행 · 증빙' }));
+    await user.type(screen.getByLabelText(/공급가액/), '80000');
+    await user.type(screen.getByLabelText('용도'), '정기 회의');
+    await user.type(screen.getByLabelText('거래처'), '회의공간');
+    await user.click(screen.getByRole('button', { name: '집행 등록' }));
+    await user.click(screen.getByRole('button', { name: /증빙 .*펼치기/ }));
+    await user.type(screen.getByLabelText('증빙 항목 추가'), '4대보험 완납증명서');
+    await user.click(screen.getByRole('button', { name: '항목 추가' }));
+    let saved: Project = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
+    expect(saved.expenses[0].evidence.map((item) => item.label)).toContain('4대보험 완납증명서');
+    await user.click(screen.getByLabelText('4대보험 완납증명서 목록에서 빼기'));
+    saved = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
+    expect(saved.expenses[0].evidence.map((item) => item.label)).not.toContain('4대보험 완납증명서');
+  });
+
+  it('집행건을 복사하면 카드 안에서 값을 고쳐 새로 등록한다 — 증빙도 함께 온다', async () => {
+    localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture()));
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole('button', { name: '집행 · 증빙' }));
+    await user.type(screen.getByLabelText(/공급가액/), '80000');
+    await user.type(screen.getByLabelText('용도'), '월 임차료');
+    await user.type(screen.getByLabelText('거래처'), '임대인');
+    await user.click(screen.getByRole('button', { name: '집행 등록' }));
+    await user.click(screen.getByLabelText('월 임차료 복사'));
+    // 등록 폼으로 올라가지 않고 카드 안에서 처리한다
+    const card = within(screen.getAllByRole('article')[0]);
+    expect(card.getByText(/증빙 .*건도 함께 복사됩니다/)).toBeInTheDocument();
+    await user.click(card.getByRole('button', { name: '복사해서 등록' }));
+    const saved: Project = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
+    expect(saved.expenses).toHaveLength(2);
+    expect(saved.expenses.map((expense) => expense.purpose)).toEqual(['월 임차료', '월 임차료']);
+    // 증빙 목록도 그대로 따라온다 — 준비 여부는 새로 챙겨야 하므로 체크는 풀린 채로
+    const [copy, origin] = saved.expenses;
+    expect(copy.evidence.map((item) => item.label)).toEqual(origin.evidence.map((item) => item.label));
+    expect(copy.evidence.every((item) => !item.completed)).toBe(true);
+    expect(copy.id).not.toBe(origin.id);
+  });
+
+  it('직접 넣은 증빙 항목까지 복사된다', async () => {
+    localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture()));
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole('button', { name: '집행 · 증빙' }));
+    await user.type(screen.getByLabelText(/공급가액/), '50000');
+    await user.type(screen.getByLabelText('용도'), '월 구독료');
+    await user.type(screen.getByLabelText('거래처'), '서비스사');
+    await user.click(screen.getByRole('button', { name: '집행 등록' }));
+    await user.click(screen.getByRole('button', { name: /증빙 .*펼치기/ }));
+    await user.type(screen.getByLabelText('증빙 항목 추가'), '이용약관 사본');
+    await user.click(screen.getByRole('button', { name: '항목 추가' }));
+    await user.click(screen.getByLabelText('월 구독료 복사'));
+    await user.click(within(screen.getAllByRole('article')[0]).getByRole('button', { name: '복사해서 등록' }));
+    const saved: Project = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
+    expect(saved.expenses[0].evidence.map((item) => item.label)).toContain('이용약관 사본');
+  });
+
+  it('집행 등록에 재원을 고르면 저장되고, 기본값은 현금이다', async () => {
+    // 재원은 현금·현물 둘로만 묻는다 — 정산이 그 두 갈래로 맞춰지기 때문이다.
     localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture('prestartup2026')));
     const user = userEvent.setup(); render(<App />);
     await user.click(screen.getByRole('button', { name: '집행 · 증빙' }));
     await user.selectOptions(screen.getByLabelText('비목'), 'PRE_MATERIAL');
-    expect(screen.getByLabelText('재원')).toHaveValue('subsidy');   // 기본값
-    await user.selectOptions(screen.getByLabelText('재원'), 'matching_cash');
+    expect(screen.getByLabelText('재원')).toHaveValue('cash');   // 기본값
+    await user.selectOptions(screen.getByLabelText('재원'), 'inkind');
     await user.type(screen.getByLabelText(/공급가액/), '50000');
     await user.type(screen.getByLabelText('용도'), '재료 구입');
     await user.type(screen.getByLabelText('거래처'), '테스트상사');
     await user.click(screen.getByRole('button', { name: '집행 등록' }));
     const saved: Project = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
-    expect(saved.expenses[0].fundingSource).toBe('matching_cash');
+    expect(saved.expenses[0].fundingSource).toBe('inkind');
   });
 
   it('편성 구성 파이 — 상단 칩으로 전체와 사업 하나를 오간다 (파이만, 세목 막대 없음)', async () => {
@@ -836,8 +914,9 @@ describe('세목별 추가 입력', () => {
     const user = userEvent.setup(); render(<App />);
     await user.click(screen.getByRole('button', { name: '집행 · 증빙' }));
     await user.click(screen.getByRole('button', { name: '정기 회의 수정' }));
-    expect(screen.getByLabelText('회의 목적')).toHaveValue('개발 범위 확정');
-    expect(screen.getByLabelText('참석자')).toHaveValue('김대표');
+    const editCard = within(screen.getAllByRole('article')[0]);
+    expect(editCard.getByLabelText('회의 목적')).toHaveValue('개발 범위 확정');
+    expect(editCard.getByLabelText('참석자')).toHaveValue('김대표');
   });
 });
 
@@ -854,10 +933,12 @@ describe('월별 집행계획 (매트릭스 열)', () => {
       }),
     };
   };
-  const openSpending = async (user: ReturnType<typeof userEvent.setup>, project: Project) => {
+  // 월 칸은 기본으로 모두 접혀 있다 — 월별 동작을 보려면 "전체"로 켜고 시작한다.
+  const openSpending = async (user: ReturnType<typeof userEvent.setup>, project: Project, showMonths = true) => {
     localStorage.setItem('gwajeon.project.v1', JSON.stringify(project));
     render(<App />);
     await user.click(screen.getByRole('button', { name: '집행 · 증빙' }));
+    if (showMonths) await user.click(screen.getByRole('button', { name: '전체' }));
   };
 
   it('월마다 계획·집행 열이 나란히 붙는다', async () => {
@@ -936,7 +1017,7 @@ describe('월별 집행계획 (매트릭스 열)', () => {
 
   it('사업기간이 비어 있으면 월 열 없이 이유를 알려준다', async () => {
     const user = userEvent.setup();
-    await openSpending(user, { ...fixture('nrd2026-forprofit'), endDate: '' });
+    await openSpending(user, { ...fixture('nrd2026-forprofit'), endDate: '' }, false);
     expect(screen.queryByRole('columnheader', { name: '계획' })).toBeNull();
     expect(screen.getByText(/사업기간이 설정되어 있지 않아/)).toBeInTheDocument();
     // 예산·집행·잔액은 그대로 보인다

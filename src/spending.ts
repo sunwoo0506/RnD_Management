@@ -5,10 +5,15 @@
 // 예산과 잔액은 언제나 편성 비목(categoryId) 기준으로 계산한다. 세목은 집계·계획·규정 조회의
 // 단위일 뿐, 예산 변경 관리와 정산이 보는 돈의 단위는 비목이기 때문이다.
 import { categoryOf, visibleCategories } from './rules';
-import type { BudgetCategoryId, Expense, Project, RulePack } from './types';
+import type { BudgetCategoryId, Expense, FundingSplit, Project, RulePack } from './types';
 
 const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
 const spentOf = (expenses: Expense[]): number => sum(expenses.map((expense) => expense.amount));
+// 현물로 집행한 건인지. 재원 구분을 안 적은 구버전 집행건은 현금으로 본다 (편성의 기본값과 같다).
+export const isInKindExpense = (expense: Expense): boolean =>
+  expense.fundingSource === 'inkind' || expense.fundingSource === 'matching_inkind';
+const inKindOf = (expenses: Expense[]): number =>
+  sum(expenses.filter(isInKindExpense).map((expense) => expense.amount));
 // 예산이 0원인 비목에서 0으로 나누지 않는다.
 const rateOf = (spent: number, budget: number): number => budget > 0 ? spent / budget * 100 : 0;
 
@@ -29,6 +34,13 @@ export interface SpendRow {
   remaining: number;
   rate: number;         // 소진율 %
   over: boolean;        // 예산 초과
+  // 현금·현물 구분 — 정산은 둘을 따로 맞춰야 해서 합계만으로는 확인이 안 된다.
+  // 예산은 편성의 현물 계상액(inKindAmount)이, 집행은 각 건의 재원 구분(fundingSource)이 근거다.
+  budgetInKind: number;
+  budgetCash: number;
+  spentInKind: number;
+  spentCash: number;
+  inKindOver: boolean;  // 현물 집행이 현물 예산을 넘었는지 (합계는 맞아도 구분이 어긋날 수 있다)
   subRows: SubSpendRow[];
 }
 
@@ -68,10 +80,16 @@ export const categorySpending = (pack: RulePack, project: Project): SpendRow[] =
     const budget = item?.amount ?? 0;
     const expenses = project.expenses.filter((expense) => expense.categoryId === category.id);
     const spent = spentOf(expenses);
+    // 편성 금액을 넘는 현물 입력은 세지 않는다 (편성 화면의 상한 규칙과 같다).
+    const budgetInKind = Math.min(item?.inKindAmount ?? 0, budget);
+    const spentInKind = inKindOf(expenses);
     return {
       categoryId: category.id, name: category.name,
       budget, spent, remaining: budget - spent,
       rate: rateOf(spent, budget), over: spent > budget,
+      budgetInKind, budgetCash: budget - budgetInKind,
+      spentInKind, spentCash: spent - spentInKind,
+      inKindOver: spentInKind > budgetInKind,
       subRows: subRowsOf(expenses, item?.subItems ?? []),
     };
   });
@@ -184,21 +202,33 @@ export interface MatrixSubRow extends SubSpendRow {
   planEditable: boolean;   // 편성된 세목만 계획을 고칠 수 있다 (삭제된 세목·미지정은 예산이 없다)
   planTotal: number;       // 사업기간 전체의 계획 합 — 예산과 다르면 검증에서 알린다
 }
+// 현금·현물 분해 행. 정산은 재원별로 따로 맞춰야 해서 계획도 재원별로 세운다.
+export interface MatrixSplitRow {
+  split: FundingSplit;
+  name: string;            // '현금' | '현물'
+  budget: number; spent: number; remaining: number; rate: number; over: boolean;
+  cells: MonthCell[];
+  planTotal: number;
+}
 export interface MatrixRow {
   categoryId: BudgetCategoryId;
   name: string;
   budget: number; spent: number; remaining: number; rate: number; over: boolean;
+  budgetCash: number; budgetInKind: number; spentCash: number; spentInKind: number; inKindOver: boolean;
   cells: MonthCell[];
+  // 현물이 편성된 비목은 현금·현물이 각각 계획 단위가 된다 (세목과 같은 문법).
+  // 비어 있으면 비목 자체가 계획 단위다.
+  splitRows: MatrixSplitRow[];
   planEditable: boolean;   // 세목이 나뉜 비목은 세목 합계가 계획이므로 직접 고칠 수 없다
   planTotal: number;       // 사업기간 전체의 계획 합 (세목이 나뉘면 세목 합계)
   subRows: MatrixSubRow[];
 }
 export interface SpendingMatrix {
   rows: MatrixRow[];
-  totals: { budget: number; spent: number; remaining: number; rate: number; cells: MonthCell[] };
+  totals: { budget: number; spent: number; remaining: number; rate: number; budgetCash: number; budgetInKind: number; spentCash: number; spentInKind: number; inKindOver: boolean; cells: MonthCell[] };
   outOfRange: { actual: number; count: number } | null;  // 사업기간 밖 집행 — 정산 때 문제가 되므로 숨기지 않는다
 }
-export interface PlanSelection { categoryId?: BudgetCategoryId; subItemId?: string }
+export interface PlanSelection { categoryId?: BudgetCategoryId; subItemId?: string; split?: FundingSplit }
 
 const addCells = (rows: { cells: MonthCell[] }[], months: string[]): MonthCell[] =>
   months.map((month, index) => ({
@@ -218,9 +248,9 @@ export const spendingMatrix = (pack: RulePack, project: Project, months: string[
   const indexOf = new Map(allMonths.map((month, index) => [month, index]));
   const inPeriod = new Set(allMonths);
 
-  const overrideOf = (categoryId: BudgetCategoryId, subItemId: string | undefined, month: string): number | undefined =>
+  const overrideOf = (categoryId: BudgetCategoryId, subItemId: string | undefined, split: FundingSplit | undefined, month: string): number | undefined =>
     project.monthlyPlan?.find((entry) =>
-      entry.categoryId === categoryId && entry.subItemId === subItemId && entry.month === month)?.amount;
+      entry.categoryId === categoryId && entry.subItemId === subItemId && entry.split === split && entry.month === month)?.amount;
 
   const actualByMonth = (expenses: Expense[]): Map<string, number> => {
     const byMonth = new Map<string, number>();
@@ -237,10 +267,10 @@ export const spendingMatrix = (pack: RulePack, project: Project, months: string[
   // 달들은 이미 지나갔거나 확정된 계획이라 원래 균등분할 값을 그대로 둔다.
   // 이후 달들이 "예산 − (이전 달 + 수기 입력 합)"을 나눠 가져 계획 합계가 예산과 맞는다.
   // 수기 합이 예산을 넘으면 이후 달은 0이 되고, planTotal이 예산과 어긋나 검증에서 드러난다.
-  const leafCells = (categoryId: BudgetCategoryId, subItemId: string | undefined, budget: number, expenses: Expense[]): { cells: MonthCell[]; planTotal: number } => {
+  const leafCells = (categoryId: BudgetCategoryId, subItemId: string | undefined, split: FundingSplit | undefined, budget: number, expenses: Expense[]): { cells: MonthCell[]; planTotal: number } => {
     const overrides = new Map<string, number>();
     for (const month of allMonths) {
-      const value = overrideOf(categoryId, subItemId, month);
+      const value = overrideOf(categoryId, subItemId, split, month);
       if (value != null) overrides.set(month, value);
     }
     const base = splitEvenly(budget, allMonths.length);
@@ -270,18 +300,30 @@ export const spendingMatrix = (pack: RulePack, project: Project, months: string[
   const rows: MatrixRow[] = categorySpending(pack, project).map((row) => {
     const expenses = project.expenses.filter((expense) => expense.categoryId === row.categoryId);
     const subRows: MatrixSubRow[] = row.subRows.map((sub) => {
-      const leaf = leafCells(row.categoryId, sub.subItemId, sub.budget,
+      const leaf = leafCells(row.categoryId, sub.subItemId, undefined, sub.budget,
         expenses.filter((expense) => sub.subItemId ? expense.subItemId === sub.subItemId : !expense.subItemId));
       return { ...sub, planEditable: !!sub.subItemId && !sub.orphan, cells: leaf.cells, planTotal: leaf.planTotal };
     });
     // 세목이 나뉜 비목의 계획은 세목 합계다 — 편성 화면의 "세목이 있으면 비목 금액은 세목 합계" 규칙과 같다.
     const divided = subRows.some((sub) => sub.planEditable);
-    const leaf = divided ? null : leafCells(row.categoryId, undefined, row.budget, expenses);
+    // 현물이 편성된 비목은 현금·현물이 계획 단위다. 세목으로 이미 나뉜 비목은 세목이 우선한다
+    // (세목에는 현물 구분이 없어 두 기준을 겹치면 계획 합계가 어긋난다).
+    const splitByFunding = !divided && (row.budgetInKind > 0 || row.spentInKind > 0);
+    const splitRows: MatrixSplitRow[] = splitByFunding
+      ? ([['cash', '현금', row.budgetCash, row.spentCash], ['inkind', '현물', row.budgetInKind, row.spentInKind]] as const).map(([split, name, budget, spent]) => {
+          const leaf = leafCells(row.categoryId, undefined, split, budget,
+            expenses.filter((expense) => split === 'inkind' ? isInKindExpense(expense) : !isInKindExpense(expense)));
+          return { split, name, budget, spent, remaining: budget - spent, rate: rateOf(spent, budget), over: spent > budget, cells: leaf.cells, planTotal: leaf.planTotal };
+        })
+      : [];
+    const leaf = divided || splitByFunding ? null : leafCells(row.categoryId, undefined, undefined, row.budget, expenses);
+    const childCells = divided ? addCells(subRows, months) : addCells(splitRows, months);
     return {
       ...row,
-      planEditable: !divided,
-      cells: leaf ? leaf.cells : addCells(subRows, months),
-      planTotal: leaf ? leaf.planTotal : sum(subRows.map((sub) => sub.planTotal)),
+      planEditable: !divided && !splitByFunding,
+      cells: leaf ? leaf.cells : childCells,
+      planTotal: leaf ? leaf.planTotal : (divided ? sum(subRows.map((sub) => sub.planTotal)) : sum(splitRows.map((split) => split.planTotal))),
+      splitRows,
       subRows,
     };
   });
@@ -295,9 +337,17 @@ export const spendingMatrix = (pack: RulePack, project: Project, months: string[
 
   const budget = sum(rows.map((row) => row.budget));
   const spent = sum(rows.map((row) => row.spent));
+  const budgetInKind = sum(rows.map((row) => row.budgetInKind));
+  const spentInKind = sum(rows.map((row) => row.spentInKind));
   return {
     rows,
-    totals: { budget, spent, remaining: budget - spent, rate: rateOf(spent, budget), cells: addCells(rows, months) },
+    totals: {
+      budget, spent, remaining: budget - spent, rate: rateOf(spent, budget),
+      budgetCash: budget - budgetInKind, budgetInKind,
+      spentCash: spent - spentInKind, spentInKind,
+      inKindOver: spentInKind > budgetInKind,
+      cells: addCells(rows, months),
+    },
     outOfRange: outside.length ? { actual: spentOf(outside), count: outside.length } : null,
   };
 };
@@ -306,8 +356,8 @@ export const spendingMatrix = (pack: RulePack, project: Project, months: string[
 export const setMonthlyPlan = (project: Project, leaf: PlanSelection, month: string, amount: number): Project => {
   if (!leaf.categoryId) return project;
   const rest = (project.monthlyPlan ?? []).filter((entry) =>
-    !(entry.categoryId === leaf.categoryId && entry.subItemId === leaf.subItemId && entry.month === month));
-  return { ...project, monthlyPlan: [...rest, { categoryId: leaf.categoryId, subItemId: leaf.subItemId, month, amount }] };
+    !(entry.categoryId === leaf.categoryId && entry.subItemId === leaf.subItemId && entry.split === leaf.split && entry.month === month));
+  return { ...project, monthlyPlan: [...rest, { categoryId: leaf.categoryId, subItemId: leaf.subItemId, split: leaf.split, month, amount }] };
 };
 
 // ---- 증빙 누락 알림 (집행일 경과 기준) ----

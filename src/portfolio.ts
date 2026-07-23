@@ -47,18 +47,19 @@ export const periodProgress = (project: Project, today: string): number => {
 };
 
 // ---- 재원별 사용액 (② 사업별 사업비 구성) ----
-// 집행건의 fundingSource 로 지원금/민간 현금/민간 현물 사용액을 가른다.
+// 집행건의 fundingSource 로 현금/현물 사용액을 가른다 — 정산이 그 두 갈래로 맞춰지기 때문이다.
+// 지원금과 민간부담 현금을 따로 묻던 시절의 값(subsidy·matching_cash)은 모두 현금으로 친다.
 // 재원을 안 적은 집행건(이 필드가 생기기 전 데이터)은 "미구분"으로 따로 센다 —
 // 어림잡아 아무 재원에 넣으면 편성 대비 초과 경고를 믿을 수 없게 된다.
-export interface FundingUsage { subsidy: number; matchingCash: number; matchingInKind: number; unassigned: number; total: number }
+export interface FundingUsage { cash: number; inKind: number; unassigned: number; total: number }
 
 export const fundingUsage = (project: Project): FundingUsage => {
-  const usage: FundingUsage = { subsidy: 0, matchingCash: 0, matchingInKind: 0, unassigned: 0, total: 0 };
+  const usage: FundingUsage = { cash: 0, inKind: 0, unassigned: 0, total: 0 };
   for (const expense of project.expenses) {
     usage.total += expense.amount;
-    if (expense.fundingSource === 'subsidy') usage.subsidy += expense.amount;
-    else if (expense.fundingSource === 'matching_cash') usage.matchingCash += expense.amount;
-    else if (expense.fundingSource === 'matching_inkind') usage.matchingInKind += expense.amount;
+    const source = expense.fundingSource;
+    if (source === 'inkind' || source === 'matching_inkind') usage.inKind += expense.amount;
+    else if (source === 'cash' || source === 'subsidy' || source === 'matching_cash') usage.cash += expense.amount;
     else usage.unassigned += expense.amount;
   }
   return usage;

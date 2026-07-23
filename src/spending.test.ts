@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evidenceAlarms, categorySpending, evidenceReadiness, monthSequence, spendingMatrix, splitEvenly, spendingTotals } from './spending';
+import { evidenceAlarms, categorySpending, evidenceReadiness, monthSequence, setMonthlyPlan, spendingMatrix, splitEvenly, spendingTotals } from './spending';
 import { getPack } from './rules';
 import type { Expense, Project } from './types';
 
@@ -31,6 +31,86 @@ describe('categorySpending', () => {
     expect(activity.remaining).toBe(21_500_000);
     expect(Math.round(activity.rate)).toBe(28);
     expect(activity.over).toBe(false);
+  });
+
+  it('현금·현물을 나눠 집계한다 — 재원 구분이 없는 집행은 현금으로 본다', () => {
+    const rows = categorySpending(pack, project({
+      budgets: [{ categoryId: 'DIRECT_ACTIVITY', amount: 30_000_000, inKindAmount: 12_000_000 }],
+      expenses: [
+        expense({ categoryId: 'DIRECT_ACTIVITY', amount: 5_000_000, fundingSource: 'matching_inkind' }),
+        expense({ categoryId: 'DIRECT_ACTIVITY', amount: 3_000_000, fundingSource: 'subsidy' }),
+        expense({ categoryId: 'DIRECT_ACTIVITY', amount: 1_000_000 }),   // 구분 미입력 → 현금
+      ],
+    }));
+    const activity = rows.find((row) => row.categoryId === 'DIRECT_ACTIVITY')!;
+    expect(activity).toMatchObject({
+      budgetInKind: 12_000_000, budgetCash: 18_000_000,
+      spentInKind: 5_000_000, spentCash: 4_000_000,
+      inKindOver: false,
+    });
+  });
+
+  it('현물이 편성된 비목은 현금·현물이 계획 단위가 되고 비목 계획은 둘의 합이다', () => {
+    const matrix = spendingMatrix(pack, project({
+      startDate: '2026-07-01', endDate: '2026-08-31',
+      budgets: [{ categoryId: 'DIRECT_LABOR', amount: 10_000_000, inKindAmount: 4_000_000 }],
+    }), ['2026-07', '2026-08']);
+    const labor = matrix.rows.find((row) => row.categoryId === 'DIRECT_LABOR')!;
+    expect(labor.planEditable).toBe(false);                       // 비목 자체는 못 고친다 (현금·현물이 단위)
+    expect(labor.splitRows.map((split) => split.split)).toEqual(['cash', 'inkind']);
+    expect(labor.splitRows[0].budget).toBe(6_000_000);
+    expect(labor.splitRows[1].budget).toBe(4_000_000);
+    // 각 재원은 자기 예산을 균등분할하고, 비목 줄은 둘의 합이다
+    expect(labor.splitRows[0].cells.map((cell) => cell.plan)).toEqual([3_000_000, 3_000_000]);
+    expect(labor.splitRows[1].cells.map((cell) => cell.plan)).toEqual([2_000_000, 2_000_000]);
+    expect(labor.cells.map((cell) => cell.plan)).toEqual([5_000_000, 5_000_000]);
+  });
+
+  it('현금·현물 계획은 재원별로 따로 저장된다', () => {
+    const base = project({
+      startDate: '2026-07-01', endDate: '2026-08-31',
+      budgets: [{ categoryId: 'DIRECT_LABOR', amount: 10_000_000, inKindAmount: 4_000_000 }],
+    });
+    const edited = setMonthlyPlan(base, { categoryId: 'DIRECT_LABOR', split: 'inkind' }, '2026-07', 1_000_000);
+    const matrix = spendingMatrix(pack, edited, ['2026-07', '2026-08']);
+    const labor = matrix.rows.find((row) => row.categoryId === 'DIRECT_LABOR')!;
+    // 현물만 바뀌고 현금은 그대로 — 현물의 나머지는 다음 달로 재분배된다
+    expect(labor.splitRows[1].cells.map((cell) => cell.plan)).toEqual([1_000_000, 3_000_000]);
+    expect(labor.splitRows[0].cells.map((cell) => cell.plan)).toEqual([3_000_000, 3_000_000]);
+  });
+
+  it('월별 집행은 재원별로 갈라 담긴다 — 현금은 지원금·민간부담 현금을 함께 센다', () => {
+    const matrix = spendingMatrix(pack, project({
+      startDate: '2026-07-01', endDate: '2026-08-31',
+      budgets: [{ categoryId: 'DIRECT_LABOR', amount: 10_000_000, inKindAmount: 4_000_000 }],
+      expenses: [
+        expense({ categoryId: 'DIRECT_LABOR', amount: 1_000_000, date: '2026-07-10', fundingSource: 'cash' }),
+        expense({ categoryId: 'DIRECT_LABOR', amount: 500_000, date: '2026-07-20', fundingSource: 'subsidy' }),
+        expense({ categoryId: 'DIRECT_LABOR', amount: 700_000, date: '2026-07-25', fundingSource: 'inkind' }),
+      ],
+    }), ['2026-07', '2026-08']);
+    const labor = matrix.rows.find((row) => row.categoryId === 'DIRECT_LABOR')!;
+    expect(labor.splitRows[0].cells[0].actual).toBe(1_500_000);   // 현금 = 1,000,000 + 지원금 500,000
+    expect(labor.splitRows[1].cells[0].actual).toBe(700_000);     // 현물
+  });
+
+  it('현물 집행이 현물 예산을 넘으면 합계가 맞아도 알린다', () => {
+    const rows = categorySpending(pack, project({
+      budgets: [{ categoryId: 'DIRECT_ACTIVITY', amount: 10_000_000, inKindAmount: 2_000_000 }],
+      expenses: [expense({ categoryId: 'DIRECT_ACTIVITY', amount: 3_000_000, fundingSource: 'matching_inkind' })],
+    }));
+    const activity = rows.find((row) => row.categoryId === 'DIRECT_ACTIVITY')!;
+    expect(activity.spent).toBeLessThan(activity.budget);   // 합계는 예산 안
+    expect(activity.inKindOver).toBe(true);                 // 그래도 현물은 초과
+  });
+
+  it('현물 계상액이 편성 금액을 넘으면 편성 금액까지만 센다', () => {
+    const rows = categorySpending(pack, project({
+      budgets: [{ categoryId: 'DIRECT_ACTIVITY', amount: 5_000_000, inKindAmount: 9_000_000 }],
+    }));
+    const activity = rows.find((row) => row.categoryId === 'DIRECT_ACTIVITY')!;
+    expect(activity.budgetInKind).toBe(5_000_000);
+    expect(activity.budgetCash).toBe(0);
   });
 
   it('세목이 편성된 비목은 세목별 하위 행을 만든다', () => {
