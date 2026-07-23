@@ -299,7 +299,9 @@ ${m.source_files.length ? m.source_files.map((file) => `- ${file}`).join('\n') :
 
 ## 검토가 필요한 지점
 
-${unverified > 0
+${pkg.source_text.length === 0 ? `**조문 원문(source_text)이 한 건도 없습니다.** 근거 원문 없이는 화면 문구와 원문을 대조할 수 없어 검토 자체가 불가능합니다. 규정 본문이 담긴 문서로 다시 추출하거나 원문을 직접 채워주세요.
+
+` : ''}${unverified > 0
   ? `**원문 대조에 실패한 항목이 ${unverified}건 있습니다.** 인용문을 원본 문서에서 찾지 못한 것이라, 승인 전에 원문을 직접 확인해야 합니다.
 
 | 구분 | 미확인 |

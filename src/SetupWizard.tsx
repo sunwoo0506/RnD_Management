@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { AlertCircle, ArrowLeft, ArrowRight, BookOpenCheck, Check, CheckCircle2, CloudUpload, FileSearch, Search, ShieldCheck, Sparkles, Trash2, Upload, Wand2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { AlertCircle, ArrowLeft, ArrowRight, BookOpenCheck, Check, CheckCircle2, CloudUpload, Download, FileSearch, Search, ShieldCheck, Sparkles, Trash2, Upload, Wand2 } from 'lucide-react';
 import { deriveTotalBudget, formatWon, getPack, isRegulationDbPack, makeDraftBudgets, previewFunding, selectablePacks, settlementDeadlineFor } from './rules';
 import { classifyProgram, guessProgramName, guessYear, type MatchResult } from './matching';
-import { DOCUMENT_TYPE_LABEL, type DocumentType, guessDocumentType, registryEnabled, searchRegistry, submitRegistryShare, type RegistryEntry } from './registry';
+import { DOCUMENT_TYPE_LABEL, type DocumentType, guessDocumentType, registryEnabled, searchRegistry, submitRegistryShare, submitRegulationPackage, type RegistryEntry } from './registry';
+import { buildRegulationPackage } from './regulationPackage';
 import { annotateVerification, buildCustomPack, fundingScheduleAmountWon, runExtraction, suggestedFundingRates, type Extraction } from './llmExtract';
 import type { Project, RulePack } from './types';
 
@@ -22,15 +23,11 @@ interface DocItem {
   error?: string;
 }
 
-// 공유 신청에 담을 팩. AI로 추출했으면 추출 팩을 올린다 — 편성이 쓰는 팩(chosenPack)은
-// "비목은 검증된 규정DB에서만" 원칙 때문에 기준 팩으로 남는 일이 많아서, 그걸 올리면
-// 문서에서 뽑은 규칙이 빠진 채 기존 팩의 복제본만 대기열에 들어간다
-// (디딤돌_글로벌 신청이 도약 팩과 똑같았던 원인). 추출 없이 공유 DB의 팩을 골랐다면
-// 새 팩을 다시 신청하지 않고 문서만 신청한다.
-export const sharePackOf = (extractedPack: RulePack | null, registryPick: RegistryEntry | null, chosenPack: RulePack) =>
-  extractedPack ? { pack: extractedPack, origin: 'extracted' as const, programRegistryId: registryPick?.id ?? null }
-  : registryPick ? {}
-  : { pack: chosenPack, origin: 'pack' as const };
+// 추출 없이 공유할 때 신청에 담을 팩. AI 추출 팩은 여기로 오지 않는다 — 팩만 올리면 근거 검토가
+// 불가능하므로, 조문 원문(source_text)과 검토본(Review.xlsx)을 갖춘 규정DB 패키지 신청
+// (submitRegulationPackage)으로 올린다. 공유 DB의 팩을 골랐다면 새 팩을 다시 신청하지 않는다.
+export const sharePackOf = (registryPick: RegistryEntry | null, chosenPack: RulePack) =>
+  registryPick ? {} : { pack: chosenPack, origin: 'pack' as const };
 
 export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project: Project) => void; onCancel?: () => void }) {
   const [step, setStep] = useState<1 | 2>(1);
@@ -145,6 +142,17 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
     }
   };
 
+  // 추출 결과를 규정DB 패키지(manifest + 6 JSON)로 편다 — 사람이 만든 패키지와 같은 구성이라
+  // 조문 원문(source_text)이 함께 담기고, 검토본(Review.xlsx)도 같은 포맷으로 내려받을 수 있다.
+  const wizardPackage = useMemo(() => {
+    if (ai.status !== 'done' || !ai.extraction) return null;
+    return buildRegulationPackage(ai.extraction, {
+      programName: programName.trim() || form.name || ai.extraction.programName,
+      year: Number(programYear) || ai.extraction.year,
+      sourceFiles: docs.filter((doc) => doc.status === 'done').map((doc) => doc.file.name),
+    });
+  }, [ai.status, ai.extraction, programName, programYear, form.name, docs]);
+
   const fillRates = () => {
     if (!rateSuggestion) return;
     setForm((prev) => ({
@@ -182,10 +190,19 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
           const name = programName.trim() || form.name;
           const year = Number(programYear) || null;
           const shareDocs = docs.map((doc) => ({ file: doc.file, documentType: doc.role }));
-          await submitRegistryShare({
-            programName: name, year, docs: shareDocs,
-            ...sharePackOf(extractedPack, registryPick, chosenPack),
-          });
+          if (extractedPack && wizardPackage) {
+            // 추출 팩은 규정DB 패키지로 신청한다 — 팩만 올리면 조문 원문이 없어 관리자가 검토할 수 없다.
+            await submitRegulationPackage({
+              programName: name, year, pack: extractedPack, regulationPackage: wizardPackage,
+              programRegistryId: registryPick?.id ?? null,
+            });
+            await submitRegistryShare({ programName: name, year, docs: shareDocs });
+          } else {
+            await submitRegistryShare({
+              programName: name, year, docs: shareDocs,
+              ...sharePackOf(registryPick, chosenPack),
+            });
+          }
         } catch (error) {
           alert(`공유 신청에 실패했습니다 (${error instanceof Error ? error.message : ''}). 과제는 정상 생성됩니다.`);
         }
@@ -337,7 +354,13 @@ export default function SetupWizard({ onCreate, onCancel }: { onCreate: (project
               <p className="wiz-hint">예산 편성 기준은 대개 공고문·사업계획서에 있지만, 증빙 서류는 아래 규정도 확인이 필요할 수 있어요. 정부 사이트에 흩어져 있어 자동으로 가져오지는 못하니, 직접 찾아 공유 규정 DB에 올려두면 다음부터 검색으로 바로 쓸 수 있어요.</p>
               <ul className="ref-reg-list">{ai.extraction.referencedRegulations.map((reg, index) => <li key={index} className={reg.verified ? '' : 'unverified'}><strong>{reg.name}</strong><em>"{reg.quote.slice(0, 70)}{reg.quote.length > 70 ? '…' : ''}" ({reg.ref})</em></li>)}</ul>
             </div>}
-            <button type="button" className="primary" onClick={applyAi} disabled={acceptedRules.size === 0 && !useDocCats}><Check /> 선택한 규정 적용 ({acceptedRules.size}건{useDocCats ? ' + 비목 구성' : ''})</button>
+            {/* 조문 원문이 없으면 근거 검토 자체가 불가능하다 — 공유 신청 전에 알린다. */}
+            {wizardPackage && wizardPackage.source_text.length === 0 && <p className="field-error"><AlertCircle /> 조문 원문(source_text)이 한 건도 추출되지 않았습니다. 이대로 공유 신청하면 관리자가 근거를 검토할 수 없으니, 규정 본문이 담긴 문서를 추가하고 다시 추출해주세요.</p>}
+            <div className="wiz-ai-actions">
+              <button type="button" className="primary" onClick={applyAi} disabled={acceptedRules.size === 0 && !useDocCats}><Check /> 선택한 규정 적용 ({acceptedRules.size}건{useDocCats ? ' + 비목 구성' : ''})</button>
+              {/* 추출이 제대로 됐는지 사람이 만든 규정DB와 같은 포맷(6시트)으로 대조한다. */}
+              <button type="button" className="secondary" disabled={!wizardPackage} onClick={() => wizardPackage && import('./exporters').then((m) => m.exportExtractionReview(wizardPackage))}><Download /> 검토본 엑셀(Review.xlsx)</button>
+            </div>
           </div>}
         </div>}
 

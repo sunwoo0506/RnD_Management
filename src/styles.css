@@ -460,6 +460,7 @@ label { display: grid; gap: 6px; color: #4d586c; font-size: 13px; font-weight: 7
 .ai-stale strong { font-size: 12px; }
 .ai-stale span { font-size: 11px; color: #4d586c; line-height: 1.5; }
 .ai-stale button { flex: none; }
+.wiz-ai-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .ai-rerun { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 .ai-rerun .wiz-hint { margin: 0; }
 .ai-rerun button { flex: none; margin-left: auto; }
