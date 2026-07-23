@@ -10,6 +10,7 @@ import { baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, DEFAULT
 import { evidenceReadiness, monthSequence, setMonthlyPlan, spendingMatrix } from './spending';
 import { agencyCounts, isEnded, overviewOrder, periodProgress, portfolioTotals } from './portfolio';
 import PortfolioCharts from './PortfolioCharts';
+import PortfolioFunding from './PortfolioFunding';
 import { detailFieldsFor } from './spendingForms';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
 import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, getEvidence, getProjectDocument, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
@@ -21,7 +22,7 @@ import { buildRegulationPackage } from './regulationPackage';
 import { diffExtraction, overlayRulesFrom, summarizeDiff, type PackDiff } from './packDiff';
 import SetupWizard from './SetupWizard';
 import type { BudgetBasis, CautionItem, CategoryCap, CategoryMin, ReferenceStandard, SubItemChoice, SubItemChoices } from './rules';
-import type { BudgetCategoryId, BudgetItem, BudgetSubItem, Evidence, Expense, PackAllowedItem, PackArticle, PackCategory, PackRule, Participant, PaymentMethod, Project, ProjectDocumentLink, RulePack, SavedRulePack, Screen } from './types';
+import type { BudgetCategoryId, BudgetItem, BudgetSubItem, Evidence, Expense, FundingSource, PackAllowedItem, PackArticle, PackCategory, PackRule, Participant, PaymentMethod, Project, ProjectDocumentLink, RulePack, SavedRulePack, Screen } from './types';
 
 // 문서 생성 라이브러리(docx·excel)는 무거워서 첫 화면 번들에서 제외하고 버튼 클릭 시에만 불러온다.
 const withExporters = async (run: (mod: typeof import('./exporters')) => Promise<void>) => {
@@ -133,6 +134,7 @@ function Overview({ project, projects, onSelectProject, setScreen }: { project: 
   return <div className="page-content">
     <section className="welcome"><div><span>{new Date().getHours() < 12 ? '좋은 아침이에요' : '오늘도 수고 많으셨어요'}, {project.members[0]?.name}님</span><h2>R&D 전체 현황을 확인해보세요.</h2></div><div className="deadline"><CalendarDays /><div><small>정산 마감까지</small><strong>{dday >= 0 ? `D-${dday}` : `D+${Math.abs(dday)}`}</strong></div></div></section>
     <PortfolioOverview projects={projects} activeId={project.id} onSelect={onSelectProject} />
+    <PortfolioFunding projects={projects} />
     <PortfolioCharts projects={projects} />
     {/* 아래부터는 현재 과제 기준 — 총괄 표에서 행을 누르면 이 영역이 그 과제로 바뀐다. */}
     <div className="current-divider"><span>현재 과제</span><strong>{project.name}</strong></div>
@@ -1423,7 +1425,7 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
   const pack = packFor(project);
   const cats = visibleCategories(pack, project);
   const defaultCategoryId = cats[0]?.id ?? pack.categories[0]?.id ?? '';
-  const emptyExpenseForm = () => ({ date: today(), categoryId: defaultCategoryId, subItemId: '', payment: 'card' as PaymentMethod, supply: '', vat: '', purpose: '', vendor: '', details: {} as Record<string, string> });
+  const emptyExpenseForm = () => ({ date: today(), categoryId: defaultCategoryId, subItemId: '', payment: 'card' as PaymentMethod, funding: 'subsidy' as FundingSource | '', supply: '', vat: '', purpose: '', vendor: '', details: {} as Record<string, string> });
   // 등록 폼은 집행 현황 표 바로 아래에 늘 펼쳐 둔다 — 따로 여는 버튼이 없다.
   const [form, setForm] = useState(emptyExpenseForm());
   const [receipt, setReceipt] = useState<File | null>(null);
@@ -1555,14 +1557,14 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
         } catch { alert('영수증 파일 저장에 실패했습니다. 증빙 칸에서 다시 업로드해주세요.'); }
       }
     }
-    const base = { date: form.date, categoryId: form.categoryId, subItemId: form.subItemId || undefined, subItemName: selectedSub?.name, amount, supplyAmount: amount || undefined, vatAmount: Number(form.vat) || undefined, paymentMethod: form.payment, purpose: form.purpose, vendor: form.vendor, details: Object.keys(form.details).length ? form.details : undefined, evidence };
+    const base = { date: form.date, categoryId: form.categoryId, subItemId: form.subItemId || undefined, subItemName: selectedSub?.name, amount, supplyAmount: amount || undefined, vatAmount: Number(form.vat) || undefined, paymentMethod: form.payment, fundingSource: form.funding || undefined, purpose: form.purpose, vendor: form.vendor, details: Object.keys(form.details).length ? form.details : undefined, evidence };
     update(editing
       ? { ...project, expenses: project.expenses.map((e) => e.id === editing.id ? { ...editing, ...base } : e) }
       : { ...project, expenses: [{ id: uid(), createdAt: new Date().toISOString(), ...base }, ...project.expenses] });
     closeForm();
   };
   const startEdit = (expense: Expense) => {
-    setForm({ date: expense.date, categoryId: expense.categoryId, subItemId: expense.subItemId ?? '', payment: expense.paymentMethod ?? 'card', supply: String(expense.supplyAmount ?? expense.amount), vat: expense.vatAmount ? String(expense.vatAmount) : '', purpose: expense.purpose, vendor: expense.vendor, details: expense.details ?? {} });
+    setForm({ date: expense.date, categoryId: expense.categoryId, subItemId: expense.subItemId ?? '', payment: expense.paymentMethod ?? 'card', funding: expense.fundingSource ?? '', supply: String(expense.supplyAmount ?? expense.amount), vat: expense.vatAmount ? String(expense.vatAmount) : '', purpose: expense.purpose, vendor: expense.vendor, details: expense.details ?? {} });
     setReceipt(null); setOcr({ status: 'idle' }); setEditingId(expense.id);
   };
   const removeExpense = async (expense: Expense) => {
@@ -1730,7 +1732,12 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
         {ocr.status === 'done' && <p className="ocr-note ok"><CheckCircle2 /> {ocr.message}</p>}
         {ocr.status === 'error' && <p className="ocr-note bad"><AlertCircle /> {ocr.message}</p>}
         {ocr.text && <details className="ocr-raw"><summary>OCR 인식 원문 보기</summary><pre>{ocr.text}</pre></details>}
-        <div className="field-grid"><label>집행일<input required type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label><label>결제수단<select value={form.payment} disabled={!!editingId} onChange={(e) => setForm({ ...form, payment: e.target.value as PaymentMethod })}><option value="card">카드 결제</option><option value="transfer">계좌이체 (세금계산서)</option></select></label></div>
+        <div className="field-grid"><label>집행일<input required type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label><label>결제수단<select value={form.payment} disabled={!!editingId} onChange={(e) => setForm({ ...form, payment: e.target.value as PaymentMethod })}><option value="card">카드 결제</option><option value="transfer">계좌이체 (세금계산서)</option></select></label>
+          {/* 어느 돈주머니에서 썼는지 — 총괄 대시보드의 재원별 사용액 대조 근거. 옛 집행건은 비어 있어 수정에서 소급 입력한다. */}
+          <label>재원<select value={form.funding} onChange={(e) => setForm({ ...form, funding: e.target.value as FundingSource | '' })}>
+            {!form.funding && <option value="">미구분 (재원을 골라주세요)</option>}
+            <option value="subsidy">지원금</option><option value="matching_cash">민간부담 현금</option><option value="matching_inkind">민간부담 현물</option>
+          </select></label></div>
         <div className="field-grid three"><label><span className="label-line">공급가액 <b>집계 기준</b></span><input required inputMode="numeric" value={withCommas(form.supply)} onChange={(e) => setMoney('supply', e.target.value)} placeholder="0" /></label><label><span className="label-line">부가세액 <b>선택</b></span><input inputMode="numeric" value={withCommas(form.vat)} onChange={(e) => setMoney('vat', e.target.value)} placeholder="0" /></label><label><span className="label-line">합계 금액 <b>자동</b></span><input readOnly tabIndex={-1} value={withCommas(String(totalWithVat))} placeholder="0" /></label></div>
         <p className="field-hint">과제비 집계는 <strong>공급가액 기준(부가세 제외)</strong>입니다. 합계 금액은 공급가액+부가세액으로 자동 계산되며, 영수증의 결제금액과 맞는지 확인하는 참고용입니다.</p>
         <div className="field-grid"><label>용도<input required value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} placeholder="예: 외부 전문가 참석 정기 회의" /></label><label>거래처<input required value={form.vendor} onChange={(e) => setForm({ ...form, vendor: e.target.value })} placeholder="거래처명" /></label></div>

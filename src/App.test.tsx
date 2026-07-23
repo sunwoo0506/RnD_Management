@@ -337,8 +337,10 @@ describe('R&D 총괄 대시보드 (한눈에 보기)', () => {
     twoProjects();
     const user = userEvent.setup(); render(<App />);
     // 합계: 총사업비 3억 · 지원금 2.5억 (과제B는 지원금 미입력 = 전액 지원)
-    expect(screen.getByText('300,000,000원')).toBeInTheDocument();
-    expect(screen.getByText('250,000,000원')).toBeInTheDocument();
+    // ② 재원 표에도 같은 합계가 나오므로 ① 총괄 패널 안에서만 찾는다
+    const portfolio = document.querySelector('.portfolio-panel')!;
+    expect(portfolio).toHaveTextContent('300,000,000원');
+    expect(portfolio).toHaveTextContent('250,000,000원');
     // 부처별 칩과 간략요약
     expect(screen.getByRole('button', { name: /중소벤처기업부 1건/ })).toBeInTheDocument();
     expect(screen.getByText('온디바이스 AI 경량화 모델 개발')).toBeInTheDocument();
@@ -349,6 +351,38 @@ describe('R&D 총괄 대시보드 (한눈에 보기)', () => {
     await user.click(rowB);
     const divider = document.querySelector('.current-divider');
     expect(divider).toHaveTextContent('과제B');
+  });
+
+  it('사업별 사업비 구성 표 — 체크를 끄면 합계에서 빠지고, 미구분 집행은 소급을 안내한다', async () => {
+    const a = { ...fixture('nrd2026-forprofit'), id: 'pa', name: '과제A', totalBudget: 200_000_000, subsidyAmount: 150_000_000,
+      expenses: [
+        { id: 'e1', date: '2026-05-01', categoryId: 'DIRECT_LABOR', amount: 10_000_000, purpose: '급여', vendor: '', evidence: [], createdAt: '', fundingSource: 'subsidy' as const },
+        { id: 'e2', date: '2026-05-02', categoryId: 'DIRECT_LABOR', amount: 3_000_000, purpose: '옛 집행', vendor: '', evidence: [], createdAt: '' },   // 재원 미구분
+      ] };
+    const b = { ...fixture('prestartup2026'), id: 'pb', name: '과제B', totalBudget: 100_000_000 };
+    localStorage.setItem('gwajeon.projects.v1', JSON.stringify([a, b]));
+    localStorage.setItem('gwajeon.active-project', 'pa');
+    const user = userEvent.setup(); render(<App />);
+    const panel = document.querySelector('.portfolio-funding')!;
+    expect(panel).toHaveTextContent('합계 (2개 선택)');
+    expect(panel).toHaveTextContent('재원 소급 입력 필요');   // 미구분 300만원
+    await user.click(screen.getByRole('checkbox', { name: '과제B 합계 포함' }));
+    expect(panel).toHaveTextContent('합계 (1개 선택)');
+  });
+
+  it('집행 등록에 재원을 고르면 저장되고, 기본값은 지원금이다', async () => {
+    localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture('prestartup2026')));
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole('button', { name: '집행 · 증빙' }));
+    await user.selectOptions(screen.getByLabelText('비목'), 'PRE_MATERIAL');
+    expect(screen.getByLabelText('재원')).toHaveValue('subsidy');   // 기본값
+    await user.selectOptions(screen.getByLabelText('재원'), 'matching_cash');
+    await user.type(screen.getByLabelText(/공급가액/), '50000');
+    await user.type(screen.getByLabelText('용도'), '재료 구입');
+    await user.type(screen.getByLabelText('거래처'), '테스트상사');
+    await user.click(screen.getByRole('button', { name: '집행 등록' }));
+    const saved: Project = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
+    expect(saved.expenses[0].fundingSource).toBe('matching_cash');
   });
 
   it('편성 구성 그래프가 전체 사업 기준 라벨과 함께 뜨고, 과제를 누르면 세목이 열린다', async () => {

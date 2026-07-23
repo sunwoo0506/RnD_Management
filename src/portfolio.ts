@@ -47,6 +47,24 @@ export const periodProgress = (project: Project, today: string): number => {
   return Math.min(100, Math.max(0, Math.round((now - start) / (end - start) * 100)));
 };
 
+// ---- 재원별 사용액 (② 사업별 사업비 구성) ----
+// 집행건의 fundingSource 로 지원금/민간 현금/민간 현물 사용액을 가른다.
+// 재원을 안 적은 집행건(이 필드가 생기기 전 데이터)은 "미구분"으로 따로 센다 —
+// 어림잡아 아무 재원에 넣으면 편성 대비 초과 경고를 믿을 수 없게 된다.
+export interface FundingUsage { subsidy: number; matchingCash: number; matchingInKind: number; unassigned: number; total: number }
+
+export const fundingUsage = (project: Project): FundingUsage => {
+  const usage: FundingUsage = { subsidy: 0, matchingCash: 0, matchingInKind: 0, unassigned: 0, total: 0 };
+  for (const expense of project.expenses) {
+    usage.total += expense.amount;
+    if (expense.fundingSource === 'subsidy') usage.subsidy += expense.amount;
+    else if (expense.fundingSource === 'matching_cash') usage.matchingCash += expense.amount;
+    else if (expense.fundingSource === 'matching_inkind') usage.matchingInKind += expense.amount;
+    else usage.unassigned += expense.amount;
+  }
+  return usage;
+};
+
 // ---- 편성 구성 (③ 그래프) ----
 // 사업 간 합산은 비목 "이름" 기준이다. 비목 코드는 대체로 통일돼 있지만 예비창업패키지는
 // PRE_* 코드를 써서, 코드로 합치면 같은 인건비가 두 조각으로 갈라진다. 이름(인건비·재료비…)이

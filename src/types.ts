@@ -183,6 +183,7 @@ export interface Evidence {
 }
 
 export type PaymentMethod = 'card' | 'transfer';
+export type FundingSource = 'subsidy' | 'matching_cash' | 'matching_inkind';
 
 export interface Expense {
   id: string;
@@ -196,6 +197,9 @@ export interface Expense {
   supplyAmount?: number;
   vatAmount?: number;
   paymentMethod?: PaymentMethod;
+  // 어느 돈주머니에서 썼는지 — 지원금 / 민간부담 현금 / 민간부담 현물.
+  // 재원별 사용액 대조(총괄 대시보드 ②)의 근거다. 없으면 "미구분"으로 집계되고 수정에서 소급 입력한다.
+  fundingSource?: FundingSource;
   purpose: string;
   vendor: string;
   // 세목별 추가 입력 (회의 목적·출장자 등). 키는 src/spendingForms.ts의 DETAIL_FIELDS 정의를 따른다.

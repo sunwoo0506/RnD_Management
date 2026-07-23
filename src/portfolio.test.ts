@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agencyCounts, budgetComposition, isEnded, overviewOrder, periodProgress, portfolioTotals, subItemComposition } from './portfolio';
+import { agencyCounts, budgetComposition, fundingUsage, isEnded, overviewOrder, periodProgress, portfolioTotals, subItemComposition } from './portfolio';
 import type { Project } from './types';
 
 // 총괄 대시보드는 과제 전체를 합쳐 보여준다 — 합계·부처별 수·진행률·정렬이 이 파일의 계약이다.
@@ -51,6 +51,19 @@ describe('기간 진행률', () => {
     expect(periodProgress(project({}), '2025-01-01')).toBe(0);     // 시작 전
     expect(periodProgress(project({}), '2027-06-01')).toBe(100);   // 종료 후
     expect(periodProgress(project({ startDate: '', endDate: '' }), TODAY)).toBe(0);   // 기간 없음
+  });
+});
+
+describe('재원별 사용액 (②)', () => {
+  it('집행건의 재원 입력으로 가르고, 안 적은 건은 미구분으로 센다', () => {
+    const expense = (amount: number, fundingSource?: 'subsidy' | 'matching_cash' | 'matching_inkind') => ({
+      id: `e${amount}`, date: '2026-05-01', categoryId: 'LABOR', amount, purpose: '', vendor: '',
+      evidence: [], ...(fundingSource ? { fundingSource } : {}),
+    });
+    const usage = fundingUsage(project({
+      expenses: [expense(100, 'subsidy'), expense(30, 'matching_cash'), expense(20, 'matching_inkind'), expense(7)],
+    }));
+    expect(usage).toEqual({ subsidy: 100, matchingCash: 30, matchingInKind: 20, unassigned: 7, total: 157 });
   });
 });
 
