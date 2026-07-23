@@ -348,6 +348,91 @@ export const evidenceChecklistFor = (pack: RulePack, categoryId: BudgetCategoryI
   };
 };
 
+// ---- 타 사업 증빙 추천 ----
+// 디딤돌처럼 공고에 증빙 규정이 없는 사업은 체크리스트가 "항상 필요" 몇 건으로 끝난다.
+// 그렇다고 증빙이 필요 없는 게 아니라 그 사업 문서에 안 적혔을 뿐이라, 다른 사업 규정에서
+// 같은 이름의 비목·세목이 요구하는 서류를 모아 참고용으로 제안한다.
+// 어디까지나 "다른 사업은 이렇게 요구한다"는 참고다 — 켜서 넣는 판단은 사용자가 한다.
+export interface CrossPackEvidence {
+  packId: string;
+  packName: string;      // 어느 사업의 기준인지 (근거를 밝히지 않으면 규정으로 오인된다)
+  guideline: string;
+  matchedName: string | null;  // 그 사업에서 짝지어진 비목·세목 이름 (못 찾았으면 null)
+  documents: string[];         // 비어 있으면 그 사업 규정에는 이 비목의 증빙이 없다
+}
+
+// 한 팩 안에서 이름이 같은 비목·세목을 찾아 증빙 서류를 걷는다.
+// 증빙 문장에는 서류명이 아니라 설명이 섞여 온다 ("… 판단자료로 대체 가능").
+// 체크리스트에 넣을 수 있는 것은 서류 이름이라, 문장으로 보이는 긴 조각은 거른다.
+const isDocumentName = (text: string) => text.length <= 45 && !/(가능|대체|따른다|한다)$/.test(text);
+
+const evidenceInPack = (pack: RulePack, targetName: string): { matchedName: string; documents: string[] } | null => {
+  const target = normCategoryName(targetName);
+  if (target.length < 2) return null;
+  const all = [...pack.categories, ...(pack.referenceCategories ?? [])];
+  const category = all.find((entry) => normCategoryName(entry.name) === target)
+    // 세목 이름이 인정 항목 수준일 수 있다 (회의 식비 → 회의비)
+    ?? all.find((entry) => entry.allowedItems?.some((item) => normCategoryName(item.name) === target));
+  if (!category) return null;
+  const documents: string[] = [];
+  const push = (text?: string) => {
+    for (const group of parseEvidenceText(text ?? '')) {
+      for (const document of group.documents) {
+        if (isDocumentName(document) && !documents.includes(document)) documents.push(document);
+      }
+    }
+  };
+  for (const item of category.allowedItems ?? []) {
+    // 항목 이름으로 짝지은 경우엔 그 항목 것만 — 비목 전체를 걷으면 남의 세목 증빙까지 딸려온다
+    if (normCategoryName(item.name) === target || normCategoryName(category.name) === target) push(item.evidence);
+  }
+  // 조건부 증빙 규칙 중 여러 비목에 공통으로 걸리는 것(세금계산서·견적서 등)은 뺀다.
+  // 그 사업이 "이 비목에 요구하는 것"이 아니라 어느 비목에나 붙는 일반 서류이기 때문이다 —
+  // 화면의 체크리스트(evidenceChecklistFor)가 쓰는 기준과 같아야 추천과 실제가 어긋나지 않는다.
+  const common = commonEvidenceRuleNames(pack);
+  for (const rule of category.evidenceRules ?? []) {
+    if (common.has(rule.name)) continue;
+    for (const document of rule.documents) {
+      if (isDocumentName(document) && !documents.includes(document)) documents.push(document);
+    }
+  }
+  // requiredDocs(앱이 준 집행 증빙 기본값)는 넣지 않는다 — 규정 근거가 아니라 예시라서,
+  // 추천에 섞으면 그 사업 규정이 요구하는 것처럼 읽힌다.
+  return documents.length ? { matchedName: category.name, documents } : null;
+};
+
+// 등록된 다른 사업을 모두 돌려준다 — 짝이 없는 사업(documents가 빈 배열)도 목록에 남긴다.
+// 사업을 고르는 것은 사용자이므로, 앱이 미리 걸러내면 "왜 이 사업은 안 보이지"가 된다.
+export const crossPackEvidence = (pack: RulePack, categoryName: string, subItemName?: string): CrossPackEvidence[] => {
+  const base = basePackFor(pack);
+  const skip = new Set([pack.id, base?.id].filter(Boolean) as string[]);   // 이 사업과 상위 규정은 이미 반영돼 있다
+  const results: CrossPackEvidence[] = [];
+  for (const candidate of selectablePacks()) {
+    if (skip.has(candidate.id)) continue;
+    // 세목을 골랐으면 세목 이름으로 먼저 찾고, 없으면 비목 이름으로 되짚는다.
+    const found = (subItemName ? evidenceInPack(candidate, subItemName) : null) ?? evidenceInPack(candidate, categoryName);
+    results.push({
+      packId: candidate.id, packName: candidate.name, guideline: candidate.guideline,
+      matchedName: found?.matchedName ?? null, documents: found?.documents ?? [],
+    });
+  }
+  // 같은 서류 묶음을 그대로 물려받은 팩들(팁스 일반·딥테크)은 한 줄로 합친다 — 같은 목록을
+  // 두 번 보여주면 서로 다른 근거처럼 읽힌다.
+  const merged: CrossPackEvidence[] = [];
+  for (const entry of results) {
+    const twin = entry.documents.length > 0
+      && merged.find((other) => other.documents.length > 0 && other.documents.join('|') === entry.documents.join('|'));
+    if (twin) { twin.packName = `${twin.packName} · ${entry.packName}`; continue; }
+    merged.push(entry);
+  }
+  // 증빙을 가진 사업을 먼저, 그다음 검증된 규정DB 팩을 먼저 — 쓸모 있는 것부터 눈에 든다
+  return merged.sort((a, b) =>
+    (b.documents.length > 0 ? 1 : 0) - (a.documents.length > 0 ? 1 : 0)
+    || Number(packById(b.packId)?.verified ?? false) - Number(packById(a.packId)?.verified ?? false));
+};
+
+const packById = (id: string): RulePack | undefined => allPacks().find((pack) => pack.id === id);
+
 // ---- 세목의 규정 기준 ----
 // 집행 화면에서 고른 세목(편성 화면에서 나눠둔 것)의 기준을 찾는다. 회의비·출장비처럼
 // 세부 비목은 referenceCategories 쪽에 자기 증빙 규칙과 인정 항목을 갖고 있다.

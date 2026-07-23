@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyOverlay, articlesForRef, baseStandardFor, basisFormula, budgetBases, capFor, evidenceGuide, categoryOf, fundingCapChecks, maxAmountWithinCap, subItemChoicesFor, fundingRateChecks, packIsMissing, parseEvidenceText, evidenceChecklistFor, primaryEvidence, spendingCautions, subItemStandardFor, warningsFor, withAlwaysRequired, replacementPacksFor, rescaleBudgets, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories } from './rules';
+import { applyOverlay, articlesForRef, baseStandardFor, basisFormula, budgetBases, capFor, evidenceGuide, categoryOf, fundingCapChecks, maxAmountWithinCap, subItemChoicesFor, fundingRateChecks, packIsMissing, parseEvidenceText, evidenceChecklistFor, primaryEvidence, spendingCautions, subItemStandardFor, warningsFor, withAlwaysRequired, replacementPacksFor, rescaleBudgets, selectablePacks, documentsFor, getPack, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, monthsBetween, packFor, PACKS, referenceStandardFor, rulesFor, transferLimitError, visibleCategories, crossPackEvidence } from './rules';
 import type { Project, RulePack } from './types';
 
 describe('규정 팩 로더', () => {
@@ -1088,5 +1088,68 @@ describe('인건비 천원 미만 버림', () => {
     expect(cost.monthly).toBe(999_000);
     expect(cost.monthly % 1000).toBe(0);
     expect(cost.total).toBe(999_000 * cost.months);
+  });
+});
+
+describe('타 사업 증빙 추천', () => {
+  it('공고에 증빙 규정이 없는 사업도 다른 사업의 같은 비목 증빙을 찾아준다', () => {
+    // 디딤돌 공고에는 증빙 표가 없다 — 그렇다고 증빙이 필요 없는 게 아니라 안 적혔을 뿐이다.
+    const found = crossPackEvidence(getPack('didimdol2026'), '인건비');
+    const withDocs = found.filter((entry) => entry.documents.length > 0);
+    expect(withDocs.length).toBeGreaterThan(0);
+    // 어느 사업의 어느 비목 기준인지 반드시 함께 온다 — 밝히지 않으면 이 과제의 규정으로 오인된다
+    expect(withDocs.every((entry) => entry.packName.length > 0 && !!entry.matchedName)).toBe(true);
+  });
+
+  it('자기 사업과 상위 규정은 추천에서 뺀다 — 이미 체크리스트에 반영돼 있다', () => {
+    const pack = getPack('tips2026-general');
+    const found = crossPackEvidence(pack, '인건비');
+    expect(found.some((entry) => entry.packId === pack.id)).toBe(false);
+    expect(found.some((entry) => entry.packId === pack.basePackId)).toBe(false);
+  });
+
+  it('추천 목록은 그 사업의 실제 체크리스트와 일치한다 — 앱 기본값·공통 규칙은 섞지 않는다', () => {
+    // 추천이 그 사업 화면에서 보이는 것과 다르면 근거를 짚을 수 없다.
+    // 다른 점은 둘뿐이어야 한다: ① 어느 체크리스트에나 붙는 '항상 필요'(품의서·지출결의서)는 빼고,
+    // ② 서류명이 아닌 설명 문장은 넣지 않는다.
+    for (const id of ['tips2026-general', 'prestartup2026']) {
+      const source = getPack(id);
+      const labor = source.categories.find((category) => category.name.includes('인건비'))!;
+      const own = evidenceChecklistFor(source, labor.id, undefined, null, [], source);
+      const always = new Set(['품의서', '지출결의서']);
+      const isDocumentName = (text: string) => text.length <= 45 && !/(가능|대체|따른다|한다)$/.test(text);
+      const expected = own.documents.filter((document) => !always.has(document) && isDocumentName(document));
+      const recommended = crossPackEvidence(getPack('didimdol2026'), '인건비').find((entry) => entry.packId === id);
+      expect(recommended?.documents.slice().sort()).toEqual(expected.slice().sort());
+    }
+  });
+
+  it('앱이 준 집행 증빙 기본값(requiredDocs)은 추천에 넣지 않는다', () => {
+    // requiredDocs는 규정 근거가 아니라 예시라, 섞으면 그 사업 규정처럼 읽힌다.
+    const source = getPack('prestartup2026');
+    const labor = source.categories.find((category) => category.name.includes('인건비'))!;
+    const recommended = crossPackEvidence(getPack('didimdol2026'), '인건비').find((entry) => entry.packId === source.id);
+    for (const document of labor.requiredDocs ?? []) expect(recommended?.documents).not.toContain(document);
+  });
+
+  it('서류 이름이 아닌 설명 문장은 걸러낸다', () => {
+    const found = crossPackEvidence(getPack('didimdol2026'), '인건비');
+    const all = found.flatMap((entry) => entry.documents);
+    expect(all.every((document) => document.length <= 45)).toBe(true);
+    expect(all.some((document) => /대체 가능$/.test(document))).toBe(false);
+  });
+
+  it('짝이 없는 사업도 목록에는 남긴다 — 고르는 것은 사용자다', () => {
+    const found = crossPackEvidence(getPack('didimdol2026'), '존재하지않는비목명');
+    expect(found.length).toBeGreaterThan(0);                       // 사업 목록 자체는 나온다
+    expect(found.every((entry) => entry.documents.length === 0)).toBe(true);
+    expect(found.every((entry) => entry.matchedName === null)).toBe(true);
+  });
+
+  it('증빙을 가진 사업이 목록 앞에 온다', () => {
+    const found = crossPackEvidence(getPack('didimdol2026'), '인건비');
+    const firstEmpty = found.findIndex((entry) => entry.documents.length === 0);
+    const lastFilled = found.map((entry) => entry.documents.length > 0).lastIndexOf(true);
+    if (firstEmpty !== -1) expect(lastFilled).toBeLessThan(firstEmpty);
   });
 });
