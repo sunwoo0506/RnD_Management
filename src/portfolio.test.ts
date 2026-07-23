@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agencyCounts, budgetComposition, evidenceGaps, fundingUsage, isEnded, overviewOrder, participationTable, periodProgress, planTodos, portfolioTotals, subItemComposition } from './portfolio';
+import { budgetComposition, evidenceGaps, fundingUsage, isEnded, overviewOrder, participationTable, periodProgress, planTodos, portfolioTotals, subItemComposition } from './portfolio';
 import type { Project } from './types';
 
 // 총괄 대시보드는 과제 전체를 합쳐 보여준다 — 합계·부처별 수·진행률·정렬이 이 파일의 계약이다.
@@ -25,23 +25,7 @@ describe('총괄 합계', () => {
         }],
       }),
     ], TODAY);
-    expect(totals).toEqual({ projects: 3, active: 2, totalBudget: 350_000_000, totalSubsidy: 290_000_000, missingEvidence: 1 });
-  });
-});
-
-describe('부처별 과제 수 (3책 5공 확인용)', () => {
-  it('주관기관별로 세고 많은 순으로 정렬한다', () => {
-    const counts = agencyCounts([
-      project({ id: 'a', agency: '중소벤처기업부' }),
-      project({ id: 'b', agency: '중소벤처기업부' }),
-      project({ id: 'c', agency: '산업통상자원부' }),
-      project({ id: 'd', agency: '  ' }),   // 빈 기관명
-    ]);
-    expect(counts).toEqual([
-      { agency: '중소벤처기업부', count: 2 },
-      { agency: '기관 미입력', count: 1 },
-      { agency: '산업통상자원부', count: 1 },
-    ]);
+    expect(totals).toEqual({ projects: 3, active: 2, totalBudget: 350_000_000, totalSubsidy: 290_000_000 });
   });
 });
 

@@ -8,7 +8,7 @@ import {
 import type { Session } from '@supabase/supabase-js';
 import { baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, settlementDeadlineFor, evidenceGuide, evidenceChecklistFor, commonEvidenceRuleNames, primaryEvidence, withAlwaysRequired, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, spendingCautions, subItemStandardFor, transferLimitError, visibleCategories } from './rules';
 import { monthSequence, setMonthlyPlan, spendingMatrix } from './spending';
-import { agencyCounts, isEnded, overviewOrder, periodProgress, portfolioTotals } from './portfolio';
+import { isEnded, overviewOrder, periodProgress, portfolioTotals } from './portfolio';
 import PortfolioCharts from './PortfolioCharts';
 import PortfolioFunding from './PortfolioFunding';
 import PortfolioTodos from './PortfolioTodos';
@@ -46,8 +46,8 @@ const packBasisDate = (pack: RulePack): string =>
   pack.effectiveFrom ? `${pack.effectiveFrom} 시행 기준` : `${RULES_EFFECTIVE_DATE} 업데이트`;
 
 function Sidebar({ screen, setScreen, project, projects, onSelect, onAdd, onReset, account, sync, onLogout }: { screen: Screen; setScreen: (s: Screen) => void; project: Project; projects: Project[]; onSelect: (id: string) => void; onAdd: () => void; onReset: () => void; account: string | null; sync: 'local' | 'saving' | 'synced' | 'error'; onLogout: () => void }) {
-  const nav = [
-    { id: 'overview' as Screen, label: '한눈에 보기', icon: LayoutDashboard },
+  // 메뉴 순서는 구조를 따른다: 총괄(한눈에 보기) → 과제 선택 → 그 과제의 화면들.
+  const projectNav = [
     { id: 'budget' as Screen, label: '예산 편성', icon: WalletCards },
     { id: 'spending' as Screen, label: '집행 · 증빙', icon: FileCheck2 },
     { id: 'change' as Screen, label: '변경 관리', icon: RefreshCw },
@@ -58,19 +58,30 @@ function Sidebar({ screen, setScreen, project, projects, onSelect, onAdd, onRese
   const [menuOpen, setMenuOpen] = useState(false);
   return <aside className="sidebar">
     <div className="logo"><div className="brand-mark"><Check /></div><span>과제온</span><b>beta</b></div>
-    <button type="button" className="project-chip" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}><Building2 /><div><small>현재 과제 {projects.length > 1 ? `(${projects.length}개 중)` : ''}</small><strong>{project.name}</strong></div><ChevronRight style={{ transform: menuOpen ? 'rotate(90deg)' : undefined }} /></button>
+    <nav><button className={screen === 'overview' ? 'active' : ''} onClick={() => setScreen('overview')}><LayoutDashboard />한눈에 보기</button></nav>
+    <button type="button" className="project-chip" aria-expanded={menuOpen} onClick={() => setMenuOpen((v) => !v)}><Building2 /><div>
+      {screen === 'overview'
+        ? <><small>전체 {projects.length}개 과제</small><strong>과제 선택</strong></>
+        : <><small>현재 과제 {projects.length > 1 ? `(${projects.length}개 중)` : ''}</small><strong>{project.name}</strong></>}
+    </div><ChevronRight style={{ transform: menuOpen ? 'rotate(90deg)' : undefined }} /></button>
     {menuOpen && <div className="project-menu">
       {projects.map((p) => <button type="button" key={p.id} className={p.id === project.id ? 'active' : ''} onClick={() => { onSelect(p.id); setMenuOpen(false); }}><strong>{p.name}</strong><small>{p.companyName}{p.programName ? ` · ${p.programName}` : ''}</small></button>)}
       <button type="button" className="add" onClick={() => { setMenuOpen(false); onAdd(); }}><Plus /> 새 과제 등록</button>
     </div>}
-    <nav>{nav.map(({ id, label, icon: Icon }) => <button key={id} className={screen === id ? 'active' : ''} onClick={() => setScreen(id)}><Icon />{label}</button>)}</nav>
+    <nav>{projectNav.map(({ id, label, icon: Icon }) => <button key={id} className={screen === id ? 'active' : ''} onClick={() => setScreen(id)}><Icon />{label}</button>)}</nav>
     {/* 검증 여부·기준일은 팩에서 읽는다 — 규정DB 팩은 근거 조문까지 검토를 마쳤고 사업마다 시행일이 다르다. */}
     <div className="sidebar-bottom"><div className={`policy ${pack.verified ? 'verified' : ''}`}><BookOpenCheck /><div><strong>{pack.name}{pack.verified ? ' · 규정DB' : ' · 예시 기준 (검증 전)'}</strong><span>{packBasisDate(pack)}</span></div></div>{isCloudEnabled && <div className="cloud-chip"><span className={`sync-dot ${sync}`} /><div>{account ? <small>{account}</small> : null}<span>{SYNC_LABEL[sync]}</span></div>{account && <button onClick={onLogout}>로그아웃</button>}</div>}<button className="reset-button" onClick={onReset}><Trash2 /> 과제 삭제</button></div>
   </aside>;
 }
 
-function Header({ project }: { project: Project }) {
-  return <header className="topbar"><div><h1>{project.name}</h1><p>{project.agency} · {project.startDate} — {project.endDate}</p></div><div className="header-actions"><button className="icon-button" aria-label="알림"><Bell /></button><div className="avatar">{project.members[0]?.name.slice(0, 1) || '관'}</div><div className="user-meta"><strong>{project.members[0]?.name}</strong><span>{project.companyName}</span></div></div></header>;
+// 한눈에 보기는 과제와 무관한 메인 페이지라 상단도 특정 과제를 말하지 않는다.
+function Header({ project, projects, screen }: { project: Project; projects: Project[]; screen: Screen }) {
+  const overview = screen === 'overview';
+  return <header className="topbar"><div>
+    {overview
+      ? <><h1>R&D 총괄 대시보드</h1><p>{project.companyName} · 과제 {projects.length}개</p></>
+      : <><h1>{project.name}</h1><p>{project.agency} · {project.startDate} — {project.endDate}</p></>}
+  </div><div className="header-actions"><button className="icon-button" aria-label="알림"><Bell /></button><div className="avatar">{project.members[0]?.name.slice(0, 1) || '관'}</div><div className="user-meta"><strong>{project.members[0]?.name}</strong><span>{project.companyName}</span></div></div></header>;
 }
 
 // ① 전체 R&D 총괄 현황 — 등록된 과제 전체를 본다. 행을 누르면 그 과제로 전환된다.
@@ -78,11 +89,7 @@ function Header({ project }: { project: Project }) {
 function PortfolioOverview({ projects, activeId, onSelect }: { projects: Project[]; activeId: string; onSelect: (id: string) => void }) {
   const todayStr = today();
   const totals = portfolioTotals(projects, todayStr);
-  const agencies = agencyCounts(projects);
-  // 부처 칩 필터 — 3책 5공 확인용. 합계 카드는 필터와 무관하게 전체 기준을 유지한다.
-  const [agencyFilter, setAgencyFilter] = useState<string | null>(null);
-  const rows = overviewOrder(projects, todayStr)
-    .filter((project) => !agencyFilter || (project.agency.trim() || '기관 미입력') === agencyFilter);
+  const rows = overviewOrder(projects, todayStr);
   return <section className="panel portfolio-panel">
     <div className="panel-head"><div><span className="section-kicker">PORTFOLIO</span><h3>전체 R&D 총괄 현황</h3>
       <p>등록된 과제 전체의 사업비와 상태입니다. 행을 누르면 그 과제의 화면으로 이동합니다.</p></div></div>
@@ -90,23 +97,16 @@ function PortfolioOverview({ projects, activeId, onSelect }: { projects: Project
       <article className="metric-card"><div className="metric-icon blue"><Building2 /></div><div><span>과제 수</span><strong>{totals.active}건 진행 중</strong><small>전체 {totals.projects}건 (종료 포함)</small></div></article>
       <article className="metric-card"><div className="metric-icon violet"><CircleDollarSign /></div><div><span>전체 사업비</span><strong>{formatWon(totals.totalBudget)}</strong><small>종료 과제 포함 합계</small></div></article>
       <article className="metric-card"><div className="metric-icon green"><Landmark /></div><div><span>지원금 합계</span><strong>{formatWon(totals.totalSubsidy)}</strong><small>정부지원금 기준</small></div></article>
-      <article className="metric-card"><div className={`metric-icon ${totals.missingEvidence ? 'red' : 'green'}`}><FileCheck2 /></div><div><span>미완료 증빙</span><strong>{totals.missingEvidence}건</strong><small>{totals.missingEvidence ? '전체 과제 합계' : '모두 준비됐어요'}</small></div></article>
-    </div>
-    {/* 3책 5공은 부처별 과제 수에서 시작한다 — 칩을 누르면 그 부처 과제만 남는다. */}
-    <div className="agency-chips">
-      {agencies.map((entry) => <button type="button" key={entry.agency}
-        className={agencyFilter === entry.agency ? 'active' : ''}
-        onClick={() => setAgencyFilter((prev) => prev === entry.agency ? null : entry.agency)}>
-        {entry.agency} <b>{entry.count}건</b>
-      </button>)}
-      {agencyFilter && <button type="button" className="clear" onClick={() => setAgencyFilter(null)}>필터 해제</button>}
     </div>
     <div className="portfolio-table">
-      <div className="portfolio-row head"><span>사업명</span><span>과제명</span><span>주관기관</span><span>기간</span><span>총사업비</span><span>지원금</span><span>상태</span></div>
+      <div className="portfolio-row head"><span>사업명</span><span>과제명</span><span>주관기관</span><span>기간</span><span>총사업비</span><span>지원금</span><span>민간 현금</span><span>민간 현물</span><span>상태</span></div>
       {rows.map((row) => {
         const ended = isEnded(row, todayStr);
         const progress = periodProgress(row, todayStr);
         const dday = daysUntil(row.settlementDeadline);
+        const funding = fundingBreakdown(row);
+        // 민간부담이 없으면 —, 현금·현물 비율을 아직 안 적었으면 미입력으로 구분한다
+        const matchingCell = (value: number) => funding.matching === 0 ? '—' : funding.matchingCashRateKnown ? formatWon(value) : '비율 미입력';
         return <button type="button" key={row.id} className={`portfolio-row ${row.id === activeId ? 'current' : ''} ${ended ? 'ended' : ''}`} onClick={() => onSelect(row.id)}>
           <span className="cell-program">{row.programName ?? packFor(row).name}</span>
           <span className="cell-name"><strong>{row.name}</strong><small>{row.summary?.trim() || '요약 미입력 — 과제 설정에서 무엇을 개발하는지 적어주세요'}</small></span>
@@ -114,6 +114,8 @@ function PortfolioOverview({ projects, activeId, onSelect }: { projects: Project
           <span className="cell-period"><small>{row.startDate} ~ {row.endDate}</small><span className="progress"><i style={{ width: `${progress}%` }} /></span></span>
           <span className="cell-money">{formatWon(row.totalBudget)}</span>
           <span className="cell-money">{formatWon(row.subsidyAmount ?? row.totalBudget)}</span>
+          <span className="cell-money">{matchingCell(funding.matchingCash)}</span>
+          <span className="cell-money">{matchingCell(funding.matchingInKind)}</span>
           <span>{ended ? <em className="status-badge ended">종료</em> : <em className="status-badge">진행 중 · 정산 {dday >= 0 ? `D-${dday}` : `D+${Math.abs(dday)}`}</em>}</span>
         </button>;
       })}
@@ -123,9 +125,9 @@ function PortfolioOverview({ projects, activeId, onSelect }: { projects: Project
 }
 
 // 한눈에 보기 = 과제와 무관한 메인 대시보드. 과제별 내용은 여기 두지 않는다 —
-// 목록에서 과제를 누르면 그 과제의 화면(예산 편성)으로 이동한다.
+// 목록에서 과제를 누르면 그 과제의 화면(집행·증빙)으로 이동한다.
 function Overview({ project, projects, onSelectProject, onUpdateProject, setScreen }: { project: Project; projects: Project[]; onSelectProject: (id: string) => void; onUpdateProject: (p: Project) => void; setScreen: (s: Screen) => void }) {
-  const openProject = (id: string) => { onSelectProject(id); setScreen('budget'); };
+  const openProject = (id: string) => { onSelectProject(id); setScreen('spending'); };
   return <div className="page-content">
     <section className="welcome"><div><span>{new Date().getHours() < 12 ? '좋은 아침이에요' : '오늘도 수고 많으셨어요'}, {project.members[0]?.name}님</span><h2>R&D 전체 현황을 확인해보세요.</h2></div></section>
     <PortfolioOverview projects={projects} activeId={project.id} onSelect={openProject} />
@@ -2426,5 +2428,5 @@ export default function App() {
     setProjects((list) => list.filter((p) => p.id !== project.id));
     setActiveId(null);
   };
-  return <div className="app-shell"><Sidebar screen={screen} setScreen={setScreen} project={project} projects={projects} onSelect={(id) => { setActiveId(id); setScreen('overview'); }} onAdd={() => setAdding(true)} onReset={reset} account={session?.user.email ?? null} sync={syncState} onLogout={logout} /><main className="main"><Header project={project} />{screen === 'overview' && <Overview project={project} projects={projects} onSelectProject={(id) => setActiveId(id)} onUpdateProject={(next) => setProjects((list) => list.map((p) => p.id === next.id ? next : p))} setScreen={setScreen} />}{screen === 'budget' && <Budget project={project} update={update} setScreen={setScreen} />}{screen === 'spending' && <Spending project={project} update={update} />}{screen === 'change' && <ChangeManagement project={project} update={update} />}{screen === 'team' && <Team project={project} update={update} setScreen={setScreen} />}{screen === 'settings' && <Settings project={project} update={update} onReset={reset} />}</main></div>;
+  return <div className="app-shell"><Sidebar screen={screen} setScreen={setScreen} project={project} projects={projects} onSelect={(id) => { setActiveId(id); setScreen('spending'); }} onAdd={() => setAdding(true)} onReset={reset} account={session?.user.email ?? null} sync={syncState} onLogout={logout} /><main className="main"><Header project={project} projects={projects} screen={screen} />{screen === 'overview' && <Overview project={project} projects={projects} onSelectProject={(id) => setActiveId(id)} onUpdateProject={(next) => setProjects((list) => list.map((p) => p.id === next.id ? next : p))} setScreen={setScreen} />}{screen === 'budget' && <Budget project={project} update={update} setScreen={setScreen} />}{screen === 'spending' && <Spending project={project} update={update} />}{screen === 'change' && <ChangeManagement project={project} update={update} />}{screen === 'team' && <Team project={project} update={update} setScreen={setScreen} />}{screen === 'settings' && <Settings project={project} update={update} onReset={reset} />}</main></div>;
 }

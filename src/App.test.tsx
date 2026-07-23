@@ -341,16 +341,16 @@ describe('R&D 총괄 대시보드 (한눈에 보기)', () => {
     const portfolio = document.querySelector('.portfolio-panel')!;
     expect(portfolio).toHaveTextContent('300,000,000원');
     expect(portfolio).toHaveTextContent('250,000,000원');
-    // 부처별 칩과 간략요약
-    expect(screen.getByRole('button', { name: /중소벤처기업부 1건/ })).toBeInTheDocument();
+    // 간략요약과 민간부담 열
     expect(screen.getByText('온디바이스 AI 경량화 모델 개발')).toBeInTheDocument();
     expect(screen.getByText(/요약 미입력/)).toBeInTheDocument();   // 과제B는 아직 요약이 없다
     // 행 클릭 → 그 과제의 화면(예산 편성)으로 이동한다. 대시보드는 과제와 무관한 메인 페이지다.
     // 편성 그래프의 "과제B 세목 보기" 버튼과 겹치지 않게 목록 행에서 찾는다
     const rowB = [...document.querySelectorAll('.portfolio-table .portfolio-row')].find((row) => row.textContent?.includes('과제B')) as HTMLElement;
     await user.click(rowB);
-    expect(screen.getByText('편성 합계 100,000,000원')).toBeInTheDocument();   // 과제B(1억)의 예산 편성 화면
-    expect(document.querySelector('.portfolio-table')).toBeNull();            // 대시보드를 떠났다
+    expect(screen.getByRole('heading', { name: '집행 · 증빙 관리' })).toBeInTheDocument();   // 과제B의 집행·증빙 화면
+    expect(document.querySelector('.topbar h1')).toHaveTextContent('과제B');                 // 상단도 그 과제로
+    expect(document.querySelector('.portfolio-table')).toBeNull();                           // 대시보드를 떠났다
   });
 
   it('사업별 사업비 구성 표 — 체크를 끄면 합계에서 빠지고, 미구분 집행은 소급을 안내한다', async () => {
@@ -429,17 +429,6 @@ describe('R&D 총괄 대시보드 (한눈에 보기)', () => {
     expect(table).toHaveTextContent('130%');           // 60 + 50 + 외부 20
     expect(table).toHaveTextContent('책임 1 / 전체 2');
     expect(table.querySelector('.person-total.over')).not.toBeNull();   // 100% 초과 경고
-  });
-
-  it('부처 칩을 누르면 그 부처 과제만 목록에 남는다', async () => {
-    twoProjects();
-    const user = userEvent.setup(); render(<App />);
-    await user.click(screen.getByRole('button', { name: /산업통상자원부 1건/ }));
-    const table = document.querySelector('.portfolio-table')!;
-    expect(table).toHaveTextContent('과제B');
-    expect(table).not.toHaveTextContent('과제A');
-    await user.click(screen.getByRole('button', { name: '필터 해제' }));
-    expect(table).toHaveTextContent('과제A');
   });
 });
 

@@ -15,7 +15,6 @@ export interface PortfolioTotals {
   active: number;            // 진행 중 (종료일이 지나지 않은 과제)
   totalBudget: number;       // 전체 사업비 (총사업비 합)
   totalSubsidy: number;      // 지원금 합
-  missingEvidence: number;   // 미완료 증빙 총 건수
 }
 
 // 종료 과제도 합계에 포함한다 (사용자 결정) — 구분은 목록의 "종료" 배지가 담당한다.
@@ -24,20 +23,7 @@ export const portfolioTotals = (projects: Project[], today: string): PortfolioTo
   active: projects.filter((project) => !isEnded(project, today)).length,
   totalBudget: projects.reduce((sum, project) => sum + project.totalBudget, 0),
   totalSubsidy: projects.reduce((sum, project) => sum + (project.subsidyAmount ?? project.totalBudget), 0),
-  missingEvidence: projects.reduce((sum, project) =>
-    sum + project.expenses.reduce((count, expense) => count + expense.evidence.filter((item) => !item.completed).length, 0), 0),
 });
-
-// 주관기관(부처·전문기관)별 과제 수 — 3책 5공 확인은 부처별로 몇 건을 수행 중인지에서 시작한다.
-export const agencyCounts = (projects: Project[]): { agency: string; count: number }[] => {
-  const counts = new Map<string, number>();
-  for (const project of projects) {
-    const agency = project.agency.trim() || '기관 미입력';
-    counts.set(agency, (counts.get(agency) ?? 0) + 1);
-  }
-  return [...counts].map(([agency, count]) => ({ agency, count }))
-    .sort((a, b) => b.count - a.count || a.agency.localeCompare(b.agency));
-};
 
 // 사업기간 진행률 % (경과일 / 전체일). 기간이 없거나 어긋나면 0.
 export const periodProgress = (project: Project, today: string): number => {
