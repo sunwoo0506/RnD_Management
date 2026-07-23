@@ -461,6 +461,22 @@ label { display: grid; gap: 6px; color: #4d586c; font-size: 13px; font-weight: 7
 .ai-stale span { font-size: 11px; color: #4d586c; line-height: 1.5; }
 .ai-stale button { flex: none; }
 .wiz-ai-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+/* 관리자 승인 전 패키지 규격 검사 — 실패 항목이 먼저 눈에 들어와야 한다. */
+.pkg-checklist { display: grid; gap: 6px; background: #f8fafd; border: 1px solid #dbe3f0; border-radius: 9px; padding: 11px 13px; margin: 8px 0; }
+.pkg-checklist > strong { font-size: 12px; display: flex; gap: 8px; align-items: center; }
+.pkg-checklist > strong em { font-style: normal; font-size: 11px; padding: 1px 8px; border-radius: 99px; }
+.pkg-checklist > strong em.ok { background: #e8f7f1; color: #1d8a5f; }
+.pkg-checklist > strong em.bad { background: #fdeeee; color: #d6453d; }
+.pkg-checklist p { display: flex; gap: 6px; align-items: flex-start; margin: 0; font-size: 12px; line-height: 1.5; }
+.pkg-checklist p svg { width: 14px; flex: none; margin-top: 2px; }
+.pkg-checklist p.ok svg { color: #1d8a5f; }
+.pkg-checklist p.bad svg { color: #d6453d; }
+.pkg-checklist p b { flex: none; }
+.pkg-checklist p span { color: #4d586c; }
+.pkg-checklist button { justify-self: start; }
+.pkg-checklist small { color: #5b667b; line-height: 1.5; }
+.pkg-missing { display: flex; gap: 7px; align-items: flex-start; background: #fdeeee; border: 1px solid #f2c8c5; border-radius: 9px; padding: 10px 12px; margin: 8px 0; font-size: 12px; color: #7a2e29; line-height: 1.6; }
+.pkg-missing svg { width: 15px; flex: none; margin-top: 2px; color: #d6453d; }
 .ai-rerun { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 .ai-rerun .wiz-hint { margin: 0; }
 .ai-rerun button { flex: none; margin-left: auto; }

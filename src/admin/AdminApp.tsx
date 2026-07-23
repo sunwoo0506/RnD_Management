@@ -5,14 +5,18 @@
 // 문서 승인은 기존 문서에 새 버전을 추가하거나(연결 선택), 새 문서를 만든다 — 이전 버전은
 // 절대 지우지 않는다.
 import { useState } from 'react';
-import { AlertCircle, Check, Eye, FileText, LogOut, RefreshCw, Search, X } from 'lucide-react';
+import { AlertCircle, Check, Download, Eye, FileText, LogOut, RefreshCw, Search, X } from 'lucide-react';
 import { adminSupabase } from './adminSupabase';
 import { authErrorKo } from '../cloud';
 import { DOCUMENT_TYPE_LABEL, DOCUMENT_TYPES, type DocumentType } from '../registry';
+import { validateRegulationPackage, type RegulationPackage } from '../regulationPackage';
 
 interface PackSubmission {
   id: string; program_name: string; year: number | null; origin: string; program_registry_id: string | null;
   submitted_by: string | null; submitted_email: string | null; created_at: string;
+  // 규정DB 패키지(manifest + 6 JSON). 승인 전에 사람이 만든 패키지와 같은 규격인지 검사한다.
+  // 옛 버전 앱에서 팩만 공유한 신청은 null이다.
+  package: unknown | null;
 }
 interface DocSubmission {
   id: string; document_id: string | null; title: string; document_type: DocumentType;
@@ -382,6 +386,24 @@ export default function AdminApp() {
                 </select>
               </label>
             </div>
+            {/* 승인 전 규격 검사 — AI 추출 패키지가 사람이 만든 규정DB와 같은 규격이어야
+                검토·변환·적재를 그대로 태우고 서비스가 일괄 규칙으로 읽을 수 있다. */}
+            {row.package
+              ? (() => {
+                const checks = validateRegulationPackage(row.package);
+                const failed = checks.filter((check) => !check.ok).length;
+                return <div className="pkg-checklist">
+                  <strong>패키지 규격 검사 {failed ? <em className="bad">{failed}건 확인 필요</em> : <em className="ok">모두 통과</em>}</strong>
+                  {checks.map((check) => <p key={check.label} className={check.ok ? 'ok' : 'bad'}>
+                    {check.ok ? <Check /> : <X />}<b>{check.label}</b><span>{check.detail}</span>
+                  </p>)}
+                  <button type="button" className="secondary" onClick={() => import('../exporters').then((m) => m.exportExtractionReview(row.package as RegulationPackage))}>
+                    <Download /> 검토본 엑셀(Review.xlsx) 내려받기
+                  </button>
+                  <small>검토본은 사람이 만든 규정DB와 같은 6시트 구성입니다 — RuleReview 시트에서 화면 문구와 원문 인용을 나란히 대조하세요.</small>
+                </div>;
+              })()
+              : <p className="pkg-missing"><AlertCircle /> 규정DB 패키지가 없는 신청입니다 (옛 버전 앱에서 팩만 공유). 조문 원문(source_text)과 검토본이 없어 공통 규격 검토가 불가능하니, 반려하고 다시 신청하도록 안내하세요.</p>}
             {row.program_registry_id && edit.programRegistryId === row.program_registry_id && <p className="doc-empty">사용자 화면에서 이미 사업명에 연결된 과제가 보낸 신청이라 자동으로 연결을 골라뒀어요.</p>}
             {!edit.programRegistryId && nameMatches.length > 0 && <p className="doc-empty" style={{ color: '#d6453d' }}>같은 이름의 사업이 이미 있어요 — "기존 사업에 연결"에서 골라야 사업명이 중복 등록되지 않아요.</p>}
             <div className="admin-actions">

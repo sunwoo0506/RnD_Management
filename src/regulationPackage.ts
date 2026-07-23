@@ -247,6 +247,78 @@ export const buildRegulationPackage = (extraction: Extraction, meta: PackageMeta
   };
 };
 
+// ---- 승인 전 패키지 검사 ----
+// AI 추출 패키지가 사람이 만든 규정DB와 같은 규격인지 본다. 규격이 같아야
+// 검토(Review.xlsx)·변환·적재 스크립트를 그대로 태우고, 서비스가 규정DB 데이터를
+// 일괄 규칙으로 읽을 수 있다. 관리자 승인 화면이 이 결과를 체크리스트로 보여준다.
+export interface PackageCheck { label: string; ok: boolean; detail: string }
+
+const DATA_FILES = ['expense_categories', 'budget_screen_guides', 'expense_allowed_items', 'expense_limit_rules', 'regulation_rules', 'source_text'] as const;
+// rules.ts의 normRef와 같은 규칙 — 근거 표기의 공백·구두점 차이를 무시하고 조문을 찾는다.
+const normRefText = (text: string) => text.replace(/[\s·.,()]/g, '');
+
+export const validateRegulationPackage = (raw: unknown): PackageCheck[] => {
+  const checks: PackageCheck[] = [];
+  const pkg = (raw && typeof raw === 'object' ? raw : null) as Record<string, unknown> | null;
+  const manifest = pkg?.manifest && typeof pkg.manifest === 'object' ? pkg.manifest as Record<string, unknown> : null;
+  checks.push({
+    label: 'manifest', ok: !!manifest,
+    detail: manifest ? `${String(manifest.title ?? '?')} · 생성 ${String(manifest.generated_at ?? '?')}` : '패키지에 manifest가 없습니다',
+  });
+
+  const missing = DATA_FILES.filter((key) => !Array.isArray(pkg?.[key]));
+  checks.push({
+    label: '데이터 파일 6종', ok: missing.length === 0,
+    detail: missing.length ? `없음: ${missing.join(', ')}` : DATA_FILES.map((key) => `${key} ${(pkg![key] as unknown[]).length}건`).join(' · '),
+  });
+  if (missing.length || !pkg) return checks;   // 아래 검사는 파일이 있어야 의미가 있다
+
+  const rows = (key: typeof DATA_FILES[number]) => pkg[key] as Record<string, unknown>[];
+  const counts = (manifest?.counts ?? {}) as Record<string, number>;
+  const COUNT_KEYS: [string, typeof DATA_FILES[number]][] = [
+    ['categories', 'expense_categories'], ['budget_guides', 'budget_screen_guides'], ['allowed_items', 'expense_allowed_items'],
+    ['limit_rules', 'expense_limit_rules'], ['regulation_rules', 'regulation_rules'], ['source_text', 'source_text'],
+  ];
+  const mismatch = COUNT_KEYS
+    .filter(([meta, file]) => counts[meta] != null && counts[meta] !== rows(file).length)
+    .map(([meta, file]) => `${meta}: 표기 ${counts[meta]} ≠ 실제 ${rows(file).length}`);
+  checks.push({
+    label: 'manifest 건수 일치', ok: mismatch.length === 0,
+    detail: mismatch.length ? mismatch.join(', ') : '표기된 건수가 실제 파일과 같습니다',
+  });
+
+  const sourceText = rows('source_text');
+  checks.push({
+    label: '조문 원문(source_text)', ok: sourceText.length > 0,
+    detail: sourceText.length ? `${sourceText.length}건` : '0건 — 근거 원문이 없어 검토가 불가능합니다',
+  });
+
+  // 규칙·상한·인정항목의 근거(source_article)가 조문 원문에서 열리는지 — 근거가 안 열리면
+  // 화면에서 "원문 미수록"이 되거나, 더 나쁘게는 다른 규정의 같은 번호 조문이 잘못 붙는다.
+  const articleRefs = sourceText.map((article) => normRefText(String(article.source_article ?? ''))).filter(Boolean);
+  const resolves = (ref: string) => {
+    const target = normRefText(ref);
+    return articleRefs.some((article) => target.startsWith(article) || article.startsWith(target));
+  };
+  const refs = [...rows('regulation_rules'), ...rows('expense_limit_rules'), ...rows('expense_allowed_items')]
+    .map((row) => String(row.source_article ?? '')).filter(Boolean);
+  const unresolved = [...new Set(refs.filter((ref) => !resolves(ref)))];
+  checks.push({
+    label: '근거가 원문에서 열림', ok: unresolved.length === 0,
+    detail: unresolved.length
+      ? `원문 없는 근거 ${unresolved.length}종: ${unresolved.slice(0, 3).join(' | ')}${unresolved.length > 3 ? ' …' : ''}`
+      : `근거 ${new Set(refs).size}종이 모두 조문 원문에서 해결됩니다`,
+  });
+
+  const unverified = [...rows('regulation_rules'), ...rows('expense_limit_rules'), ...rows('expense_allowed_items'), ...sourceText]
+    .filter((row) => row.verified === false).length;
+  checks.push({
+    label: '원문 인용 대조', ok: unverified === 0,
+    detail: unverified ? `${unverified}건이 원문에서 인용을 찾지 못했습니다 — Review.xlsx에서 직접 확인하세요` : '모든 인용이 원문에서 확인됐습니다',
+  });
+  return checks;
+};
+
 // 패키지 README — 사람이 만든 패키지와 같은 구성(기준 / 원본 / 파일 / 이 사업의 특징 / 갱신 방법).
 // 검토자가 이 폴더만 받아도 무엇을 확인해야 하는지 알 수 있어야 한다.
 export const buildPackageReadme = (pkg: RegulationPackage): string => {
