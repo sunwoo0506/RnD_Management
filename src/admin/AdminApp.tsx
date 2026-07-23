@@ -29,7 +29,11 @@ interface ExistingDocument {
   issuing_authority: string | null; document_number: string | null; legal_level: number | null;
   document_programs: { program_registry_id: string }[];
 }
-interface ExistingProgram { id: string; program_name: string; year: number | null }
+// origin 이하는 등록된 사업 목록 표시용 — Edge Function이 구버전이면 안 내려오므로 선택 필드로 둔다.
+interface ExistingProgram {
+  id: string; program_name: string; year: number | null;
+  origin?: string; verified?: boolean; is_active?: boolean; updated_at?: string;
+}
 // 사업명 하나에 연결된 문서들 — 버전별로 뭐가 있고 없는지 확인하는 용도라 버전을 전부 담는다.
 interface ProgramDocumentVersion {
   id: string; version_label: string | null; status: string; effective_from: string | null; source_url: string | null; created_at: string;
@@ -655,6 +659,42 @@ export default function AdminApp() {
         {existingDocuments.filter((doc) => showMatchedDocs || doc.document_programs.length === 0).filter((doc) => doc.title.toLowerCase().includes(docSearchQ.trim().toLowerCase())).length === 0
           && <p className="doc-empty">{showMatchedDocs ? '문서가 없어요.' : '미매칭 문서가 없어요 — 전부 사업명이 연결돼 있어요.'}</p>}
       </div>
+    </section>
+
+    {/* 등록된 사업 전체 — 승인·검색을 오가지 않아도 지금 DB에 무엇이 있는지 한눈에 본다. */}
+    <section className="panel admin-card">
+      <div className="panel-head"><div><h3><FileText /> 등록된 사업 ({existingPrograms.length})</h3><p>공유 규정 DB에 등록된 사업 전체입니다. 검증된 규정DB 팩만 예산편성 화면의 비목이 됩니다.</p></div></div>
+      {existingPrograms.length === 0
+        ? <p className="doc-empty">등록된 사업이 없습니다.</p>
+        : <div className="admin-groups admin-card-fields">
+          {[...existingPrograms]
+            .sort((a, b) => Number(b.is_active ?? true) - Number(a.is_active ?? true) || a.program_name.localeCompare(b.program_name))
+            .map((program) => {
+              const docCount = existingDocuments.filter((doc) => doc.document_programs.some((link) => link.program_registry_id === program.id)).length;
+              const editingThis = programNameEdit?.id === program.id;
+              return <div className="program-row" key={program.id}>
+                {editingThis
+                  ? <>
+                    <div className="field-grid" style={{ flex: 1 }}>
+                      <label>사업명<input value={programNameEdit.programName} onChange={(e) => setProgramNameEdit({ ...programNameEdit, programName: e.target.value })} /></label>
+                      <label>연도<input inputMode="numeric" value={programNameEdit.year} onChange={(e) => setProgramNameEdit({ ...programNameEdit, year: e.target.value.replace(/\D/g, '').slice(0, 4) })} /></label>
+                    </div>
+                    <button type="button" className="secondary" onClick={() => setProgramNameEdit(null)}>취소</button>
+                    <button type="button" className="primary" disabled={savingProgram} onClick={saveProgramEdit}>{savingProgram ? '저장 중…' : '저장'}</button>
+                  </>
+                  : <>
+                    {program.origin && <span className={`program-origin ${program.origin === 'regulation_db' ? 'db' : 'extracted'}`}>
+                      {program.origin === 'regulation_db' ? (program.verified ? '규정DB · 검증됨' : '규정DB') : 'AI 추출 · 미검증'}
+                    </span>}
+                    <div>
+                      <strong>{program.program_name}{program.is_active === false && <em className="program-inactive">비활성</em>}</strong>
+                      <small>{program.year ?? '연도 미상'} · 연결 문서 {docCount}건{program.updated_at ? ` · 갱신 ${program.updated_at.slice(0, 10)}` : ''}</small>
+                    </div>
+                    <button type="button" className="secondary" onClick={() => startEditProgram(program)}>사업명 수정</button>
+                  </>}
+              </div>;
+            })}
+        </div>}
     </section>
   </main>;
 }

@@ -54,7 +54,7 @@ const list = async () => {
     db.from('program_registry_submissions').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
     db.from('document_submissions').select('*').eq('status', 'pending').order('created_at', { ascending: false }),
     db.from('documents').select('id, title, document_type, issuing_authority, document_number, legal_level, document_programs(program_registry_id)').eq('is_active', true).order('title'),
-    db.from('program_registry').select('id, program_name, year').order('program_name'),
+    db.from('program_registry').select('id, program_name, year, origin, verified, is_active, updated_at').order('program_name'),
     db.from('registry_trash').select('id, kind, title, submitted_by, rejected_at').order('rejected_at', { ascending: false }),
   ]);
   if (packErr) throw new Error(packErr.message);

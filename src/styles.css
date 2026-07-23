@@ -484,6 +484,16 @@ label { display: grid; gap: 6px; color: #4d586c; font-size: 13px; font-weight: 7
 .trash-row strong { font-size: 12px; }
 .trash-row small { font-size: 11px; color: #5b667b; }
 .trash-row button { flex: none; }
+/* 관리자 하단 — 등록된 사업 전체 목록. */
+.program-row { display: flex; gap: 10px; align-items: center; padding: 9px 11px; background: #f8fafd; border: 1px solid #dbe3f0; border-radius: 9px; }
+.program-row .program-origin { flex: none; font-size: 11px; padding: 2px 8px; border-radius: 99px; }
+.program-row .program-origin.db { background: #e8f7f1; color: #1d8a5f; }
+.program-row .program-origin.extracted { background: #fff7f0; color: #cf8a2e; }
+.program-row > div { flex: 1; display: grid; gap: 1px; }
+.program-row strong { font-size: 12px; display: flex; gap: 6px; align-items: center; }
+.program-row .program-inactive { font-style: normal; font-size: 10px; padding: 1px 6px; border-radius: 99px; background: #eef1f7; color: #5b667b; }
+.program-row small { font-size: 11px; color: #5b667b; }
+.program-row button { flex: none; }
 .ai-rerun { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 .ai-rerun .wiz-hint { margin: 0; }
 .ai-rerun button { flex: none; margin-left: auto; }
