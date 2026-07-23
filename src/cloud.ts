@@ -7,7 +7,11 @@ let userId: string | null = null;
 export const setCloudUser = (id: string | null) => { userId = id; };
 export const cloudActive = () => supabase !== null && userId !== null;
 
-export const signUpEmail = (email: string, password: string) => supabase!.auth.signUp({ email, password });
+// 이메일 인증을 켜면 확인 메일의 링크가 여기(가입한 그 주소)로 돌아온다. 지정하지 않으면
+// Supabase 설정의 Site URL(기본 localhost:3000)로 보내는데, 거기에 앱이 없으면
+// "사이트에 연결할 수 없음"이 된다. 단, 이 주소가 대시보드의 Redirect URL 허용 목록에 있어야 한다.
+export const signUpEmail = (email: string, password: string) =>
+  supabase!.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
 export const signInEmail = (email: string, password: string) => supabase!.auth.signInWithPassword({ email, password });
 export const signOutCloud = () => supabase?.auth.signOut();
 
