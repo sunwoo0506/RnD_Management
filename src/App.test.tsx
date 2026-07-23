@@ -397,6 +397,40 @@ describe('R&D 총괄 대시보드 (한눈에 보기)', () => {
     expect(document.querySelector('.drill-panel')).toHaveTextContent('과제A — 세목 구성');
   });
 
+  it('지금 확인할 일 — 밀린 월별 계획을 다음달로 미루면 계획이 옮겨진다', async () => {
+    // 1~12월 과제, 인건비 1,200만 → 월 100만. 집행 0원이라 지난달까지 전부 미달.
+    const a = { ...fixture('nrd2026-forprofit'), id: 'pa', name: '과제A',
+      budgets: [{ categoryId: 'DIRECT_LABOR', amount: 12_000_000 }], startDate: '2026-01-01', endDate: '2026-12-31' };
+    localStorage.setItem('gwajeon.projects.v1', JSON.stringify([a]));
+    localStorage.setItem('gwajeon.active-project', 'pa');
+    const user = userEvent.setup(); render(<App />);
+    const block = document.querySelector('.portfolio-todos')!;
+    expect(block).toHaveTextContent('밀림');   // 지난달 미달분이 사라지지 않는다
+    // 가장 밀린 1월 항목을 다음달로 미룬다
+    await user.click([...block.querySelectorAll('button')].find((b) => b.textContent === '다음달로 미루기')!);
+    const saved: Project = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
+    // 1월 계획은 집행액(0)으로, 2월 계획은 기존 100만 + 이월 100만 = 200만
+    expect(saved.monthlyPlan).toEqual(expect.arrayContaining([
+      expect.objectContaining({ month: '2026-01', amount: 0 }),
+      expect.objectContaining({ month: '2026-02', amount: 2_000_000 }),
+    ]));
+  });
+
+  it('지금 확인할 일 — 참여율 현황표가 이름으로 합치고 100% 초과·3책5공을 경고한다', async () => {
+    const a = { ...fixture('nrd2026-forprofit'), id: 'pa', name: '과제A',
+      participants: [{ id: '1', name: '박연구', projectRate: 60, externalRate: 20, isLead: true }] };
+    const b = { ...fixture('prestartup2026'), id: 'pb', name: '과제B',
+      participants: [{ id: '2', name: '박연구', projectRate: 50, externalRate: 0 }] };
+    localStorage.setItem('gwajeon.projects.v1', JSON.stringify([a, b]));
+    localStorage.setItem('gwajeon.active-project', 'pa');
+    render(<App />);
+    const table = document.querySelector('.people-table')!;
+    expect(table).toHaveTextContent('박연구');
+    expect(table).toHaveTextContent('130%');           // 60 + 50 + 외부 20
+    expect(table).toHaveTextContent('책임 1 / 전체 2');
+    expect(table.querySelector('.person-total.over')).not.toBeNull();   // 100% 초과 경고
+  });
+
   it('부처 칩을 누르면 그 부처 과제만 목록에 남는다', async () => {
     twoProjects();
     const user = userEvent.setup(); render(<App />);

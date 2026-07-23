@@ -7,10 +7,11 @@ import {
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, settlementDeadlineFor, evidenceGuide, evidenceChecklistFor, commonEvidenceRuleNames, primaryEvidence, withAlwaysRequired, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, spendingCautions, subItemStandardFor, transferLimitError, visibleCategories } from './rules';
-import { evidenceReadiness, monthSequence, setMonthlyPlan, spendingMatrix } from './spending';
+import { monthSequence, setMonthlyPlan, spendingMatrix } from './spending';
 import { agencyCounts, isEnded, overviewOrder, periodProgress, portfolioTotals } from './portfolio';
 import PortfolioCharts from './PortfolioCharts';
 import PortfolioFunding from './PortfolioFunding';
+import PortfolioTodos from './PortfolioTodos';
 import { detailFieldsFor } from './spendingForms';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal } from './storage';
 import { authErrorKo, deleteCloudProject, deleteEvidence, deleteProjectDocuments, fetchCloudProjects, getEvidence, getProjectDocument, saveCloudProject, setCloudUser, signInEmail, signOutCloud, signUpEmail, storeEvidence, storeProjectDocument } from './cloud';
@@ -121,7 +122,7 @@ function PortfolioOverview({ projects, activeId, onSelect }: { projects: Project
   </section>;
 }
 
-function Overview({ project, projects, onSelectProject, setScreen }: { project: Project; projects: Project[]; onSelectProject: (id: string) => void; setScreen: (s: Screen) => void }) {
+function Overview({ project, projects, onSelectProject, onUpdateProject, setScreen }: { project: Project; projects: Project[]; onSelectProject: (id: string) => void; onUpdateProject: (p: Project) => void; setScreen: (s: Screen) => void }) {
   const pack = packFor(project);
   const spent = project.expenses.reduce((sum, item) => sum + item.amount, 0);
   const incomplete = project.expenses.reduce((sum, item) => sum + item.evidence.filter((e) => !e.completed).length, 0);
@@ -129,13 +130,14 @@ function Overview({ project, projects, onSelectProject, setScreen }: { project: 
   const dday = daysUntil(project.settlementDeadline);
   const alerts = project.participants.filter((p) => p.projectRate + p.externalRate > 100).length;
   const funding = fundingBreakdown(project);
-  const readiness = evidenceReadiness(pack, project);
   const pct = (value: number) => project.totalBudget ? value / project.totalBudget * 100 : 0;
   return <div className="page-content">
     <section className="welcome"><div><span>{new Date().getHours() < 12 ? '좋은 아침이에요' : '오늘도 수고 많으셨어요'}, {project.members[0]?.name}님</span><h2>R&D 전체 현황을 확인해보세요.</h2></div><div className="deadline"><CalendarDays /><div><small>정산 마감까지</small><strong>{dday >= 0 ? `D-${dday}` : `D+${Math.abs(dday)}`}</strong></div></div></section>
     <PortfolioOverview projects={projects} activeId={project.id} onSelect={onSelectProject} />
     <PortfolioFunding projects={projects} />
     <PortfolioCharts projects={projects} />
+    <PortfolioTodos projects={projects} currentMonth={today().slice(0, 7)} onUpdate={onUpdateProject}
+      onGo={(id, target) => { onSelectProject(id); setScreen(target); }} />
     {/* 아래부터는 현재 과제 기준 — 총괄 표에서 행을 누르면 이 영역이 그 과제로 바뀐다. */}
     <div className="current-divider"><span>현재 과제</span><strong>{project.name}</strong></div>
     <div className="metric-grid">
@@ -162,37 +164,7 @@ function Overview({ project, projects, onSelectProject, setScreen }: { project: 
         ? <p className="field-hint">민간부담금 중 현금 비율 {funding.matchingCashRate}% 적용 (과제 설정에서 변경). 공고문 기준 최소 금액이며, 실제 협약 내용을 우선 확인하세요.</p>
         : null}
     </section>
-    <div className="overview-grid single">
-      <section className="panel next-actions"><div className="panel-head"><div><span className="section-kicker">NEXT ACTION</span><h3>지금 확인할 일</h3></div></div>
-        {incomplete > 0 ? <button onClick={() => setScreen('spending')} className="action-item warning"><AlertCircle /><div><strong>증빙 {incomplete}개가 비어 있어요</strong><span>아래에서 무엇이 빠졌는지 확인하세요</span></div><ChevronRight /></button> : <div className="empty-action"><CheckCircle2 /><strong>증빙이 모두 준비됐어요</strong><span>새 집행건을 등록하면 필요한 서류를 안내해드려요.</span></div>}
-        {alerts > 0 && <button onClick={() => setScreen('budget')} className="action-item danger"><AlertCircle /><div><strong>참여율 100% 초과</strong><span>예산 편성의 인건비 산정에서 비율을 조정해주세요</span></div><ChevronRight /></button>}
-        <button onClick={() => setScreen('spending')} className="quick-add"><Plus /> 새 집행건 등록</button>
-      </section>
-    </div>
-    {/* 숫자 하나("증빙 12개가 비어 있어요")로는 무엇을 준비해야 하는지 알 수 없다.
-        서류 종류별로 얼마나 밀렸는지, 집행건별로 무엇이 빠졌는지 나눠서 체크리스트로 보여준다. */}
-    {readiness.total > 0 && <section className="panel evidence-readiness">
-      <div className="panel-head">
-        <div><span className="section-kicker">EVIDENCE</span><h3>증빙 준비 현황</h3>
-          <p>집행건 {project.expenses.length}건 중 {readiness.readyExpenses}건 완료 · 서류 {readiness.done}/{readiness.total}건 준비됨</p></div>
-        <button className="text-button" onClick={() => setScreen('spending')}>집행·증빙으로 <ArrowRight /></button>
-      </div>
-      <div className="readiness-bar"><i style={{ width: `${readiness.rate}%` }} className={readiness.rate >= 100 ? 'done' : ''} /></div>
-      {/* 같은 서류를 몰아서 만들 수 있게 종류별로도 센다 */}
-      <div className="doc-tally">{readiness.byDocument.map((entry) => <span key={entry.label} className={entry.done === entry.total ? 'ok' : ''}>
-        {entry.done === entry.total ? <CheckCircle2 /> : <FileText />}{entry.label} <b>{entry.done}/{entry.total}</b>
-      </span>)}</div>
-      {readiness.todos.length > 0
-        ? <div className="todo-list">{readiness.todos.map((todo) => <button type="button" key={todo.expenseId} onClick={() => setScreen('spending')}>
-          <div className="todo-head">
-            <strong>{todo.purpose}</strong>
-            <em>{todo.categoryName}{todo.subItemName ? ` · ${todo.subItemName}` : ''} · {todo.date}</em>
-            <b className={todo.done ? '' : 'none'}>{todo.done}/{todo.total}</b>
-          </div>
-          <div className="todo-missing">{todo.missing.map((label) => <span key={label}><FileClock />{label}</span>)}</div>
-        </button>)}</div>
-        : <p className="field-hint">모든 집행건의 증빙이 준비됐습니다.</p>}
-    </section>}
+
     <section className="guide-banner"><div className="guide-icon"><ShieldCheck /></div><div><span>과제온 가이드</span><strong>집행 전에 인정 기준을 먼저 확인하세요.</strong><p>비목을 선택하면 중기부 기준 증빙 목록과 주의사항을 바로 보여드려요.</p></div><button onClick={() => setScreen('spending')}>집행 등록하기 <ArrowRight /></button></section>
   </div>;
 }
@@ -1028,7 +1000,8 @@ function ParticipantsPanel({ project, update }: { project: Project; update: (p: 
       return <Fragment key={p.id}>
         {showGroup && <div className="labor-group"><b>{KIND_LABEL[kind]}</b><span>{sortedParticipants.filter((x) => fundingKindOf(x) === kind).length}명</span></div>}
         <div className={over ? 'labor-row over' : 'labor-row'}>
-          <div className="labor-person"><div className="avatar">{p.name[0]}</div><strong>{p.name}</strong></div>
+          <div className="labor-person"><div className="avatar">{p.name[0]}</div><div className="person-id"><strong>{p.name}</strong>
+            <label className="lead-toggle" title="이 과제의 연구책임자 — 총괄 대시보드의 3책 5공 카운트에 쓰여요"><input type="checkbox" aria-label={`${p.name} 연구책임자`} checked={!!p.isLead} onChange={(e) => setP(p.id, { isLead: e.target.checked })} /><span>연구책임자</span></label></div></div>
           <select aria-label={`${p.name} 기존/신규 구분`} value={p.laborType ?? 'existing'} onChange={(e) => setP(p.id, { laborType: e.target.value as 'existing' | 'new' })}><option value="existing">기존인력</option><option value="new">신규인력</option></select>
           <div className="labor-period">
             <input type="date" aria-label={`${p.name} 참여 시작일`} value={p.laborStart ?? project.startDate} onChange={(e) => setP(p.id, { laborStart: e.target.value })} />
@@ -2486,5 +2459,5 @@ export default function App() {
     setProjects((list) => list.filter((p) => p.id !== project.id));
     setActiveId(null);
   };
-  return <div className="app-shell"><Sidebar screen={screen} setScreen={setScreen} project={project} projects={projects} onSelect={(id) => { setActiveId(id); setScreen('overview'); }} onAdd={() => setAdding(true)} onReset={reset} account={session?.user.email ?? null} sync={syncState} onLogout={logout} /><main className="main"><Header project={project} />{screen === 'overview' && <Overview project={project} projects={projects} onSelectProject={(id) => setActiveId(id)} setScreen={setScreen} />}{screen === 'budget' && <Budget project={project} update={update} setScreen={setScreen} />}{screen === 'spending' && <Spending project={project} update={update} />}{screen === 'change' && <ChangeManagement project={project} update={update} />}{screen === 'team' && <Team project={project} update={update} setScreen={setScreen} />}{screen === 'settings' && <Settings project={project} update={update} onReset={reset} />}</main></div>;
+  return <div className="app-shell"><Sidebar screen={screen} setScreen={setScreen} project={project} projects={projects} onSelect={(id) => { setActiveId(id); setScreen('overview'); }} onAdd={() => setAdding(true)} onReset={reset} account={session?.user.email ?? null} sync={syncState} onLogout={logout} /><main className="main"><Header project={project} />{screen === 'overview' && <Overview project={project} projects={projects} onSelectProject={(id) => setActiveId(id)} onUpdateProject={(next) => setProjects((list) => list.map((p) => p.id === next.id ? next : p))} setScreen={setScreen} />}{screen === 'budget' && <Budget project={project} update={update} setScreen={setScreen} />}{screen === 'spending' && <Spending project={project} update={update} />}{screen === 'change' && <ChangeManagement project={project} update={update} />}{screen === 'team' && <Team project={project} update={update} setScreen={setScreen} />}{screen === 'settings' && <Settings project={project} update={update} onReset={reset} />}</main></div>;
 }

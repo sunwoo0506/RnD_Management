@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agencyCounts, budgetComposition, fundingUsage, isEnded, overviewOrder, periodProgress, portfolioTotals, subItemComposition } from './portfolio';
+import { agencyCounts, budgetComposition, evidenceGaps, fundingUsage, isEnded, overviewOrder, participationTable, periodProgress, planTodos, portfolioTotals, subItemComposition } from './portfolio';
 import type { Project } from './types';
 
 // 총괄 대시보드는 과제 전체를 합쳐 보여준다 — 합계·부처별 수·진행률·정렬이 이 파일의 계약이다.
@@ -98,6 +98,71 @@ describe('편성 구성 (③ 그래프)', () => {
     }));
     expect(subs.map((slice) => slice.name)).toEqual(['인건비', '출장비', '회의비']);
     expect(subs.find((slice) => slice.name === '출장비')?.category).toBe('연구활동비');
+  });
+});
+
+describe('월별 계획 체크리스트 (④-1)', () => {
+  // 2026-01~12 과제, 인건비 1,200만 → 균등분할 월 100만. 1월만 60만 집행 (미달), 7월 120만 (완료).
+  const planned = () => project({
+    packId: 'nrd2026-forprofit',
+    budgets: [{ categoryId: 'DIRECT_LABOR', amount: 12_000_000 }],
+    expenses: [
+      { id: 'e1', date: '2026-01-15', categoryId: 'DIRECT_LABOR', amount: 600_000, purpose: '', vendor: '', evidence: [], createdAt: '' },
+      { id: 'e2', date: '2026-07-10', categoryId: 'DIRECT_LABOR', amount: 1_200_000, purpose: '', vendor: '', evidence: [], createdAt: '' },
+    ],
+  });
+
+  it('이번 달까지의 미달 칸이 밀린 달부터 나오고, 이번 달 완료는 진행됨으로 담긴다', () => {
+    const todos = planTodos([planned()], '2026-07');
+    const pendingMonths = todos.filter((item) => !item.done).map((item) => item.month);
+    expect(pendingMonths).toEqual(['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06']);   // 7월은 완료
+    expect(todos.find((item) => item.month === '2026-01')).toMatchObject({ planned: 1_000_000, actual: 600_000, remaining: 400_000, nextMonth: '2026-02' });
+    expect(todos.filter((item) => item.done).map((item) => item.month)).toEqual(['2026-07']);   // 지난달 완료는 노이즈라 안 담는다
+  });
+
+  it('사업기간 마지막 달은 다음 달이 없어 미루기 대상이 아니다', () => {
+    const todos = planTodos([planned()], '2026-12');
+    const last = todos.find((item) => item.month === '2026-12');
+    expect(last?.nextMonth).toBeUndefined();
+  });
+});
+
+describe('증빙 빠짐 (④-2)', () => {
+  it('과제별로 비목·세목 그룹과 빠진 서류 수를 센다', () => {
+    const gaps = evidenceGaps([project({
+      packId: 'nrd2026-forprofit',
+      expenses: [{
+        id: 'e1', date: '2026-05-01', categoryId: 'DIRECT_ACTIVITY', subItemName: '회의비', amount: 1, purpose: '정기회의', vendor: '', createdAt: '',
+        evidence: [
+          { id: 'v1', label: '회의록', completed: false },
+          { id: 'v2', label: '영수증', completed: false },
+          { id: 'v3', label: '품의서', completed: true },
+        ],
+      }],
+    })]);
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0].total).toBe(2);
+    expect(gaps[0].groups).toEqual([{ label: '연구활동비 · 회의비', count: 2 }]);
+  });
+});
+
+describe('연구인력 참여율 현황표 (④-3)', () => {
+  it('이름으로 합쳐 총 참여율을 내고, 외부 참여율은 최대값 하나만 쓴다', () => {
+    const rows = participationTable([
+      project({ id: 'a', name: '과제A', participants: [
+        { id: '1', name: '박연구', projectRate: 50, externalRate: 20, isLead: true },
+        { id: '2', name: '김개발', projectRate: 30, externalRate: 0 },
+      ] }),
+      project({ id: 'b', name: '과제B', participants: [
+        { id: '3', name: '박연구', projectRate: 40, externalRate: 10 },   // 외부 참여율이 과제마다 다르면 최대값
+      ] }),
+    ]);
+    const park = rows.find((row) => row.name === '박연구')!;
+    expect(park.total).toBe(110);      // 50 + 40 + 외부 20 (최대값 — 중복 합산하지 않는다)
+    expect(park.external).toBe(20);
+    expect(park.leadCount).toBe(1);
+    expect(park.projects.map((entry) => entry.name)).toEqual(['과제A', '과제B']);
+    expect(rows[0].name).toBe('박연구');   // 총 참여율 큰 순
   });
 });
 

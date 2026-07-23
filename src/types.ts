@@ -164,6 +164,8 @@ export interface Participant {
   name: string;
   projectRate: number;
   externalRate: number;
+  isLead?: boolean;               // 이 과제의 연구책임자 — 3책 5공(책임 3·전체 5) 카운트의 근거
+
   // ---- 인건비 관리 (인력·담당자 화면) ----
   laborType?: 'existing' | 'new'; // 기존/신규 인력 (미입력 시 기존)
   laborStart?: string;            // 참여 시작일 (미입력 시 과제 시작일)

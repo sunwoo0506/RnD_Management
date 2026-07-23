@@ -3,7 +3,8 @@
 // 과제 배열을 받아 총괄 숫자를 만드는 순수 계산만 담당한다.
 // 기획: docs/superpowers/specs/2026-07-23-portfolio-dashboard.md
 import { categoryOf, packFor } from './rules';
-import type { Project } from './types';
+import { evidenceReadiness, monthSequence, spendingMatrix } from './spending';
+import type { BudgetCategoryId, Project } from './types';
 
 // 날짜는 모두 'YYYY-MM-DD' 문자열이라 사전순 비교가 곧 날짜 비교다.
 export const isEnded = (project: Project, today: string): boolean =>
@@ -106,6 +107,119 @@ export const subItemComposition = (project: Project): SubItemSlice[] =>
         : [{ category, name: category, amount: item.amount }];
     })
     .sort((a, b) => b.amount - a.amount);
+
+// ---- 월별 계획 체크리스트 (④-1) ----
+// 진행/할 것은 저장하지 않고 금액으로 판정한다: 그 달 집행액이 계획액에 도달하면 진행됨.
+// 별도 체크 필드가 없으니 화면은 항상 실제 데이터와 일치한다 (사용자 결정).
+export interface PlanTodoItem {
+  projectId: string;
+  projectName: string;
+  month: string;                 // 'YYYY-MM'
+  categoryId: BudgetCategoryId;
+  subItemId?: string;
+  label: string;                 // 비목 또는 "비목 · 세목"
+  planned: number;
+  actual: number;
+  remaining: number;
+  done: boolean;
+  // 다음달로 미루기에 필요한 값 — 다음 달이 사업기간 밖이면 미룰 수 없다.
+  nextMonth?: string;
+  nextPlan?: number;
+}
+
+const nextMonthOf = (month: string): string => {
+  const [year, mm] = month.split('-').map(Number);
+  return mm === 12 ? `${year + 1}-01` : `${year}-${String(mm + 1).padStart(2, '0')}`;
+};
+
+// 이번 달까지의 계획 칸을 체크리스트로 편다. 지난달 미달분도 함께 나와 밀린 것이 사라지지 않는다.
+// 진행됨(done)은 이번 달 것만 담는다 — 지난달 완료까지 쌓으면 목록이 소음이 된다.
+export const planTodos = (projects: Project[], currentMonth: string): PlanTodoItem[] => {
+  const items: PlanTodoItem[] = [];
+  for (const project of projects) {
+    const allMonths = monthSequence(project.startDate, project.endDate);
+    const shown = allMonths.filter((month) => month <= currentMonth);
+    if (!shown.length) continue;
+    // 다음 달 계획(미루기 대상 값)까지 한 번에 읽는다
+    const withNext = allMonths.filter((month) => month <= nextMonthOf(currentMonth));
+    const matrix = spendingMatrix(packFor(project), project, withNext);
+    for (const row of matrix.rows) {
+      const leaves = row.planEditable
+        ? [{ label: row.name, categoryId: row.categoryId, subItemId: undefined as string | undefined, cells: row.cells }]
+        : row.subRows.filter((sub) => sub.planEditable).map((sub) => ({ label: `${row.name} · ${sub.name}`, categoryId: row.categoryId, subItemId: sub.subItemId, cells: sub.cells }));
+      for (const leaf of leaves) {
+        for (const cell of leaf.cells) {
+          if (cell.month > currentMonth || cell.plan <= 0) continue;
+          const done = cell.actual >= cell.plan;
+          if (done && cell.month !== currentMonth) continue;
+          const next = nextMonthOf(cell.month);
+          const nextCell = allMonths.includes(next) ? leaf.cells.find((entry) => entry.month === next) : undefined;
+          items.push({
+            projectId: project.id, projectName: project.name, month: cell.month,
+            categoryId: leaf.categoryId, subItemId: leaf.subItemId, label: leaf.label,
+            planned: cell.plan, actual: cell.actual, remaining: cell.plan - cell.actual, done,
+            ...(nextCell ? { nextMonth: next, nextPlan: nextCell.plan } : {}),
+          });
+        }
+      }
+    }
+  }
+  // 밀린 것(오래된 달)부터, 같은 달 안에서는 남은 금액 큰 순
+  return items.sort((a, b) => Number(a.done) - Number(b.done) || a.month.localeCompare(b.month) || b.remaining - a.remaining);
+};
+
+// ---- 증빙 빠짐 (④-2) ----
+// 과제마다 evidenceReadiness를 돌려 사업별 ▸ 세목별로 묶는다.
+export interface EvidenceGap {
+  projectId: string;
+  projectName: string;
+  total: number;                                  // 빠진 서류 수
+  groups: { label: string; count: number }[];     // 비목(·세목)별
+}
+
+export const evidenceGaps = (projects: Project[]): EvidenceGap[] =>
+  projects.map((project) => {
+    const readiness = evidenceReadiness(packFor(project), project);
+    const groups = new Map<string, number>();
+    for (const todo of readiness.todos) {
+      const label = todo.subItemName ? `${todo.categoryName} · ${todo.subItemName}` : todo.categoryName;
+      groups.set(label, (groups.get(label) ?? 0) + todo.missing.length);
+    }
+    return {
+      projectId: project.id, projectName: project.name,
+      total: readiness.total - readiness.done,
+      groups: [...groups].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count),
+    };
+  }).filter((gap) => gap.total > 0);
+
+// ---- 연구인력 참여율 현황표 (④-3) ----
+// 사람 합치기는 이름 기준이다 — 과제마다 따로 입력되고 공통 인물 ID가 없다.
+// 표기가 다르면("박연구"/"박연구원") 다른 사람으로 집계되므로 화면이 그 사실을 안내한다.
+export interface PersonRow {
+  name: string;
+  total: number;        // 등록 과제 참여율 합 + 외부 참여율
+  external: number;     // 외부(미등록) 과제 참여율 — 과제마다 다르게 적혔으면 최대값 (중복 합산 방지)
+  leadCount: number;    // 연구책임자 수 (3책)
+  projects: { id: string; name: string; rate: number; isLead: boolean }[];
+}
+
+export const participationTable = (projects: Project[]): PersonRow[] => {
+  const people = new Map<string, PersonRow>();
+  for (const project of projects) {
+    for (const participant of project.participants) {
+      const name = participant.name.trim();
+      if (!name) continue;
+      const row = people.get(name) ?? { name, total: 0, external: 0, leadCount: 0, projects: [] };
+      row.projects.push({ id: project.id, name: project.name, rate: participant.projectRate, isLead: !!participant.isLead });
+      row.external = Math.max(row.external, participant.externalRate || 0);
+      if (participant.isLead) row.leadCount += 1;
+      people.set(name, row);
+    }
+  }
+  return [...people.values()]
+    .map((row) => ({ ...row, total: row.projects.reduce((sum, entry) => sum + entry.rate, 0) + row.external }))
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+};
 
 // 목록 순서: 진행 중(종료일 가까운 순) → 종료(최근 종료 먼저). 종료 과제는 합계에는 남기고
 // 자리만 뒤로 보낸다.
