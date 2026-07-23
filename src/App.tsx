@@ -85,7 +85,7 @@ function PortfolioOverview({ projects, activeId, onSelect }: { projects: Project
     .filter((project) => !agencyFilter || (project.agency.trim() || '기관 미입력') === agencyFilter);
   return <section className="panel portfolio-panel">
     <div className="panel-head"><div><span className="section-kicker">PORTFOLIO</span><h3>전체 R&D 총괄 현황</h3>
-      <p>등록된 과제 전체의 사업비와 상태입니다. 행을 누르면 그 과제로 전환됩니다.</p></div></div>
+      <p>등록된 과제 전체의 사업비와 상태입니다. 행을 누르면 그 과제의 화면으로 이동합니다.</p></div></div>
     <div className="metric-grid">
       <article className="metric-card"><div className="metric-icon blue"><Building2 /></div><div><span>과제 수</span><strong>{totals.active}건 진행 중</strong><small>전체 {totals.projects}건 (종료 포함)</small></div></article>
       <article className="metric-card"><div className="metric-icon violet"><CircleDollarSign /></div><div><span>전체 사업비</span><strong>{formatWon(totals.totalBudget)}</strong><small>종료 과제 포함 합계</small></div></article>
@@ -122,50 +122,17 @@ function PortfolioOverview({ projects, activeId, onSelect }: { projects: Project
   </section>;
 }
 
+// 한눈에 보기 = 과제와 무관한 메인 대시보드. 과제별 내용은 여기 두지 않는다 —
+// 목록에서 과제를 누르면 그 과제의 화면(예산 편성)으로 이동한다.
 function Overview({ project, projects, onSelectProject, onUpdateProject, setScreen }: { project: Project; projects: Project[]; onSelectProject: (id: string) => void; onUpdateProject: (p: Project) => void; setScreen: (s: Screen) => void }) {
-  const pack = packFor(project);
-  const spent = project.expenses.reduce((sum, item) => sum + item.amount, 0);
-  const incomplete = project.expenses.reduce((sum, item) => sum + item.evidence.filter((e) => !e.completed).length, 0);
-  const complete = project.expenses.length ? Math.round(project.expenses.filter((e) => e.evidence.every((x) => x.completed)).length / project.expenses.length * 100) : 0;
-  const dday = daysUntil(project.settlementDeadline);
-  const alerts = project.participants.filter((p) => p.projectRate + p.externalRate > 100).length;
-  const funding = fundingBreakdown(project);
-  const pct = (value: number) => project.totalBudget ? value / project.totalBudget * 100 : 0;
+  const openProject = (id: string) => { onSelectProject(id); setScreen('budget'); };
   return <div className="page-content">
-    <section className="welcome"><div><span>{new Date().getHours() < 12 ? '좋은 아침이에요' : '오늘도 수고 많으셨어요'}, {project.members[0]?.name}님</span><h2>R&D 전체 현황을 확인해보세요.</h2></div><div className="deadline"><CalendarDays /><div><small>정산 마감까지</small><strong>{dday >= 0 ? `D-${dday}` : `D+${Math.abs(dday)}`}</strong></div></div></section>
-    <PortfolioOverview projects={projects} activeId={project.id} onSelect={onSelectProject} />
+    <section className="welcome"><div><span>{new Date().getHours() < 12 ? '좋은 아침이에요' : '오늘도 수고 많으셨어요'}, {project.members[0]?.name}님</span><h2>R&D 전체 현황을 확인해보세요.</h2></div></section>
+    <PortfolioOverview projects={projects} activeId={project.id} onSelect={openProject} />
     <PortfolioFunding projects={projects} />
     <PortfolioCharts projects={projects} />
     <PortfolioTodos projects={projects} currentMonth={today().slice(0, 7)} onUpdate={onUpdateProject}
       onGo={(id, target) => { onSelectProject(id); setScreen(target); }} />
-    {/* 아래부터는 현재 과제 기준 — 총괄 표에서 행을 누르면 이 영역이 그 과제로 바뀐다. */}
-    <div className="current-divider"><span>현재 과제</span><strong>{project.name}</strong></div>
-    <div className="metric-grid">
-      <article className="metric-card"><div className="metric-icon blue"><CircleDollarSign /></div><div><span>총 사업비</span><strong>{formatWon(project.totalBudget)}</strong><small>{pack.name}</small></div></article>
-      <article className="metric-card"><div className="metric-icon violet"><ArrowUpRight /></div><div><span>누적 집행액</span><strong>{formatWon(spent)}</strong><small>{project.totalBudget ? (spent / project.totalBudget * 100).toFixed(1) : 0}% 집행</small></div></article>
-      <article className="metric-card"><div className="metric-icon green"><FileCheck2 /></div><div><span>증빙 완비율</span><strong>{complete}%</strong><small>{incomplete ? `${incomplete}개 서류 미완료` : '모두 준비됐어요'}</small></div></article>
-      <article className="metric-card"><div className={`metric-icon ${alerts ? 'red' : 'green'}`}><ShieldCheck /></div><div><span>참여율 경고</span><strong>{alerts}건</strong><small>{alerts ? '확인이 필요해요' : '안전한 상태예요'}</small></div></article>
-    </div>
-    <section className="panel funding-panel"><div className="panel-head"><div><span className="section-kicker">FUNDING</span><h3>총사업비 구성</h3><p>총 사업비 {formatWon(project.totalBudget)}의 세부 구성이에요.</p></div><button className="text-button" onClick={() => setScreen('settings')}>지원금 설정 <ArrowRight /></button></div>
-      <div className="funding-grid two">
-        <article className="funding-card major"><div className="metric-icon blue"><Landmark /></div><div><span>지원금</span><strong>{formatWon(funding.subsidy)}</strong><small>총사업비의 {pct(funding.subsidy).toFixed(0)}%</small></div></article>
-        <article className="funding-card major"><div className="metric-icon violet"><HandCoins /></div><div><span>민간부담금</span><strong>{formatWon(funding.matching)}</strong><small>총사업비의 {pct(funding.matching).toFixed(0)}%</small>
-          {funding.matching > 0 && (funding.matchingCashRateKnown
-            ? <div className="matching-split">
-                <div><Banknote /><span>현금</span><b>{formatWon(funding.matchingCash)}</b></div>
-                <div><Package /><span>현물</span><b>{formatWon(funding.matchingInKind)}</b></div>
-              </div>
-            : <div className="matching-split unknown"><AlertCircle /><span>현금·현물 비율 확인 필요 — 과제 설정에서 입력하거나 공고문을 올려 AI로 채우세요</span></div>)}
-        </div></article>
-      </div>
-      {funding.matching === 0
-        ? <p className="field-hint">자기부담 없이 전액 지원되는 과제예요.</p>
-        : funding.matchingCashRateKnown
-        ? <p className="field-hint">민간부담금 중 현금 비율 {funding.matchingCashRate}% 적용 (과제 설정에서 변경). 공고문 기준 최소 금액이며, 실제 협약 내용을 우선 확인하세요.</p>
-        : null}
-    </section>
-
-    <section className="guide-banner"><div className="guide-icon"><ShieldCheck /></div><div><span>과제온 가이드</span><strong>집행 전에 인정 기준을 먼저 확인하세요.</strong><p>비목을 선택하면 중기부 기준 증빙 목록과 주의사항을 바로 보여드려요.</p></div><button onClick={() => setScreen('spending')}>집행 등록하기 <ArrowRight /></button></section>
   </div>;
 }
 

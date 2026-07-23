@@ -345,12 +345,12 @@ describe('R&D 총괄 대시보드 (한눈에 보기)', () => {
     expect(screen.getByRole('button', { name: /중소벤처기업부 1건/ })).toBeInTheDocument();
     expect(screen.getByText('온디바이스 AI 경량화 모델 개발')).toBeInTheDocument();
     expect(screen.getByText(/요약 미입력/)).toBeInTheDocument();   // 과제B는 아직 요약이 없다
-    // 행 클릭 → 현재 과제가 과제B로 바뀐다 (아래 현재 과제 영역이 따라온다)
+    // 행 클릭 → 그 과제의 화면(예산 편성)으로 이동한다. 대시보드는 과제와 무관한 메인 페이지다.
     // 편성 그래프의 "과제B 세목 보기" 버튼과 겹치지 않게 목록 행에서 찾는다
     const rowB = [...document.querySelectorAll('.portfolio-table .portfolio-row')].find((row) => row.textContent?.includes('과제B')) as HTMLElement;
     await user.click(rowB);
-    const divider = document.querySelector('.current-divider');
-    expect(divider).toHaveTextContent('과제B');
+    expect(screen.getByText('편성 합계 100,000,000원')).toBeInTheDocument();   // 과제B(1억)의 예산 편성 화면
+    expect(document.querySelector('.portfolio-table')).toBeNull();            // 대시보드를 떠났다
   });
 
   it('사업별 사업비 구성 표 — 체크를 끄면 합계에서 빠지고, 미구분 집행은 소급을 안내한다', async () => {
