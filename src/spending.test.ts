@@ -275,13 +275,16 @@ describe('spendingMatrix', () => {
     expect(row.cells.every((cell) => cell.plan === 1_000_000)).toBe(true);
   });
 
-  it('사용자가 고친 달은 그 값을, 나머지는 자동 계산값을 쓴다', () => {
+  it('수기로 고친 달을 빼고, 나머지 달이 잔액을 나눠 가진다 — 계획 합계는 예산과 같다', () => {
+    // 예산 1,200만, 7월을 500만으로 → 남은 700만을 11개월이 균등분할 (합계는 정확히 700만)
     const matrix = spendingMatrix(pack, simple({
       monthlyPlan: [{ categoryId: 'DIRECT_ACTIVITY', month: '2026-07', amount: 5_000_000 }],
     }), ALL);
     const row = activityOf(matrix) as ReturnType<typeof spendingMatrix>['rows'][number];
     expect(row.cells[0].plan).toBe(5_000_000);
-    expect(row.cells[1].plan).toBe(1_000_000);
+    expect(row.cells[1].plan).toBe(636_363);                       // 7,000,000 / 11 버림
+    expect(row.cells.reduce((sum, cell) => sum + cell.plan, 0)).toBe(12_000_000);   // 합계 보존
+    expect(row.planTotal).toBe(12_000_000);
   });
 
   it('예산이 바뀌면 고치지 않은 달만 따라 움직인다', () => {
@@ -291,7 +294,17 @@ describe('spendingMatrix', () => {
     }), ALL);
     const row = activityOf(matrix) as ReturnType<typeof spendingMatrix>['rows'][number];
     expect(row.cells[0].plan).toBe(5_000_000);
-    expect(row.cells[1].plan).toBe(2_000_000);
+    expect(row.cells[1].plan).toBe(1_727_272);                     // (24,000,000 − 5,000,000) / 11 버림
+    expect(row.planTotal).toBe(24_000_000);
+  });
+
+  it('수기 합이 예산을 넘으면 남은 달은 0이 되고 planTotal이 초과를 드러낸다', () => {
+    const matrix = spendingMatrix(pack, simple({
+      monthlyPlan: [{ categoryId: 'DIRECT_ACTIVITY', month: '2026-07', amount: 15_000_000 }],
+    }), ALL);
+    const row = activityOf(matrix) as ReturnType<typeof spendingMatrix>['rows'][number];
+    expect(row.cells[1].plan).toBe(0);
+    expect(row.planTotal).toBe(15_000_000);   // 예산 12,000,000 초과 — 화면 검증이 알린다
   });
 
   it('집행금액은 집행일이 속한 달에 잡힌다', () => {

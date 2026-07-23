@@ -142,8 +142,8 @@ export const evidenceReadiness = (pack: RulePack, project: Project): EvidenceRea
 
 // ---- 월별 집행계획 ----
 // 사업기간 중 언제 얼마를 써야 하는지 보여준다. 계획은 예산을 월수로 균등분할한 값이 기본이고,
-// 사용자가 고친 달만 저장한다(project.monthlyPlan). 안 고친 달은 계속 자동값을 따라가므로
-// 예산이 바뀌면 알아서 재조정된다.
+// 사용자가 고친 달만 저장한다(project.monthlyPlan). 안 고친 달은 "예산 − 수기 입력 합"을
+// 다시 나눠 가진다 — 한 달을 늘리면 나머지 달이 자동으로 줄어, 계획 합계가 예산과 맞아떨어진다.
 
 // 날짜 문자열에서 'YYYY-MM'만 떼어낸다. Date로 파싱하면 표준시 차이로 달이 하루 밀릴 수 있어
 // 문자열을 그대로 자른다 (집행일·과제 기간은 모두 'YYYY-MM-DD' 형식이다).
@@ -182,6 +182,7 @@ export interface MonthCell { month: string; plan: number; actual: number }
 export interface MatrixSubRow extends SubSpendRow {
   cells: MonthCell[];
   planEditable: boolean;   // 편성된 세목만 계획을 고칠 수 있다 (삭제된 세목·미지정은 예산이 없다)
+  planTotal: number;       // 사업기간 전체의 계획 합 — 예산과 다르면 검증에서 알린다
 }
 export interface MatrixRow {
   categoryId: BudgetCategoryId;
@@ -189,6 +190,7 @@ export interface MatrixRow {
   budget: number; spent: number; remaining: number; rate: number; over: boolean;
   cells: MonthCell[];
   planEditable: boolean;   // 세목이 나뉜 비목은 세목 합계가 계획이므로 직접 고칠 수 없다
+  planTotal: number;       // 사업기간 전체의 계획 합 (세목이 나뉘면 세목 합계)
   subRows: MatrixSubRow[];
 }
 export interface SpendingMatrix {
@@ -231,33 +233,43 @@ export const spendingMatrix = (pack: RulePack, project: Project, months: string[
   };
 
   // 계획을 저장하는 최소 단위의 칸. 세목이 나뉜 비목은 세목이, 아니면 비목 자체가 단위다.
-  const leafCells = (categoryId: BudgetCategoryId, subItemId: string | undefined, budget: number, expenses: Expense[]): MonthCell[] => {
-    const auto = splitEvenly(budget, allMonths.length);
+  // 수기로 고친 달을 뺀 나머지 달이 "예산 − 수기 합"을 균등하게 나눠 가진다 — 한 달을 고치면
+  // 안 고친 달들이 자동으로 재조정돼 계획 합계가 예산과 맞는다. 수기 합이 예산을 넘으면
+  // 남은 달은 0이 되고, planTotal이 예산과 어긋나 검증에서 드러난다.
+  const leafCells = (categoryId: BudgetCategoryId, subItemId: string | undefined, budget: number, expenses: Expense[]): { cells: MonthCell[]; planTotal: number } => {
+    const overrides = new Map<string, number>();
+    for (const month of allMonths) {
+      const value = overrideOf(categoryId, subItemId, month);
+      if (value != null) overrides.set(month, value);
+    }
+    const fixed = sum([...overrides.values()]);
+    const autoMonths = allMonths.filter((month) => !overrides.has(month));
+    const autoSplit = splitEvenly(Math.max(0, budget - fixed), autoMonths.length);
+    const autoByMonth = new Map(autoMonths.map((month, index) => [month, autoSplit[index] ?? 0]));
     const actual = actualByMonth(expenses);
-    return months.map((month) => {
-      const index = indexOf.get(month);
-      return {
-        month,
-        plan: overrideOf(categoryId, subItemId, month) ?? (index == null ? 0 : auto[index] ?? 0),
-        actual: actual.get(month) ?? 0,
-      };
-    });
+    const cells = months.map((month) => ({
+      month,
+      plan: overrides.get(month) ?? autoByMonth.get(month) ?? 0,
+      actual: actual.get(month) ?? 0,
+    }));
+    return { cells, planTotal: fixed + sum(autoSplit) };
   };
 
   const rows: MatrixRow[] = categorySpending(pack, project).map((row) => {
     const expenses = project.expenses.filter((expense) => expense.categoryId === row.categoryId);
-    const subRows: MatrixSubRow[] = row.subRows.map((sub) => ({
-      ...sub,
-      planEditable: !!sub.subItemId && !sub.orphan,
-      cells: leafCells(row.categoryId, sub.subItemId, sub.budget,
-        expenses.filter((expense) => sub.subItemId ? expense.subItemId === sub.subItemId : !expense.subItemId)),
-    }));
+    const subRows: MatrixSubRow[] = row.subRows.map((sub) => {
+      const leaf = leafCells(row.categoryId, sub.subItemId, sub.budget,
+        expenses.filter((expense) => sub.subItemId ? expense.subItemId === sub.subItemId : !expense.subItemId));
+      return { ...sub, planEditable: !!sub.subItemId && !sub.orphan, cells: leaf.cells, planTotal: leaf.planTotal };
+    });
     // 세목이 나뉜 비목의 계획은 세목 합계다 — 편성 화면의 "세목이 있으면 비목 금액은 세목 합계" 규칙과 같다.
     const divided = subRows.some((sub) => sub.planEditable);
+    const leaf = divided ? null : leafCells(row.categoryId, undefined, row.budget, expenses);
     return {
       ...row,
       planEditable: !divided,
-      cells: divided ? addCells(subRows, months) : leafCells(row.categoryId, undefined, row.budget, expenses),
+      cells: leaf ? leaf.cells : addCells(subRows, months),
+      planTotal: leaf ? leaf.planTotal : sum(subRows.map((sub) => sub.planTotal)),
       subRows,
     };
   });

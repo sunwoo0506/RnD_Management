@@ -498,6 +498,12 @@ label { display: grid; gap: 6px; color: #4d586c; font-size: 13px; font-weight: 7
 .editor-confirm-row { display: block; margin: 4px 0 6px; }
 .editor-confirm-row button { font-size: 12px; padding: 7px 14px; }
 
+/* 월별 계획 ↔ 예산 검증 */
+.plan-check { display: flex; gap: 7px; align-items: flex-start; margin: 10px 0 0; font-size: 12px; line-height: 1.6; }
+.plan-check svg { width: 14px; flex: none; margin-top: 2px; }
+.plan-check.ok { color: #1d8a5f; }
+.plan-check.bad { color: #b4552d; }
+
 /* ---- R&D 총괄 대시보드 (한눈에 보기 ①) ---- */
 /* 기본 .panel은 패딩이 없다(panel-head만 있음) — 총괄 패널들은 본문에 좌우 여백과 세로 리듬을 준다. */
 .portfolio-panel, .portfolio-charts, .portfolio-todos, .portfolio-people { display: grid; row-gap: 16px; padding-bottom: 22px; }

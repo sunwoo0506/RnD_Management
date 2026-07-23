@@ -1615,6 +1615,15 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
           </tfoot>
         </table>
       </div>
+      {/* 월별 계획이 예산을 다 담았는지 검증 — 수기 입력이 예산을 넘거나 전 달 수기 합이 어긋나면 알린다 */}
+      {(() => {
+        const leaves = matrix.rows.flatMap((row) => row.planEditable
+          ? [{ name: row.name, planTotal: row.planTotal, budget: row.budget }]
+          : row.subRows.filter((sub) => sub.planEditable).map((sub) => ({ name: `${row.name} · ${sub.name}`, planTotal: sub.planTotal, budget: sub.budget })));
+        const off = leaves.filter((leaf) => leaf.planTotal !== leaf.budget);
+        if (!off.length) return <p className="plan-check ok"><CheckCircle2 /> 월별 계획 합계가 비목별 예산과 일치합니다.</p>;
+        return <p className="plan-check bad"><AlertCircle /> 월별 계획이 예산과 다릅니다 — {off.map((leaf) => `${leaf.name} ${leaf.planTotal > leaf.budget ? '초과' : '부족'} ${formatWon(Math.abs(leaf.planTotal - leaf.budget))}`).join(' · ')}. 수기 입력한 달의 합이 예산을 넘었거나, 모든 달을 수기로 채운 합이 예산과 다릅니다.</p>;
+      })()}
       {matrix.outOfRange && <p className="month-gap">사업기간 밖 집행이 {matrix.outOfRange.count}건 있습니다. 정산에서 문제가 될 수 있으니 집행일을 확인해주세요.</p>}
     </section>
     <form className="panel expense-form" onSubmit={submit}><div className="form-title"><div><h3>{editingId ? '집행건 수정' : '새 집행건'}</h3><p>{editingId ? '비목·세목과 결제수단은 수정할 수 없어요. 바뀌었다면 삭제 후 다시 등록해주세요.' : '비목과 세목을 고르면 그 규정이 요구하는 서류가 자동으로 바뀝니다.'}</p></div>{editingId && <button type="button" className="close" onClick={closeForm} aria-label="수정 취소">×</button>}</div>
