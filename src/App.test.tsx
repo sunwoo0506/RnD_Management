@@ -255,6 +255,22 @@ describe('과제온 핵심 사용자 흐름', () => {
     expect(document.querySelector('.portfolio-panel')).toHaveTextContent('200,000천원');   // 총괄은 천원 단위
   });
 
+  it('과제를 삭제해도 다른 과제가 남아 있으면 한눈에 보기로 돌아간다', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const a = { ...fixture('nrd2026-forprofit'), id: 'pa', name: '지울과제' };
+    const b = { ...fixture('prestartup2026'), id: 'pb', name: '남은과제' };
+    localStorage.setItem('gwajeon.projects.v1', JSON.stringify([a, b]));
+    localStorage.setItem('gwajeon.active-project', 'pa');
+    const user = userEvent.setup(); render(<App />);
+    await user.click(screen.getByRole('button', { name: '과제 설정' }));   // 삭제 직전 화면이 설정이어도
+    await user.click(document.querySelector('.reset-button') as HTMLElement);   // 사이드바의 과제 삭제
+    // 등록 화면이 아니라 총괄 대시보드로 — 남은 과제가 목록에 있다
+    expect(document.querySelector('.portfolio-table')).not.toBeNull();
+    expect(document.querySelector('.portfolio-table')).toHaveTextContent('남은과제');
+    expect(document.querySelector('.portfolio-table')).not.toHaveTextContent('지울과제');
+    vi.restoreAllMocks();
+  });
+
   it('집행 내역 초기화는 집행만 비우고 예산 편성은 유지한다', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     localStorage.setItem('gwajeon.project.v1', JSON.stringify(fixture()));

@@ -2432,6 +2432,9 @@ export default function App() {
     if (session) await deleteCloudProject(project.id);
     setProjects((list) => list.filter((p) => p.id !== project.id));
     setActiveId(null);
+    // 다른 과제가 남아 있으면 총괄(한눈에 보기)로 돌아간다 — 삭제 직전 화면(설정 등)에
+    // 남으면 엉뚱한 과제의 그 화면이 나온다. 남은 과제가 없으면 등록 화면이 자연히 뜬다.
+    setScreen('overview');
   };
   return <div className="app-shell"><Sidebar screen={screen} setScreen={setScreen} project={project} projects={projects} onSelect={(id) => { setActiveId(id); setScreen('spending'); }} onAdd={() => setAdding(true)} onReset={reset} account={session?.user.email ?? null} sync={syncState} onLogout={logout} /><main className="main"><Header project={project} projects={projects} screen={screen} />{screen === 'overview' && <Overview project={project} projects={projects} onSelectProject={(id) => setActiveId(id)} setScreen={setScreen} />}{screen === 'budget' && <Budget project={project} update={update} setScreen={setScreen} />}{screen === 'spending' && <Spending project={project} update={update} />}{screen === 'change' && <ChangeManagement project={project} update={update} />}{screen === 'team' && <Team project={project} update={update} setScreen={setScreen} />}{screen === 'settings' && <Settings project={project} update={update} onReset={reset} />}</main></div>;
 }
