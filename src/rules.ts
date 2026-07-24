@@ -1063,15 +1063,16 @@ export interface FundingCapCheck {
   rule: PackRule;
 }
 
-// 사업기간이 걸친 연차 수. 12개월당 1년차로 세고, 남는 달도 한 연차로 친다
-// (디딤돌은 최대 1년 6개월인데 2년차까지 걸쳐 총 2억을 쓴다).
+// 사업기간이 걸친 연차 수. 연차는 달력연도를 기준으로 하므로 1차년도는 시작월부터
+// 그해 12월까지이고, 다음 연차부터는 1월~12월이다.
 export const fundingYears = (startDate?: string, endDate?: string): number => {
   const from = /^(\d{4})-(\d{2})-(\d{2})$/.exec((startDate ?? '').trim());
   const to = /^(\d{4})-(\d{2})-(\d{2})$/.exec((endDate ?? '').trim());
   if (!from || !to) return 1;
-  const months = (Number(to[1]) - Number(from[1])) * 12 + (Number(to[2]) - Number(from[2]))
-    + (Number(to[3]) >= Number(from[3]) ? 1 : 0);
-  return months > 0 ? Math.ceil(months / 12) : 1;
+  const startYear = Number(from[1]);
+  const endYear = Number(to[1]);
+  if (endYear < startYear || (endYear === startYear && `${to[2]}-${to[3]}` < `${from[2]}-${from[3]}`)) return 1;
+  return endYear - startYear + 1;
 };
 
 export const fundingCapChecks = (pack: RulePack, project: Project): FundingCapCheck[] =>

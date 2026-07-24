@@ -1362,10 +1362,10 @@ function Budget({ project, projects, researchers, update, setScreen }: { project
       const acknowledged = (project.fundingCapAck ?? []).includes(check.rule.id);
       if (matches) return <div key={check.rule.id} className="notice soft"><CheckCircle2 /><div>
         <strong>{check.perYear != null
-          ? `${check.targetLabel}이 ${check.years}개 연차 총 적용 한도와 일치합니다`
+          ? `연차별 ${check.basis} 한도는 ${formatWon(check.perYear)}입니다`
           : `${check.targetLabel}이 이 사업의 한도와 일치합니다`}</strong>
         <span>{check.perYear != null
-          ? `연차별 최대 ${formatWon(check.perYear)} · ${check.years}개 연차 합계 최대 ${formatWon(check.cap)}`
+          ? `입력한 ${check.targetLabel} 합계 ${formatWon(check.entered)} · ${check.years}개 연차 전체 최대 ${formatWon(check.cap)}`
           : formatWon(check.cap)} · {check.basis} {refLink(check.rule)}</span>
       </div></div>;
       // 원하는 금액으로 맞추면 총사업비와 비목 편성을 함께 옮긴다 — 금액만 바꾸고 편성을 두면 합계가 어긋난다.
@@ -1408,18 +1408,20 @@ function Budget({ project, projects, researchers, update, setScreen }: { project
       return <section key={check.rule.id} className={`cap-alert ${check.over ? 'over' : 'under'}`}>
         <div className="cap-alert-head">
           <span className="cap-badge">{check.over ? '확인 필요' : '금액 확인'}</span>
-          <h3>{check.over
-            ? `입력한 ${check.targetLabel}이 사업기간 총 적용 한도를 넘습니다`
-            : `입력한 ${check.targetLabel}이 사업기간 총 적용 한도보다 적습니다`}</h3>
+          <h3>{check.perYear != null
+            ? `연차별 ${check.basis} 한도는 ${formatWon(check.perYear)}입니다`
+            : check.over
+              ? `입력한 ${check.targetLabel}이 사업 한도를 넘습니다`
+              : `입력한 ${check.targetLabel}이 사업 한도보다 적습니다`}</h3>
         </div>
         <div className="cap-alert-figures">
           <div><span>입력한 {check.targetLabel} 합계</span><strong>{formatWon(check.entered)}</strong></div>
           <div className="cap-arrow"><ArrowRight /></div>
           {check.perYear != null
             ? <><div><span>연차별 한도</span><strong className="cap-target">{formatWon(check.perYear)}</strong></div>
-              <div><span>{check.years}개 연차 합계 한도</span><strong>{formatWon(check.cap)}</strong></div></>
+              <div><span>{check.years}개 연차 전체 최대</span><strong>{formatWon(check.cap)}</strong></div></>
             : <div><span>이 사업 한도</span><strong className="cap-target">{formatWon(check.cap)}</strong></div>}
-          <div className="cap-diff"><span>차이</span><strong>{check.over ? '+' : '−'}{formatWon(Math.abs(check.diff))}</strong></div>
+          {check.perYear == null && <div className="cap-diff"><span>차이</span><strong>{check.over ? '+' : '−'}{formatWon(Math.abs(check.diff))}</strong></div>}
         </div>
         {/* 연 한도가 총액보다 먼저 걸리는 사업이 있다 — 왜 2억이 아니라 1억인지 밝히지 않으면
             사용자는 화면이 규정을 잘못 읽은 줄 안다. */}
@@ -1431,7 +1433,9 @@ function Budget({ project, projects, researchers, update, setScreen }: { project
         </p>}
         <p className="cap-alert-basis">{check.basis} · {check.rule.message} {refLink(check.rule)}</p>
         <div className="cap-alert-actions">
-          <button type="button" className="primary" onClick={applyCap}><Check /> 총 {formatWon(check.cap)}으로 수정</button>
+          {check.perYear != null && !check.over
+            ? <button type="button" className="primary" onClick={keep}><Check /> 연차별 한도 확인</button>
+            : <button type="button" className="primary" onClick={applyCap}><Check /> {formatWon(check.cap)}으로 수정</button>}
           <button type="button" className="secondary" onClick={keep}>현재 금액 유지</button>
           {/* 한도·현재값 말고 원하는 금액을 직접 넣고 싶은 경우 — 예: 한도보다 낮게 잡되 현재값과도 다른 금액 */}
           <div className="cap-manual">
@@ -1660,12 +1664,17 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
   // ---- 예산 집행 현황 (비목·세목 × 월) ----
   // 월 열은 숨길 수 있고, 다 숨겨도 예산·집행·잔액 열은 남는다.
   const allMonths = monthSequence(project.startDate, project.endDate);
-  // 사업 시작월부터 12개월씩 연차를 나눈다. 달력연도 기준으로 자르면 7월 시작 과제의 1차년도가
-  // 두 조각으로 갈라지므로, 협약의 사업연차 기준이 집행·연 한도 확인에 더 알맞다.
-  const annualPeriods = Array.from({ length: Math.ceil(allMonths.length / 12) }, (_, index) => {
-    const months = allMonths.slice(index * 12, (index + 1) * 12);
-    return { index, label: `${index + 1}차년도`, months, from: months[0], to: months[months.length - 1] };
-  });
+  // 이 사업의 연차는 달력연도 기준이다: 1차년도는 시작월~그해 12월, 이후는 1월~12월.
+  // 종료 연도는 사업 종료월까지만 담는다.
+  const annualPeriods = [...allMonths.reduce((groups, month) => {
+    const year = month.slice(0, 4);
+    const months = groups.get(year) ?? [];
+    months.push(month);
+    groups.set(year, months);
+    return groups;
+  }, new Map<string, string[]>()).entries()].map(([year, months], index) => ({
+    index, year, label: `${index + 1}차년도`, months, from: months[0], to: months[months.length - 1],
+  }));
   const currentMonth = today().slice(0, 7);
   const currentAnnualIndex = annualPeriods.findIndex((period) => period.months.includes(currentMonth));
   const initialAnnualIndex = currentAnnualIndex >= 0
@@ -1673,8 +1682,8 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
     : allMonths.length > 0 && currentMonth > allMonths[allMonths.length - 1] ? Math.max(0, annualPeriods.length - 1) : 0;
   const [selectedAnnualIndex, setSelectedAnnualIndex] = useState(initialAnnualIndex);
   const selectedAnnualPeriod = annualPeriods[selectedAnnualIndex] ?? annualPeriods[0];
-  // 현재 진행 연차의 월은 기본으로 보이고, 사용자가 필요 없는 달만 개별로 끈다.
-  const [hiddenMonths, setHiddenMonths] = useState<Set<string>>(() => new Set());
+  // 첫 진입 때는 월을 모두 접어 고정 요약 열을 먼저 보여준다. 필요한 달만 체크해서 연다.
+  const [hiddenMonths, setHiddenMonths] = useState<Set<string>>(() => new Set(monthSequence(project.startDate, project.endDate)));
   const [monthsHidden, setMonthsHidden] = useState(false);
   const [budgetHistoryOpen, setBudgetHistoryOpen] = useState(false);
   const shownMonths = monthsHidden ? [] : (selectedAnnualPeriod?.months ?? []).filter((month) => !hiddenMonths.has(month));
@@ -1688,7 +1697,7 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
   const toggleMonth = (month: string) => setHiddenMonths((prev) => { const next = new Set(prev); if (next.has(month)) next.delete(month); else next.add(month); return next; });
   const selectAnnualPeriod = (index: number) => {
     setSelectedAnnualIndex(index);
-    setHiddenMonths(new Set());
+    setHiddenMonths(new Set(annualPeriods[index]?.months ?? []));
     setMonthsHidden(false);
   };
   const editPlan = (categoryId: string, subItemId: string | undefined, month: string, raw: string, split?: FundingSplit) =>

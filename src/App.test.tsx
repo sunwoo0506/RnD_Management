@@ -1002,11 +1002,12 @@ describe('월별 집행계획 (매트릭스 열)', () => {
   it('월마다 계획·집행 열이 나란히 붙는다', async () => {
     const user = userEvent.setup();
     await openSpending(user, fixture('nrd2026-forprofit'));
-    // 2026-07-01 ~ 2027-06-30 = 12개월이 열 머리글로 깔린다
+    // 1차년도는 시작월부터 해당 연도 12월까지다.
     expect(screen.getByRole('columnheader', { name: '2026-07' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: '2027-06' })).toBeInTheDocument();
-    expect(screen.getAllByRole('columnheader', { name: '계획' })).toHaveLength(12);
-    expect(screen.getAllByRole('columnheader', { name: '집행' })).toHaveLength(12);
+    expect(screen.getByRole('columnheader', { name: '2026-12' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: '2027-01' })).toBeNull();
+    expect(screen.getAllByRole('columnheader', { name: '계획' })).toHaveLength(6);
+    expect(screen.getAllByRole('columnheader', { name: '집행' })).toHaveLength(6);
   });
 
   it('월별 숨기기를 누르면 월 열만 사라지고 예산·집행·잔액은 남는다', async () => {
@@ -1033,7 +1034,7 @@ describe('월별 집행계획 (매트릭스 열)', () => {
     await user.click(screen.getByRole('button', { name: '해제' }));
     expect(screen.queryByRole('columnheader', { name: '2026-08' })).toBeNull();
     await user.click(screen.getByRole('button', { name: '전체' }));
-    expect(screen.getAllByRole('columnheader', { name: '계획' })).toHaveLength(12);
+    expect(screen.getAllByRole('columnheader', { name: '계획' })).toHaveLength(6);
   });
 
   it('세목을 나누지 않은 비목은 계획 칸을 바로 고칠 수 있다', async () => {
@@ -1064,7 +1065,7 @@ describe('월별 집행계획 (매트릭스 열)', () => {
     expect(screen.getByText('사업기간 2026-07-01 ~ 2027-06-30 · 12개월')).toBeInTheDocument();
   });
 
-  it('사업기간을 12개월 단위 연차로 나누고 현재 진행 연차만 기본 표시한다', async () => {
+  it('사업기간을 달력연도 단위 연차로 나누고 현재 진행 연차만 표시한다', async () => {
     const user = userEvent.setup();
     await openSpending(user, { ...fixture('nrd2026-forprofit'), startDate: '2026-07-01', endDate: '2027-12-31' });
     expect(screen.getByRole('button', { name: '1차년도' })).toHaveClass('active');
@@ -1073,8 +1074,19 @@ describe('월별 집행계획 (매트릭스 열)', () => {
 
     await user.click(screen.getByRole('button', { name: '2차년도' }));
     expect(screen.queryByRole('columnheader', { name: '2026-07' })).toBeNull();
-    expect(screen.getByRole('columnheader', { name: '2027-07' })).toBeInTheDocument();
-    expect(screen.getAllByRole('columnheader', { name: '계획' })).toHaveLength(6);
+    expect(screen.queryByRole('columnheader', { name: '2027-07' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: '전체' }));
+    expect(screen.getByRole('columnheader', { name: '2027-01' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '2027-12' })).toBeInTheDocument();
+    expect(screen.getAllByRole('columnheader', { name: '계획' })).toHaveLength(12);
+  });
+
+  it('집행·증빙 화면의 월 표시는 처음에 모두 체크 해제되어 있다', async () => {
+    const user = userEvent.setup();
+    await openSpending(user, fixture('nrd2026-forprofit'), false);
+    expect(screen.getByRole('checkbox', { name: '26-07' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: '26-12' })).not.toBeChecked();
+    expect(screen.queryByRole('columnheader', { name: '2026-07' })).toBeNull();
   });
 
   it('사업기간이 한 달뿐이면 월이 하나만 나오는 이유를 알려준다', async () => {

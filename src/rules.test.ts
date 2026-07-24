@@ -710,6 +710,17 @@ describe('사업비 한도 대조', () => {
     expect(halfMore[0].over).toBe(false);
   });
 
+  it('연차 수는 시작월과 관계없이 달력연도 경계로 계산한다', () => {
+    const checks = fundingCapChecks(getPack('didimdol2026'), {
+      ...projectWith(100_000_000, 'didimdol2026'),
+      startDate: '2026-07-24',
+      endDate: '2027-06-30',
+    });
+    expect(checks[0].years).toBe(2);
+    expect(checks[0].perYear).toBe(100_000_000);
+    expect(checks[0].cap).toBe(200_000_000);
+  });
+
   it('연 한도가 없는 사업은 총액 한도를 그대로 쓴다', () => {
     // 사업기간을 짧게 잡아도 한도가 줄면 안 된다 (예비창업패키지는 연 한도가 없다)
     const checks = fundingCapChecks(getPack('prestartup2026'), { ...projectWith(20_000_000, 'prestartup2026'), endDate: '2026-03-31' });
