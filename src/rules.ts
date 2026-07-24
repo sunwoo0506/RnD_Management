@@ -1083,15 +1083,23 @@ export const fundingCapChecks = (pack: RulePack, project: Project): FundingCapCh
       const entered = target === 'subsidy'
         ? (project.subsidyAmount ?? project.totalBudget)
         : project.totalBudget;
+      // 이미 등록된 과제의 규정 사본에는 fundingCapPerYear 필드가 없을 수 있다.
+      // 디딤돌의 기존 문구(최대 2억원, 연 1억원 이내)는 그대로 보존되어 있으므로 이를
+      // 호환 정보로 읽어 새로 등록한 과제와 동일한 연차별 안내를 제공한다.
+      const legacyAnnualCap = rule.fundingCap === 200_000_000
+        && /(?:연|年)\s*1\s*억\s*원?/.test(rule.message)
+        ? 100_000_000
+        : undefined;
+      const perYear = rule.fundingCapPerYear ?? legacyAnnualCap;
       // 총액과 연 한도가 함께 있으면 짧은 과제에는 총액을 다 쓸 수 없다 —
       // "최대 2억원(연 1억원 이내)"인 사업의 1년짜리 과제 한도는 1억이다.
       const years = fundingYears(project.startDate, project.endDate);
-      const byYear = rule.fundingCapPerYear != null ? rule.fundingCapPerYear * years : null;
+      const byYear = perYear != null ? perYear * years : null;
       const cap = byYear != null ? Math.min(rule.fundingCap, byYear) : rule.fundingCap;
       return {
         cap,
         totalCap: rule.fundingCap,
-        ...(rule.fundingCapPerYear != null ? { perYear: rule.fundingCapPerYear } : {}),
+        ...(perYear != null ? { perYear } : {}),
         years,
         annualBound: byYear != null && byYear < rule.fundingCap,
         target,

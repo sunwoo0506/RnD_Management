@@ -721,6 +721,26 @@ describe('사업비 한도 대조', () => {
     expect(checks[0].cap).toBe(200_000_000);
   });
 
+  it('기존 과제의 규정 사본도 문구에서 디딤돌 연 1억 한도를 복원한다', () => {
+    const current = getPack('didimdol2026');
+    const legacy = {
+      ...current,
+      rules: current.rules.map((rule) => {
+        if (rule.fundingCap !== 200_000_000) return rule;
+        const { fundingCapPerYear: _removed, ...withoutAnnualField } = rule;
+        return withoutAnnualField;
+      }),
+    };
+    const checks = fundingCapChecks(legacy, {
+      ...projectWith(100_000_000, 'didimdol2026'),
+      startDate: '2026-07-24',
+      endDate: '2027-12-31',
+    });
+    expect(checks[0].perYear).toBe(100_000_000);
+    expect(checks[0].years).toBe(2);
+    expect(checks[0].cap).toBe(200_000_000);
+  });
+
   it('연 한도가 없는 사업은 총액 한도를 그대로 쓴다', () => {
     // 사업기간을 짧게 잡아도 한도가 줄면 안 된다 (예비창업패키지는 연 한도가 없다)
     const checks = fundingCapChecks(getPack('prestartup2026'), { ...projectWith(20_000_000, 'prestartup2026'), endDate: '2026-03-31' });
