@@ -1064,6 +1064,19 @@ describe('월별 집행계획 (매트릭스 열)', () => {
     expect(screen.getByText('사업기간 2026-07-01 ~ 2027-06-30 · 12개월')).toBeInTheDocument();
   });
 
+  it('사업기간을 12개월 단위 연차로 나누고 현재 진행 연차만 기본 표시한다', async () => {
+    const user = userEvent.setup();
+    await openSpending(user, { ...fixture('nrd2026-forprofit'), startDate: '2026-07-01', endDate: '2027-12-31' });
+    expect(screen.getByRole('button', { name: '1차년도' })).toHaveClass('active');
+    expect(screen.getByRole('columnheader', { name: '2026-07' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: '2027-07' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: '2차년도' }));
+    expect(screen.queryByRole('columnheader', { name: '2026-07' })).toBeNull();
+    expect(screen.getByRole('columnheader', { name: '2027-07' })).toBeInTheDocument();
+    expect(screen.getAllByRole('columnheader', { name: '계획' })).toHaveLength(6);
+  });
+
   it('사업기간이 한 달뿐이면 월이 하나만 나오는 이유를 알려준다', async () => {
     const user = userEvent.setup();
     await openSpending(user, { ...fixture('nrd2026-forprofit'), startDate: '2026-07-01', endDate: '2026-07-31' });
