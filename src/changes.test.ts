@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { agreementDocsOf, applyTransfer, approveChange, missingAgreementDocs, nextDocumentNo, pendingChanges, projectedBudgets, rejectChange, requestChange, statusOf, typeOf } from './changes';
+import { packFor } from './rules';
+import { monthSequence, spendingMatrix, validateMonthlyRedistribution } from './spending';
 import type { Project, ProjectDocumentLink } from './types';
 
 // 변경은 신청해서 승인을 받아야 효력이 생긴다 — 예산이 언제 움직이는지가 이 파일의 계약이다.
@@ -120,13 +122,13 @@ describe('통보 · 승인 구분', () => {
 });
 
 describe('승인 · 반려', () => {
-  it('승인되면 그때 예산이 움직이고 편성 확정이 풀린다', () => {
+  it('승인되면 그때 예산이 움직이고 기존 편성 확정 상태를 유지한다', () => {
     const requested = { ...requestChange(project(), transfer, NOW), budgetConfirmed: true };
     const approved = approveChange(requested, requested.changes[0].id, '2026-09-10T00:00:00.000Z');
     expect(amountOf(approved, 'DIRECT_LABOR')).toBe(50_000_000);
     expect(amountOf(approved, 'DIRECT_ACTIVITY')).toBe(50_000_000);
     expect(statusOf(approved.changes[0])).toBe('approved');
-    expect(approved.budgetConfirmed).toBe(false);
+    expect(approved.budgetConfirmed).toBe(true);
     expect(pendingChanges(approved)).toHaveLength(0);
   });
 
@@ -171,5 +173,116 @@ describe('금액 이동 계산', () => {
   it('받는 비목이 아직 없으면 만들어 넣는다', () => {
     const moved = applyTransfer([{ categoryId: 'A', amount: 100 }], 'A', 'B', 30);
     expect(moved).toEqual([{ categoryId: 'A', amount: 70 }, { categoryId: 'B', amount: 30 }]);
+  });
+
+  it('세목이 있는 비목은 변경 후 금액에 맞춰 세목도 같은 비율로 조정한다', () => {
+    const moved = applyTransfer([
+      { categoryId: 'A', amount: 20, subItems: [{ id: 'a1', name: '회의비', amount: 8 }, { id: 'a2', name: '출장비', amount: 12 }] },
+      { categoryId: 'B', amount: 10, subItems: [{ id: 'b1', name: '재료비', amount: 10 }] },
+    ], 'A', 'B', 5);
+    const from = moved.find((item) => item.categoryId === 'A')!;
+    const to = moved.find((item) => item.categoryId === 'B')!;
+    expect(from.subItems?.reduce((sum, sub) => sum + sub.amount, 0)).toBe(from.amount);
+    expect(to.subItems?.reduce((sum, sub) => sum + sub.amount, 0)).toBe(to.amount);
+    expect(from.subItems?.map((sub) => sub.amount)).toEqual([6, 9]);
+    expect(to.subItems?.map((sub) => sub.amount)).toEqual([15]);
+  });
+
+  it('비목이 줄어들면 현물 계상액도 새 비목 금액을 넘지 않게 제한한다', () => {
+    const moved = applyTransfer([
+      { categoryId: 'A', amount: 20, inKindAmount: 15 },
+      { categoryId: 'B', amount: 10 },
+    ], 'A', 'B', 10);
+    expect(moved.find((item) => item.categoryId === 'A')?.inKindAmount).toBe(10);
+  });
+});
+
+// 승인되면 예산이 바뀐다 — 월별 집행계획도 새 예산에 맞춰야 한다.
+// 손대지 않은 비목은 균등분할이라 자동으로 따라가지만, 월별로 손대 둔 비목은 옛 배분에 갇힌다.
+// 적용월(변경시작월)을 받아 그 달 이전은 유지하고, 그 달부터 남은 예산을 다시 나눈다.
+describe('승인 시 월별 집행계획 재배분 (적용월 기준)', () => {
+  const pack = packFor(project());
+  const planOf = (p: Project, categoryId: string) => {
+    const months = monthSequence(p.startDate, p.endDate);
+    const row = spendingMatrix(pack, p, months).rows.find((r) => r.categoryId === categoryId)!;
+    const at = (month: string) => row.cells[months.indexOf(month)]?.plan ?? 0;
+    return { at, planTotal: row.planTotal };
+  };
+
+  it('적용월 이전 달은 그대로 두고, 적용월부터 남은 예산을 새 예산에 맞춰 다시 나눈다', () => {
+    // 받는 비목(ACTIVITY, 40M)을 7월에 손대 둔 상태 — 그대로면 예산이 바뀌어도 옛 배분에 갇힌다.
+    const edited = project({ monthlyPlan: [{ categoryId: 'DIRECT_ACTIVITY', month: '2026-07', amount: 5_000_000 }] });
+    const before = planOf(edited, 'DIRECT_ACTIVITY');
+
+    // LABOR → ACTIVITY 12M 이동, 적용월 2026-10 (기간의 4번째 달)
+    const requested = requestChange(edited, { ...transfer, amount: 12_000_000, effectiveMonth: '2026-10' }, NOW);
+    const approved = approveChange(requested, requested.changes[0].id, NOW, undefined, pack);
+    const after = planOf(approved, 'DIRECT_ACTIVITY');
+
+    // 적용월 이전(7·8·9월)은 승인 전 값 그대로
+    for (const m of ['2026-07', '2026-08', '2026-09']) expect(after.at(m)).toBe(before.at(m));
+    // 계획 합계가 새 예산(52M)과 맞는다 — 이게 핵심 수정(월 배분이 편성을 따라간다)
+    expect(after.planTotal).toBe(52_000_000);
+    expect(amountOf(approved, 'DIRECT_ACTIVITY')).toBe(52_000_000);
+    // 늘어난 예산은 적용월(10월) 이후로 몰린다 — 10월이 직전 달(9월)보다 커진다
+    expect(after.at('2026-10')).toBeGreaterThan(after.at('2026-09'));
+  });
+
+  it('보내는 비목도 적용월 이전은 유지하고 합계가 새 예산과 맞는다', () => {
+    const before = planOf(project(), 'DIRECT_LABOR');   // 60M 균등분할 = 월 5,000,000
+    const requested = requestChange(project(), { ...transfer, amount: 12_000_000, effectiveMonth: '2026-10' }, NOW);
+    const approved = approveChange(requested, requested.changes[0].id, NOW, undefined, pack);
+    const after = planOf(approved, 'DIRECT_LABOR');
+
+    for (const m of ['2026-07', '2026-08', '2026-09']) expect(after.at(m)).toBe(before.at(m));
+    expect(after.planTotal).toBe(48_000_000);
+    // 줄어든 예산은 적용월 이후에서 빠진다 — 10월이 직전 달보다 작아진다
+    expect(after.at('2026-10')).toBeLessThan(after.at('2026-09'));
+  });
+
+  it('적용월이 첫 달이면 이전 달이 없어 전체를 균등 재배분한다', () => {
+    const requested = requestChange(project(), { ...transfer, amount: 12_000_000, effectiveMonth: '2026-07' }, NOW);
+    const approved = approveChange(requested, requested.changes[0].id, NOW, undefined, pack);
+    const after = planOf(approved, 'DIRECT_ACTIVITY');
+    expect(after.planTotal).toBe(52_000_000);
+    expect(after.at('2026-07')).toBe(after.at('2026-08'));   // 전 기간 균등이라 앞 두 달이 같다
+  });
+
+  it('pack 없이 승인하면(구버전 호출) 월별 계획을 건드리지 않는다', () => {
+    const edited = project({ monthlyPlan: [{ categoryId: 'DIRECT_ACTIVITY', month: '2026-07', amount: 5_000_000 }] });
+    const requested = requestChange(edited, { ...transfer, effectiveMonth: '2026-10' }, NOW);
+    const approved = approveChange(requested, requested.changes[0].id, NOW);
+    expect(approved.monthlyPlan).toEqual(edited.monthlyPlan);
+  });
+
+  it('적용월 이전 계획 합계보다 새 예산이 작아지는 승인은 거부한다', () => {
+    const requested = requestChange(project(), { ...transfer, amount: 50_000_000, effectiveMonth: '2026-10' }, NOW);
+    const nextBudgets = applyTransfer(requested.budgets, transfer.fromCategoryId, transfer.toCategoryId, 50_000_000);
+    const invalid = validateMonthlyRedistribution(pack, requested, { ...requested, budgets: nextBudgets }, [transfer.fromCategoryId, transfer.toCategoryId], '2026-10');
+    expect(invalid).toMatchObject({ categoryId: 'DIRECT_LABOR', fixedPlan: 15_000_000, nextBudget: 10_000_000 });
+
+    const approved = approveChange(requested, requested.changes[0].id, NOW, undefined, pack);
+    expect(approved).toBe(requested);
+    expect(amountOf(approved, 'DIRECT_LABOR')).toBe(60_000_000);
+    expect(statusOf(approved.changes[0])).toBe('submitted');
+  });
+
+  it('적용월이 첫 달이면 이전 계획이 없어 큰 폭의 예산 축소도 허용한다', () => {
+    const requested = requestChange(project(), { ...transfer, amount: 50_000_000, effectiveMonth: '2026-07' }, NOW);
+    const approved = approveChange(requested, requested.changes[0].id, NOW, undefined, pack);
+    expect(amountOf(approved, 'DIRECT_LABOR')).toBe(10_000_000);
+    expect(statusOf(approved.changes[0])).toBe('approved');
+  });
+
+  it('적용월부터 새로 계산을 고르면 이전 달은 0원이고 전체 예산이 적용월 이후에 배분된다', () => {
+    const requested = requestChange(project(), {
+      ...transfer, amount: 12_000_000, effectiveMonth: '2026-08', monthlyPlanChangeMode: 'restart',
+    }, NOW);
+    const approved = approveChange(requested, requested.changes[0].id, NOW, undefined, pack);
+    const after = planOf(approved, 'DIRECT_ACTIVITY');
+    expect(after.at('2026-07')).toBe(0);
+    expect(after.at('2026-08')).toBeGreaterThan(0);
+    expect(after.planTotal).toBe(52_000_000);
+    expect(approved.changes[0].monthlyPlanChangeMode).toBe('restart');
   });
 });

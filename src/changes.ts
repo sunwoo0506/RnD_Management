@@ -1,4 +1,5 @@
-import type { BudgetChange, BudgetItem, ChangeStatus, ChangeType, Project, ProjectDocumentLink } from './types';
+import { redistributeMonthlyPlan, validateMonthlyRedistribution } from './spending';
+import type { BudgetChange, BudgetItem, ChangeStatus, ChangeType, MonthlyPlanChangeMode, Project, ProjectDocumentLink, RulePack } from './types';
 
 // ---- 예산 변경 신청 흐름 ----
 // 변경은 저장하는 순간 끝나는 일이 아니다. 전문기관에 신청해서 승인을 받아야 효력이 생기고,
@@ -84,7 +85,7 @@ export const nextDocumentNo = (project: Project, now: string): string => {
 // 신청과 승인 사이에 다른 변경이 승인되면 그 사이 예산이 이미 움직였기 때문이다.
 export const requestChange = (
   project: Project,
-  input: { fromCategoryId: string; toCategoryId: string; amount: number; reasonKey: string; reason: string; changeType?: ChangeType; usagePlan?: string; planFileId?: string; planFileName?: string },
+  input: { fromCategoryId: string; toCategoryId: string; amount: number; reasonKey: string; reason: string; changeType?: ChangeType; effectiveMonth?: string; monthlyPlanChangeMode?: MonthlyPlanChangeMode; usagePlan?: string; planFileId?: string; planFileName?: string },
   now: string,
 ): Project => {
   const before = project.budgets.map((item) => ({ ...item }));
@@ -95,6 +96,8 @@ export const requestChange = (
     reasonKey: input.reasonKey, reason: input.reason,
     before, after,
     createdAt: now, changeType: input.changeType ?? 'approval', status: 'submitted', submittedAt: now,
+    effectiveMonth: input.effectiveMonth,
+    monthlyPlanChangeMode: input.monthlyPlanChangeMode ?? 'preserve',
     planFileId: input.planFileId, planFileName: input.planFileName,
     usagePlan: input.usagePlan,
     documentNo: nextDocumentNo(project, now),
@@ -102,28 +105,64 @@ export const requestChange = (
   return { ...project, changes: [change, ...project.changes] };
 };
 
+// 비목 금액이 움직이면 그 안의 세목과 현물도 같은 편성 안에서 유효해야 한다.
+// 세목은 기존 비율로 조정하고 반올림 차이는 마지막 세목에 모아 합계가 비목 금액과 정확히 맞게 한다.
+const resizeBudgetItem = (item: BudgetItem, amount: number): BudgetItem => {
+  const nextAmount = Math.max(0, amount);
+  const subItems = item.subItems?.length
+    ? (() => {
+        const basis = item.subItems.reduce((total, sub) => total + sub.amount, 0);
+        if (basis <= 0) return item.subItems.map((sub, index) => ({ ...sub, amount: index === item.subItems!.length - 1 ? nextAmount : 0 }));
+        let assigned = 0;
+        return item.subItems.map((sub, index) => {
+          const adjusted = index === item.subItems!.length - 1
+            ? nextAmount - assigned
+            : Math.round(nextAmount * sub.amount / basis);
+          assigned += adjusted;
+          return { ...sub, amount: adjusted };
+        });
+      })()
+    : undefined;
+  return {
+    ...item,
+    amount: nextAmount,
+    ...(subItems ? { subItems } : {}),
+    ...(item.inKindAmount != null ? { inKindAmount: Math.min(item.inKindAmount, nextAmount) || undefined } : {}),
+  };
+};
+
 // 비목 간 금액 이동을 적용한 새 편성 배열. 받는 비목이 아직 없으면 만들어 넣는다.
 export const applyTransfer = (budgets: BudgetItem[], fromId: string, toId: string, amount: number): BudgetItem[] => {
-  const next = budgets.map((item) => item.categoryId === fromId ? { ...item, amount: item.amount - amount } : item);
+  const next = budgets.map((item) => item.categoryId === fromId ? resizeBudgetItem(item, item.amount - amount) : item);
   const target = next.find((item) => item.categoryId === toId);
-  if (target) return next.map((item) => item.categoryId === toId ? { ...item, amount: item.amount + amount } : item);
+  if (target) return next.map((item) => item.categoryId === toId ? resizeBudgetItem(item, item.amount + amount) : item);
   return [...next, { categoryId: toId, amount }];
 };
 
 // 승인 — 이때 비로소 예산이 움직인다. 지금 예산에 이동을 적용하고, 그 결과를 이력에 남긴다.
-export const approveChange = (project: Project, changeId: string, now: string, note?: string): Project => {
+// pack이 넘어오고 변경에 적용월이 있으면 월별 집행계획도 새 예산에 맞춰 재배분한다(적용월 이전 달은 유지).
+export const approveChange = (project: Project, changeId: string, now: string, note?: string, pack?: RulePack): Project => {
   const change = project.changes.find((item) => item.id === changeId);
   if (!change || statusOf(change) !== 'submitted') return project;
   const before = project.budgets.map((item) => ({ ...item }));
   const budgets = applyTransfer(before, change.fromCategoryId, change.toCategoryId, change.amount);
-  return {
+  const next: Project = {
     ...project,
     budgets,
     // 승인 시점의 예산이 신청 때와 다를 수 있어(그 사이 다른 변경이 승인됨) 실제 적용된 값으로 갱신한다.
     changes: project.changes.map((item) => item.id !== changeId ? item
       : { ...item, status: 'approved', decidedAt: now, decisionNote: note, before, after: budgets.map((entry) => ({ ...entry })) }),
-    budgetConfirmed: false,   // 편성이 바뀌었으니 확정은 풀린다 — 다시 확인하고 확정해야 한다
+    // 변경관리에서 승인한 편성은 이미 검토를 거친 값이다. 기존 확정 상태를 유지해 집행·증빙에 즉시 반영한다.
+    budgetConfirmed: true,
   };
+  // 적용월 기준으로 보내는·받는 비목의 월별 계획을 새 예산에 맞춰 다시 나눈다.
+  if (pack && change.effectiveMonth) {
+    const mode = change.monthlyPlanChangeMode ?? 'preserve';
+    const invalid = validateMonthlyRedistribution(pack, project, next, [change.fromCategoryId, change.toCategoryId], change.effectiveMonth, mode);
+    if (invalid) return project;
+    return redistributeMonthlyPlan(pack, project, next, [change.fromCategoryId, change.toCategoryId], change.effectiveMonth, mode);
+  }
+  return next;
 };
 
 // 반려 — 예산은 그대로 두고 회신 내용만 남긴다. 지운다면 왜 못 바꿨는지가 사라진다.

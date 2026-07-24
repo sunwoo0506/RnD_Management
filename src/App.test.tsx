@@ -347,7 +347,7 @@ describe('과제온 핵심 사용자 흐름', () => {
     const approved: Project = JSON.parse(localStorage.getItem('gwajeon.projects.v1')!)[0];
     expect(approved.changes[0].status).toBe('approved');
     expect(approved.budgets).not.toEqual(before.budgets);
-    expect(approved.budgetConfirmed).toBe(false);   // 편성이 바뀌었으니 확정은 풀린다
+    expect(approved.budgetConfirmed).toBe(true);   // 변경관리 승인을 마친 값은 집행에 바로 쓴다
     expect(screen.getByRole('button', { name: /비교표 Word/ })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /공문 Word/ }).length).toBeGreaterThan(0);
     vi.restoreAllMocks();
@@ -1016,7 +1016,7 @@ describe('월별 집행계획 (매트릭스 열)', () => {
     expect(screen.queryByRole('columnheader', { name: '2026-07' })).toBeNull();
     expect(screen.queryByRole('columnheader', { name: '계획' })).toBeNull();
     // 고정 열은 그대로다
-    expect(screen.getByRole('columnheader', { name: '예산' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '변경예산' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '집행금액' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: '잔액' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '월별 보기' }));
@@ -1079,7 +1079,7 @@ describe('월별 집행계획 (매트릭스 열)', () => {
     expect(screen.queryByRole('columnheader', { name: '계획' })).toBeNull();
     expect(screen.getByText(/사업기간이 설정되어 있지 않아/)).toBeInTheDocument();
     // 예산·집행·잔액은 그대로 보인다
-    expect(screen.getByRole('columnheader', { name: '예산' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: '변경예산' })).toBeInTheDocument();
   });
 
   it('사업기간 밖 집행은 기간 외 행으로 드러난다', async () => {

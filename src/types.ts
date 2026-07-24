@@ -266,6 +266,7 @@ export type ChangeStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
 // 어느 쪽에 해당하는지는 사업 공고·협약서·규정이 정하므로 앱이 단정하지 않고 사용자가 고른다.
 // 미지정(구버전 이력)은 승인으로 본다 — 둘 중 더 엄격한 쪽이라 잘못 봐도 손해가 없다.
 export type ChangeType = 'notification' | 'approval';
+export type MonthlyPlanChangeMode = 'preserve' | 'restart';
 
 export interface BudgetChange {
   id: string;
@@ -279,6 +280,11 @@ export interface BudgetChange {
   createdAt: string;
   changeType?: ChangeType;
   status?: ChangeStatus;
+  // 변경이 반영되는 시작월('YYYY-MM'). 승인 시 월별 집행계획을 이 달부터 새 예산에 맞춰 재배분한다.
+  // 이 달 이전은 이미 집행·확정된 것으로 보아 그대로 둔다. 구버전 이력에는 없다(그때는 재배분 안 함).
+  effectiveMonth?: string;
+  // preserve: 적용월 이전 계획 유지, restart: 이전 달을 0원으로 하고 적용월부터 전체 예산 재계산
+  monthlyPlanChangeMode?: MonthlyPlanChangeMode;
   submittedAt?: string;
   decidedAt?: string;      // 승인·반려된 날
   decisionNote?: string;   // 반려 사유 등 전문기관 회신 내용
@@ -372,6 +378,9 @@ export interface Project {
   members: Member[];
   participants: Participant[];
   budgets: BudgetItem[];
+  agreementBudgets?: BudgetItem[]; // 최초협약 당시 확정한 기준 예산. 이후 변경과 무관하게 보존한다.
+  agreementBudgetConfirmedAt?: string;
+  agreementBudgetSourceDocumentId?: string;
   monthlyPlan?: MonthlyPlanEntry[]; // 사용자가 고친 월별 계획 칸만 (나머지는 균등분할 자동값)
   expenses: Expense[];
   changes: BudgetChange[];

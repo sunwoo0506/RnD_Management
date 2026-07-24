@@ -5,7 +5,7 @@
 // 예산과 잔액은 언제나 편성 비목(categoryId) 기준으로 계산한다. 세목은 집계·계획·규정 조회의
 // 단위일 뿐, 예산 변경 관리와 정산이 보는 돈의 단위는 비목이기 때문이다.
 import { categoryOf, visibleCategories } from './rules';
-import type { BudgetCategoryId, Expense, FundingSplit, Project, RulePack } from './types';
+import type { BudgetCategoryId, Expense, FundingSplit, MonthlyPlanChangeMode, MonthlyPlanEntry, Project, RulePack } from './types';
 
 const sum = (values: number[]): number => values.reduce((total, value) => total + value, 0);
 const spentOf = (expenses: Expense[]): number => sum(expenses.map((expense) => expense.amount));
@@ -358,6 +358,88 @@ export const setMonthlyPlan = (project: Project, leaf: PlanSelection, month: str
   const rest = (project.monthlyPlan ?? []).filter((entry) =>
     !(entry.categoryId === leaf.categoryId && entry.subItemId === leaf.subItemId && entry.split === leaf.split && entry.month === month));
   return { ...project, monthlyPlan: [...rest, { categoryId: leaf.categoryId, subItemId: leaf.subItemId, split: leaf.split, month, amount }] };
+};
+
+// ---- 예산 변경 승인 시 월별 집행계획 재배분 ----
+// 변경이 승인되면 비목 예산이 바뀐다. 손대지 않은 비목은 균등분할이라 예산을 자동으로 따라가지만,
+// 월별로 손대 둔 비목은 옛 배분값에 고정돼 새 예산과 어긋난다. 그래서 적용월(변경시작월)을 받아
+// "적용월 이전 달은 지금 값 그대로, 적용월부터 종료월까지 남은 예산을 균등 재배분"한다.
+//
+// 방법: 영향받은 비목(보내는·받는)의 리프별로 적용월 이전 달 값을 override로 못 박고, 그 비목의
+// 나머지 override는 걷어낸다. 그러면 leafCells가 새 예산 기준으로 적용월 이후를 자동 재분배한다
+// (firstEdited 이후 로직을 그대로 재사용). 적용월이 첫 달이면 이전 달이 없어 전체가 균등 재배분된다.
+export const redistributeMonthlyPlan = (
+  pack: RulePack,
+  projectBefore: Project,   // 예산 이동 전 — 적용월 이전 달의 '지금' 계획값을 여기서 읽는다
+  projectAfter: Project,    // 예산 이동 후 — 여기에 monthlyPlan을 다시 써서 반환한다
+  categoryIds: BudgetCategoryId[],
+  effectiveMonth: string,
+  mode: MonthlyPlanChangeMode = 'preserve',
+): Project => {
+  const allMonths = monthSequence(projectAfter.startDate, projectAfter.endDate);
+  const effIndex = allMonths.indexOf(effectiveMonth);
+  // 적용월이 사업기간 밖이면 재배분하지 않는다 (기존 동작 유지).
+  if (effIndex < 0) return projectAfter;
+  const beforeMonths = allMonths.slice(0, effIndex);
+  const targets = new Set(categoryIds);
+
+  // 적용월 이전 달의 '지금' 계획값을 리프 단위로 읽는다 (변경 전 예산 기준). cells는 allMonths 순서와 같다.
+  const preRows = spendingMatrix(pack, projectBefore, allMonths).rows.filter((row) => targets.has(row.categoryId));
+
+  // 계획 저장 단위(리프)를 추려낸다: 세목이 나뉜 비목은 세목이, 현물이 편성된 비목은 현금·현물이, 아니면 비목 자체가 단위.
+  const leaves: { sel: PlanSelection; cells: MonthCell[] }[] = [];
+  for (const row of preRows) {
+    if (row.planEditable) leaves.push({ sel: { categoryId: row.categoryId }, cells: row.cells });
+    else if (row.subRows.some((sub) => sub.planEditable)) {
+      for (const sub of row.subRows) if (sub.planEditable) leaves.push({ sel: { categoryId: row.categoryId, subItemId: sub.subItemId }, cells: sub.cells });
+    } else {
+      for (const sr of row.splitRows) leaves.push({ sel: { categoryId: row.categoryId, split: sr.split }, cells: sr.cells });
+    }
+  }
+
+  // 영향받은 비목의 기존 override는 모두 걷어낸다 — 적용월 이전 달만 다시 못 박아 결과를 예측 가능하게 한다.
+  const kept = (projectAfter.monthlyPlan ?? []).filter((entry) => !targets.has(entry.categoryId));
+  const pins: MonthlyPlanEntry[] = [];
+  for (const leaf of leaves) {
+    beforeMonths.forEach((month, index) => {
+      pins.push({
+        categoryId: leaf.sel.categoryId!, subItemId: leaf.sel.subItemId, split: leaf.sel.split, month,
+        amount: mode === 'restart' ? 0 : leaf.cells[index]?.plan ?? 0,
+      });
+    });
+  }
+  return { ...projectAfter, monthlyPlan: [...kept, ...pins] };
+};
+
+export interface MonthlyRedistributionError {
+  categoryId: BudgetCategoryId;
+  fixedPlan: number;
+  nextBudget: number;
+}
+
+// 적용월 이전 계획은 유지해야 하므로 그 합계보다 비목 예산을 더 낮출 수 없다.
+// 승인 화면과 계산 계층이 같은 검증을 사용해 UI를 우회해도 불일치가 저장되지 않게 한다.
+export const validateMonthlyRedistribution = (
+  pack: RulePack,
+  projectBefore: Project,
+  projectAfter: Project,
+  categoryIds: BudgetCategoryId[],
+  effectiveMonth: string,
+  mode: MonthlyPlanChangeMode = 'preserve',
+): MonthlyRedistributionError | null => {
+  if (mode === 'restart') return null;
+  const allMonths = monthSequence(projectAfter.startDate, projectAfter.endDate);
+  const effIndex = allMonths.indexOf(effectiveMonth);
+  if (effIndex <= 0) return null;
+  const beforeMonths = allMonths.slice(0, effIndex);
+  const targets = new Set(categoryIds);
+  const rows = spendingMatrix(pack, projectBefore, beforeMonths).rows.filter((row) => targets.has(row.categoryId));
+  for (const row of rows) {
+    const fixedPlan = sum(row.cells.map((cell) => cell.plan));
+    const nextBudget = projectAfter.budgets.find((item) => item.categoryId === row.categoryId)?.amount ?? 0;
+    if (fixedPlan > nextBudget) return { categoryId: row.categoryId, fixedPlan, nextBudget };
+  }
+  return null;
 };
 
 // ---- 증빙 누락 알림 (집행일 경과 기준) ----

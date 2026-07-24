@@ -1,4 +1,4 @@
-import { Document, HeadingLevel, Packer, Paragraph, Table, TableCell, TableRow, TextRun, WidthType } from 'docx';
+import { AlignmentType, BorderStyle, Document, HeadingLevel, Packer, Paragraph, Table, TableCell, TableLayoutType, TableRow, TextRun, WidthType } from 'docx';
 import { saveAs } from 'file-saver';
 import writeXlsxFile from 'write-excel-file/browser';
 import { capFor, categoryOf, formatWon, fundingBreakdown, packFor } from './rules';
@@ -44,14 +44,26 @@ export const exportBudgetXlsx = async (project: Project) => {
   await file.toFile(`${safeName(project.name)}_예산편성표.xlsx`);
 };
 
-const cell = (text: string, bold = false) => new TableCell({
-  children: [new Paragraph({ children: [new TextRun({ text, bold })] })],
+// 비교표 열 너비(twips) — 지정하지 않으면 Word가 셀 내용 길이에 맞춰 열을 제멋대로 늘려 표가 틀어진다.
+// 비목명은 넓게, 금액 3칸은 같은 폭으로 고정한다. 합 9360 ≒ A4 기본 여백 기준 본문 폭.
+const CHANGE_COL_WIDTHS = [3360, 2000, 2000, 2000];
+
+const cell = (text: string, width: number, opts: { bold?: boolean; align?: (typeof AlignmentType)[keyof typeof AlignmentType] } = {}) => new TableCell({
+  width: { size: width, type: WidthType.DXA },
+  margins: { top: 40, bottom: 40, left: 80, right: 80 },
+  children: [new Paragraph({ alignment: opts.align ?? AlignmentType.LEFT, children: [new TextRun({ text, bold: opts.bold })] })],
 });
 
 const changeRows = (project: Project, change: BudgetChange) => packFor(project).categories.map((category) => {
   const before = change.before.find((item) => item.categoryId === category.id)?.amount ?? 0;
   const after = change.after.find((item) => item.categoryId === category.id)?.amount ?? 0;
-  return new TableRow({ children: [cell(category.name), cell(formatWon(before)), cell(formatWon(after)), cell(formatWon(after - before))] });
+  const [wName, wBefore, wAfter, wDelta] = CHANGE_COL_WIDTHS;
+  return new TableRow({ children: [
+    cell(category.name, wName),
+    cell(formatWon(before), wBefore, { align: AlignmentType.RIGHT }),
+    cell(formatWon(after), wAfter, { align: AlignmentType.RIGHT }),
+    cell(formatWon(after - before), wDelta, { align: AlignmentType.RIGHT }),
+  ] });
 });
 
 export const exportChangeDocx = async (project: Project, official = false) => {
@@ -76,10 +88,21 @@ export const exportChangeDocx = async (project: Project, official = false) => {
         new Paragraph({ text: `변경 사유: ${change.reason}` }),
       ];
 
+  const [wName, wBefore, wAfter, wDelta] = CHANGE_COL_WIDTHS;
+  const border = { style: BorderStyle.SINGLE, size: 4, color: 'BFBFBF' };
   const table = new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
+    // 고정 레이아웃 + 명시적 열 너비로 모든 행의 열이 정확히 정렬되게 한다.
+    width: { size: CHANGE_COL_WIDTHS.reduce((a, b) => a + b, 0), type: WidthType.DXA },
+    columnWidths: CHANGE_COL_WIDTHS,
+    layout: TableLayoutType.FIXED,
+    borders: { top: border, bottom: border, left: border, right: border, insideHorizontal: border, insideVertical: border },
     rows: [
-      new TableRow({ children: [cell('비목', true), cell('변경 전', true), cell('변경 후', true), cell('증감', true)] }),
+      new TableRow({ tableHeader: true, children: [
+        cell('비목', wName, { bold: true }),
+        cell('변경 전', wBefore, { bold: true, align: AlignmentType.RIGHT }),
+        cell('변경 후', wAfter, { bold: true, align: AlignmentType.RIGHT }),
+        cell('증감', wDelta, { bold: true, align: AlignmentType.RIGHT }),
+      ] }),
       ...changeRows(project, change),
     ],
   });

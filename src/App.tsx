@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import type { Session } from '@supabase/supabase-js';
 import { baseStandardFor, basisFormula, budgetBases, capFor, categoryOf, crossPackEvidence, DEFAULT_INSURANCE_RATE, mandatoryNotesFor, maxAmountWithinCap, packIsMissing, subItemChoicesFor, replacementPacksFor, selectablePacks, fundingCapChecks, fundingRateChecks, rescaleBudgets, deriveTotalBudget, settlementDeadlineFor, evidenceGuide, evidenceChecklistFor, commonEvidenceRuleNames, primaryEvidence, withAlwaysRequired, formatWon, fundingBreakdown, globalRules, isRegulationDbPack, laborCostFor, makeDraftBudgets, minFor, packFor, previewFunding, REASON_TEMPLATES, RULES_EFFECTIVE_DATE, findArticles, referenceStandardFor, rulesFor, severanceApplies, spendingCautions, subItemStandardFor, transferLimitError, visibleCategories } from './rules';
-import { evidenceAlarms, monthSequence, setMonthlyPlan, spendingMatrix } from './spending';
+import { evidenceAlarms, monthSequence, setMonthlyPlan, spendingMatrix, validateMonthlyRedistribution } from './spending';
 import { isEnded, otherProjectsRate, overviewOrder, periodProgress, portfolioTotals } from './portfolio';
 import PortfolioCharts from './PortfolioCharts';
 import ThousandWon from './ThousandWon';
@@ -15,6 +15,7 @@ import PortfolioPeople from './PortfolioPeople';
 import PortfolioTodos from './PortfolioTodos';
 import { detailFieldsFor } from './spendingForms';
 import { draftChangeReason } from './changeReason';
+import { extractAgreementBudgets } from './agreementBudget';
 import { exportChangeLetter, sealImageFrom } from './letterDocx';
 import { CHANGE_ACTION_LABEL, CHANGE_TYPE_GUIDE, CHANGE_TYPE_LABEL, typeOf, AGREEMENT_DOC_LABEL, AGREEMENT_DOC_TYPES, agreementDocsOf, applyTransfer, approveChange, nextDocumentNo, pendingChanges, projectedBudgets, rejectChange, requestChange, STATUS_LABEL, statusOf, type AgreementDocType } from './changes';
 import { collectEvidenceIds, downloadBackup, loadActiveProjectId, loadProjectOwner, loadProjects, loadResearchers, parseBackup, saveActiveProjectId, saveProjectOwner, saveProjectsLocal, saveResearchersLocal } from './storage';
@@ -1290,6 +1291,8 @@ function Budget({ project, projects, researchers, update, setScreen }: { project
     return map;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pack.id, cats.map((c) => c.id).join('|')]);
+  // 예산 한도 확인 카드 — 한도로 맞추는 대신 원하는 금액을 직접 넣을 수 있게 규정 id별 입력값을 보관한다.
+  const [capManual, setCapManual] = useState<Record<string, string>>({});
   // ---- 세목(비목 내 하위 항목) 편집 ----
   const [subOpen, setSubOpen] = useState<Set<string>>(new Set());
   const toggleSub = (id: string) => setSubOpen((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
@@ -1361,12 +1364,14 @@ function Budget({ project, projects, researchers, update, setScreen }: { project
         <strong>{check.targetLabel}이 이 사업의 한도와 일치합니다</strong>
         <span>{formatWon(check.cap)} · {check.basis} {refLink(check.rule)}</span>
       </div></div>;
-      // 한도에 맞추면 총사업비와 비목 편성을 함께 옮긴다 — 금액만 바꾸고 편성을 두면 합계가 어긋난다.
-      const applyCap = () => {
+      // 원하는 금액으로 맞추면 총사업비와 비목 편성을 함께 옮긴다 — 금액만 바꾸고 편성을 두면 합계가 어긋난다.
+      // 한도 버튼은 amount=check.cap, 직접 입력은 사용자가 넣은 금액을 그대로 쓴다.
+      const applyAmount = (amount: number) => {
+        if (!Number.isSafeInteger(amount) || amount <= 0 || amount > check.cap) return;
         const subsidyRate = project.subsidyRate ?? 100;
-        const nextSubsidy = check.target === 'subsidy' ? check.cap : Math.round(check.cap * subsidyRate / 100);
-        const nextTotal = check.target === 'total' ? check.cap : deriveTotalBudget(nextSubsidy, subsidyRate);
-        if (!confirm(`${check.targetLabel}을 ${formatWon(check.cap)}으로 맞출까요?\n총사업비 ${formatWon(project.totalBudget)} → ${formatWon(nextTotal)}\n비목별 편성 금액도 지금 비율 그대로 새 총액에 맞춰 조정됩니다.`)) return;
+        const nextSubsidy = check.target === 'subsidy' ? amount : Math.round(amount * subsidyRate / 100);
+        const nextTotal = check.target === 'total' ? amount : deriveTotalBudget(nextSubsidy, subsidyRate);
+        if (!confirm(`${check.targetLabel}을 ${formatWon(amount)}으로 맞출까요?\n총사업비 ${formatWon(project.totalBudget)} → ${formatWon(nextTotal)}\n비목별 편성 금액도 지금 비율 그대로 새 총액에 맞춰 조정됩니다.`)) return;
         update({
           ...project,
           subsidyAmount: nextSubsidy,
@@ -1375,7 +1380,17 @@ function Budget({ project, projects, researchers, update, setScreen }: { project
           budgetConfirmed: false,
           fundingCapAck: (project.fundingCapAck ?? []).filter((id) => id !== check.rule.id),
         });
+        setCapManual((prev) => { const next = { ...prev }; delete next[check.rule.id]; return next; });
       };
+      const applyCap = () => applyAmount(check.cap);
+      const manualAmount = Number(capManual[check.rule.id] || 0);
+      const manualError = capManual[check.rule.id]
+        ? !Number.isSafeInteger(manualAmount) || manualAmount <= 0
+          ? '1원 이상의 올바른 금액을 입력해주세요.'
+          : manualAmount > check.cap
+            ? `이 사업의 최대 한도는 ${formatWon(check.cap)}입니다.`
+            : null
+        : null;
       const keep = () => update({ ...project, fundingCapAck: [...(project.fundingCapAck ?? []), check.rule.id] });
       const undoKeep = () => update({ ...project, fundingCapAck: (project.fundingCapAck ?? []).filter((id) => id !== check.rule.id) });
 
@@ -1404,6 +1419,24 @@ function Budget({ project, projects, researchers, update, setScreen }: { project
         <div className="cap-alert-actions">
           <button type="button" className="primary" onClick={applyCap}><Check /> {formatWon(check.cap)}으로 수정</button>
           <button type="button" className="secondary" onClick={keep}>현재 금액 유지</button>
+          {/* 한도·현재값 말고 원하는 금액을 직접 넣고 싶은 경우 — 예: 한도보다 낮게 잡되 현재값과도 다른 금액 */}
+          <div className="cap-manual">
+            <input
+              inputMode="numeric"
+              aria-label={`직접 입력할 ${check.targetLabel}`}
+              placeholder="직접 입력"
+              value={withCommas(capManual[check.rule.id] ?? '')}
+              onChange={(e) => setCapManual((prev) => ({ ...prev, [check.rule.id]: digitsOnly(e.target.value) }))}
+            />
+            <span>원</span>
+            <button
+              type="button"
+              className="secondary"
+              disabled={!manualAmount || !!manualError}
+              onClick={() => applyAmount(manualAmount)}
+            >이 금액으로 수정</button>
+          </div>
+          {manualError && <small className="field-error"><AlertCircle /> {manualError}</small>}
           <small>수정하면 비목별 편성 금액도 지금 비율 그대로 새 총액에 맞춰집니다.</small>
         </div>
       </section>;
@@ -1617,8 +1650,13 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
   // 정작 먼저 봐야 할 예산·집행·잔액이 밀린다. 필요한 달만 켜서 본다.
   const [hiddenMonths, setHiddenMonths] = useState<Set<string>>(() => new Set(monthSequence(project.startDate, project.endDate)));
   const [monthsHidden, setMonthsHidden] = useState(false);
+  const [budgetHistoryOpen, setBudgetHistoryOpen] = useState(false);
   const shownMonths = monthsHidden ? [] : allMonths.filter((month) => !hiddenMonths.has(month));
   const matrix = spendingMatrix(pack, project, shownMonths);
+  const agreementBudgetByCategory = new Map((project.agreementBudgets ?? []).map((item) => [item.categoryId, item.amount]));
+  const agreementBudgetTotal = [...agreementBudgetByCategory.values()].reduce((sum, amount) => sum + amount, 0);
+  const approvedBudgetChanges = project.changes.filter((change) => statusOf(change) === 'approved');
+  const latestBudgetChange = approvedBudgetChanges[0];
   // 현물이 하나도 없는 과제에서는 현금·현물 줄이 군더더기다 — 편성이든 집행이든 현물이 있을 때만 보여준다.
   const hasInKind = matrix.totals.budgetInKind > 0 || matrix.totals.spentInKind > 0;
   const toggleMonth = (month: string) => setHiddenMonths((prev) => { const next = new Set(prev); if (next.has(month)) next.delete(month); else next.add(month); return next; });
@@ -1776,9 +1814,23 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
   return <div className="page-content"><div className="page-title"><div><span className="eyebrow">모듈 2</span><h2>집행 · 증빙 관리</h2><p>집행을 등록하면 잔액과 필요한 증빙을 바로 연결합니다.</p></div></div>
     <section className="panel spend-dashboard">
       <div className="panel-head">
-        <div><h3><WalletCards /> 예산 집행 현황</h3><p>편성에서 확정한 예산 기준입니다. 비목을 누르면 아래 등록 폼이 그 비목으로 맞춰집니다.</p></div>
-        {allMonths.length > 0 && <button type="button" className="secondary" onClick={() => setMonthsHidden(!monthsHidden)}>{monthsHidden ? '월별 보기' : '월별 숨기기'}</button>}
+        <div><h3><WalletCards /> 예산 집행 현황</h3><p>최초협약 예산과 변경 후 현재 예산을 함께 보여줍니다. 비목을 누르면 아래 등록 폼이 그 비목으로 맞춰집니다.</p></div>
+        <div className="spend-head-actions">
+          {approvedBudgetChanges.length > 0 && <button type="button" className="secondary" onClick={() => setBudgetHistoryOpen((open) => !open)}>
+            변경 이력 {approvedBudgetChanges.length}건 {budgetHistoryOpen ? '숨기기' : '보기'}
+          </button>}
+          {allMonths.length > 0 && <button type="button" className="secondary" onClick={() => setMonthsHidden(!monthsHidden)}>{monthsHidden ? '월별 보기' : '월별 숨기기'}</button>}
+        </div>
       </div>
+      {budgetHistoryOpen && approvedBudgetChanges.length > 0 && <div className="spend-budget-history">
+        <p><strong>현재 표와 월별 계획은 가장 최근 승인까지 모두 반영한 최종 변경예산 기준입니다.</strong><span>아래 이력은 확인용이며 집행 계산에는 중복 반영되지 않습니다.</span></p>
+        <div>{approvedBudgetChanges.map((change, index) => <article key={change.id}>
+          <span>{index === 0 ? '최종 변경' : `${approvedBudgetChanges.length - index}차 변경`}</span>
+          <strong>{categoryOf(pack, change.fromCategoryId).name} → {categoryOf(pack, change.toCategoryId).name}</strong>
+          <b>{formatWon(change.amount)}</b>
+          <small>{new Date(change.decidedAt ?? change.createdAt).toLocaleDateString('ko-KR')}</small>
+        </article>)}</div>
+      </div>}
       {!monthsHidden && allMonths.length > 0 && <div className="month-picker">
         <span>월 표시</span>
         <em className="period">사업기간 {project.startDate} ~ {project.endDate} · {allMonths.length}개월</em>
@@ -1795,7 +1847,9 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
           <thead>
             <tr>
               <th rowSpan={2} className="col-name">비목 · 세목</th>
-              <th rowSpan={2}>예산</th><th rowSpan={2}>집행금액</th><th rowSpan={2}>잔액</th><th rowSpan={2}>소진율</th>
+              <th rowSpan={2} className="budget-baseline">협약예산</th>
+              <th rowSpan={2} aria-label="변경예산">변경예산{latestBudgetChange && <small>{new Date(latestBudgetChange.decidedAt ?? latestBudgetChange.createdAt).toLocaleDateString('ko-KR')} 기준</small>}</th>
+              <th rowSpan={2}>집행금액</th><th rowSpan={2}>잔액</th><th rowSpan={2}>소진율</th>
               {shownMonths.map((month) => <th key={month} colSpan={2} className="month-group">{month}</th>)}
             </tr>
             <tr>{shownMonths.flatMap((month) => [
@@ -1809,6 +1863,7 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
               if (split) {
                 return <tr key={key} className="sub split-row">
                   <td className="col-name"><span>└ {split.name}</span></td>
+                  <td className="budget-baseline">—</td>
                   <td>{formatWon(split.budget)}</td>
                   <td className={split.over ? 'bad' : ''}>{formatWon(split.spent)}</td>
                   <td className={split.remaining < 0 ? 'bad' : ''}>{formatWon(split.remaining)}</td>
@@ -1831,6 +1886,7 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
                   : <><button type="button" className="text-button" onClick={() => pickCategory(row.categoryId)}>{row.name}</button>
                     {row.subRows.length > 0 && <button type="button" className="text-button sub-toggle" onClick={() => toggleRow(row.categoryId)}>세목 {row.subRows.length}개 {openRows.has(row.categoryId) ? '접기' : '보기'}</button>}</>}
                 </td>
+                <td className="budget-baseline">{sub ? '—' : project.agreementBudgets ? formatWon(agreementBudgetByCategory.get(row.categoryId) ?? 0) : '미등록'}</td>
                 <td>{sub && !sub.budget ? '—' : formatWon(line.budget)}</td>
                 <td>{formatWon(line.spent)}</td>
                 <td className={line.remaining < 0 ? 'bad' : ''}>{sub && !sub.budget ? '—' : formatWon(line.remaining)}</td>
@@ -1846,13 +1902,14 @@ function Spending({ project, update }: { project: Project; update: (p: Project) 
             })}
             {matrix.outOfRange && <tr className="outside">
               <td className="col-name">기간 외 집행 <em>{matrix.outOfRange.count}건</em></td>
-              <td>—</td><td className="bad">{formatWon(matrix.outOfRange.actual)}</td><td>—</td><td />
+              <td className="budget-baseline">—</td><td>—</td><td className="bad">{formatWon(matrix.outOfRange.actual)}</td><td>—</td><td />
               {shownMonths.flatMap((month) => [<td key={`${month}-p`} className="cell-plan">—</td>, <td key={`${month}-a`}>—</td>])}
             </tr>}
           </tbody>
           <tfoot>
             <tr>
               <td className="col-name"><strong>합계</strong></td>
+              <td className="budget-baseline">{project.agreementBudgets ? formatWon(agreementBudgetTotal) : '미등록'}</td>
               <td>{formatWon(matrix.totals.budget)}
                 {hasInKind && <em className="split-note">현금 {formatWon(matrix.totals.budgetCash)} · 현물 {formatWon(matrix.totals.budgetInKind)}</em>}</td>
               <td>{formatWon(matrix.totals.spent)}
@@ -2098,7 +2155,27 @@ function EvidenceAdder({ onAdd }: { onAdd: (label: string) => void }) {
 // 협약 문서 등록 — 변경 신청의 전제다. 무엇을 어떻게 바꾸는지 견줄 기준이 있어야 신청이 성립한다.
 function AgreementDocs({ project, update }: { project: Project; update: (p: Project) => void }) {
   const [busy, setBusy] = useState<AgreementDocType | null>(null);
+  const pack = packFor(project);
+  const cats = visibleCategories(pack, project);
+  const [budgetReview, setBudgetReview] = useState<{
+    values: Record<string, string>;
+    source: 'document' | 'current' | 'saved';
+    matched: number;
+    documentId?: string;
+  } | null>(null);
   const docs = agreementDocsOf(project);
+  const openBudgetReview = (
+    budgets: BudgetItem[],
+    source: 'document' | 'current' | 'saved',
+    matched = 0,
+    documentId?: string,
+  ) => setBudgetReview({
+    values: Object.fromEntries(cats.map((category) => [
+      category.id,
+      String(budgets.find((item) => item.categoryId === category.id)?.amount ?? 0),
+    ])),
+    source, matched, documentId,
+  });
   const upload = async (type: AgreementDocType, file?: File) => {
     if (!file) return;
     setBusy(type);
@@ -2113,6 +2190,17 @@ function AgreementDocs({ project, update }: { project: Project; update: (p: Proj
       // 같은 종류를 다시 올리면 갈아끼운다 — 협약 변경으로 문서가 새로 나오는 일이 잦다.
       const rest = (project.documents ?? []).filter((doc) => !(doc.applicationType === 'AGREEMENT' && doc.documentType === type));
       update({ ...project, documents: [...rest, entry] });
+      if (type === 'AGREEMENT') {
+        try {
+          const { extractDocumentText } = await import('./extract');
+          const extracted = await extractDocumentText(file);
+          const draft = extractAgreementBudgets(extracted.text, cats, project.budgets);
+          openBudgetReview(draft.budgets, draft.matched > 0 ? 'document' : 'current', draft.matched, entry.id);
+        } catch {
+          // 읽기 어려운 문서도 등록은 유지하고, 현재 편성값을 사용자가 직접 확인하게 한다.
+          openBudgetReview(project.budgets, 'current', 0, entry.id);
+        }
+      }
     } catch { alert('업로드에 실패했습니다. 잠시 후 다시 시도해주세요.'); }
     finally { setBusy(null); }
   };
@@ -2121,7 +2209,31 @@ function AgreementDocs({ project, update }: { project: Project; update: (p: Proj
     if (doc.fileId) { try { await deleteProjectDocuments([doc.fileId]); } catch { /* 파일 삭제 실패해도 목록에서는 뺀다 */ } }
     update({ ...project, documents: (project.documents ?? []).filter((item) => item.id !== doc.id) });
   };
-  return <section className="panel agreement-panel">
+  const confirmAgreementBudget = () => {
+    if (!budgetReview) return;
+    const budgets = cats.map((category) => ({
+      categoryId: category.id,
+      amount: Number(budgetReview.values[category.id]) || 0,
+    }));
+    if (budgets.some((item) => item.amount < 0 || !Number.isSafeInteger(item.amount))) {
+      alert('비목별 금액을 0원 이상의 올바른 금액으로 입력해주세요.');
+      return;
+    }
+    const total = budgets.reduce((sum, item) => sum + item.amount, 0);
+    if (total <= 0) { alert('최초협약 예산 합계가 0원입니다. 금액을 확인해주세요.'); return; }
+    update({
+      ...project,
+      agreementBudgets: budgets,
+      agreementBudgetConfirmedAt: new Date().toISOString(),
+      agreementBudgetSourceDocumentId: budgetReview.documentId,
+    });
+    setBudgetReview(null);
+  };
+  const reviewTotal = budgetReview
+    ? Object.values(budgetReview.values).reduce((sum, value) => sum + (Number(value) || 0), 0)
+    : 0;
+
+  return <><section className="panel agreement-panel">
     <div className="panel-head"><div><span className="section-kicker">협약 문서 보관 (선택)</span><h3>협약서 · 사업계획서</h3>
       <p>변경사항 관리와 파일 보관을 이 화면에서 한 번에 할 수 있어요. 등록하지 않아도 변경 신청은 가능합니다.</p></div></div>
     <div className="agreement-list">{AGREEMENT_DOC_TYPES.map((type) => {
@@ -2139,15 +2251,57 @@ function AgreementDocs({ project, update }: { project: Project; update: (p: Proj
         </div>
       </div>;
     })}</div>
-  </section>;
+    <div className="agreement-budget-status">
+      <div><strong>최초협약 예산</strong><span>{project.agreementBudgets
+        ? `${formatWon(project.agreementBudgets.reduce((sum, item) => sum + item.amount, 0))} · ${new Date(project.agreementBudgetConfirmedAt ?? project.createdAt).toLocaleDateString('ko-KR')} 확인`
+        : '아직 등록되지 않았습니다. 예산 변경 전에 기준 예산을 확인해주세요.'}</span></div>
+      <button type="button" className="secondary" onClick={() => project.agreementBudgets
+        ? openBudgetReview(project.agreementBudgets, 'saved', 0, project.agreementBudgetSourceDocumentId)
+        : openBudgetReview(project.budgets, 'current')}>
+        {project.agreementBudgets ? '확인·수정' : '현재 예산으로 확인'}
+      </button>
+    </div>
+  </section>
+  {budgetReview && <div className="doc-viewer-overlay" onClick={() => setBudgetReview(null)}>
+    <div className="agreement-budget-modal" role="dialog" aria-modal="true" aria-label="최초협약 예산 확인" onClick={(event) => event.stopPropagation()}>
+      <div className="agreement-budget-modal-head"><div><span className="section-kicker">변경관리 기준 설정</span><h3>최초협약 예산을 확인해주세요</h3></div>
+        <button type="button" className="icon-button" aria-label="닫기" onClick={() => setBudgetReview(null)}>×</button></div>
+      <div className="notice soft"><FileCheck2 /><div><strong>{budgetReview.source === 'document'
+        ? `협약서에서 비목 ${budgetReview.matched}개의 금액을 찾았습니다`
+        : budgetReview.source === 'saved' ? '등록된 최초협약 예산입니다' : '현재 예산편성 값을 불러왔습니다'}</strong>
+        <span>{budgetReview.source === 'document'
+          ? '문서 표 형식에 따라 잘못 읽을 수 있으니 원문과 대조한 뒤 수정해주세요.'
+          : budgetReview.source === 'saved' ? '필요하면 금액을 수정해 다시 확정할 수 있습니다.' : '협약서를 등록하지 않았거나 문서에서 금액을 읽지 못했습니다. 실제 최초협약 예산과 같은지 확인해주세요.'}</span></div></div>
+      <div className="agreement-budget-grid">
+        {cats.map((category) => <label key={category.id}><span>{category.name}</span><div className="money-input wide"><input
+          inputMode="numeric"
+          value={withCommas(budgetReview.values[category.id] ?? '')}
+          onChange={(event) => setBudgetReview({
+            ...budgetReview,
+            values: { ...budgetReview.values, [category.id]: digitsOnly(event.target.value) },
+          })}
+        /><b>원</b></div></label>)}
+      </div>
+      <div className="agreement-budget-total"><span>최초협약 예산 합계</span><strong>{formatWon(reviewTotal)}</strong></div>
+      <p className="wiz-hint"><AlertCircle /> 확정한 최초협약 예산은 이후 예산 변경과 별도로 보존되며, 변경 전·후 비교의 최초 기준이 됩니다.</p>
+      <div className="agreement-budget-actions"><button type="button" className="secondary" onClick={() => setBudgetReview(null)}>취소</button>
+        <button type="button" className="primary" onClick={confirmAgreementBudget}><Check /> 이상 없음 — 최초협약 예산 등록</button></div>
+    </div>
+  </div>}</>;
 }
 
 function ChangeManagement({ project, update }: { project: Project; update: (p: Project) => void }) {
   const pack = packFor(project);
   const cats = visibleCategories(pack, project);
+  // 변경을 반영할 시작월 후보 — 사업기간 안의 달. 승인 시 이 달부터 월별 계획을 새 예산에 맞춰 재배분한다.
+  const changeMonths = monthSequence(project.startDate, project.endDate);
+  const defaultEffectiveMonth = (() => {
+    const thisMonth = new Date().toISOString().slice(0, 7);
+    return changeMonths.includes(thisMonth) ? thisMonth : changeMonths[0] ?? '';
+  })();
   // 기본값은 승인 — 둘 중 엄격한 쪽이라 잘못 골라도 손해가 없다. 통보로 착각해 집행하면 문제가 된다.
   const [changeType, setChangeType] = useState<ChangeType>('approval');
-  const [form, setForm] = useState({ from: cats[1]?.id ?? cats[0]?.id ?? '', to: cats[0]?.id ?? '', amount: '', reasonKey: REASON_TEMPLATES[0].key, reason: REASON_TEMPLATES[0].text });
+  const [form, setForm] = useState({ from: cats[1]?.id ?? cats[0]?.id ?? '', to: cats[0]?.id ?? '', amount: '', effectiveMonth: defaultEffectiveMonth, monthlyPlanChangeMode: 'preserve' as 'preserve' | 'restart', reasonKey: REASON_TEMPLATES[0].key, reason: REASON_TEMPLATES[0].text });
   const [planFile, setPlanFile] = useState<{ id: string; name: string } | null>(null);
   const [uploadingPlan, setUploadingPlan] = useState(false);
   // 공문 사유는 격식을 갖춰 써야 해서 부담이 크다 — 한두 줄만 적으면 연구행정 문체로 늘려 쓴다.
@@ -2231,6 +2385,8 @@ function ChangeManagement({ project, update }: { project: Project; update: (p: P
     update(requestChange(project, {
       fromCategoryId: form.from, toCategoryId: form.to, amount,
       reasonKey: form.reasonKey, reason: form.reason, changeType,
+      effectiveMonth: form.effectiveMonth || undefined,
+      monthlyPlanChangeMode: form.monthlyPlanChangeMode,
       planFileId: planFile?.id, planFileName: planFile?.name,
     }, new Date().toISOString()));
     setForm({ ...form, amount: '' });
@@ -2239,9 +2395,23 @@ function ChangeManagement({ project, update }: { project: Project; update: (p: P
 
   const approve = (change: BudgetChange) => {
     const notify = typeOf(change) === 'notification';
+    const nextBudgets = applyTransfer(project.budgets, change.fromCategoryId, change.toCategoryId, change.amount);
+    if (change.effectiveMonth) {
+      const invalid = validateMonthlyRedistribution(pack, project, { ...project, budgets: nextBudgets }, [change.fromCategoryId, change.toCategoryId], change.effectiveMonth, change.monthlyPlanChangeMode ?? 'preserve');
+      if (invalid) {
+        alert(`${categoryOf(pack, invalid.categoryId).name}의 적용월 이전 계획 ${formatWon(invalid.fixedPlan)}이 변경 후 예산 ${formatWon(invalid.nextBudget)}을 초과합니다.\n변경 금액이나 적용월을 조정해주세요.`);
+        return;
+      }
+    }
     const note = window.prompt(notify ? '통보 공문 번호나 발송일을 적어두시겠어요? (선택)' : '승인 내용을 적어두시겠어요? (선택 — 승인 공문 번호 등)', '') ?? undefined;
-    if (!confirm(`${categoryOf(pack, change.fromCategoryId).name} → ${categoryOf(pack, change.toCategoryId).name} ${formatWon(change.amount)}\n\n${notify ? '통보를 마친 것으로 처리하면' : '승인 처리하면'} 지금 예산에 반영되고 편성 확정이 풀립니다. 계속할까요?`)) return;
-    update(approveChange(project, change.id, new Date().toISOString(), note || undefined));
+    // 적용월이 있으면 그 달부터 월별 집행계획을 새 예산에 맞춰 다시 나눈다는 것을 승인 전에 알린다.
+    const monthNote = change.effectiveMonth
+      ? (() => { const [y, mm] = change.effectiveMonth!.split('-'); return change.monthlyPlanChangeMode === 'restart'
+        ? `\n${y}년 ${Number(mm)}월 이전 계획은 0원이 되고, 변경 후 예산 전체가 적용월부터 다시 나뉩니다.`
+        : `\n월별 집행계획은 ${y}년 ${Number(mm)}월부터 새 예산에 맞춰 다시 나뉩니다 (이전 달은 유지).`; })()
+      : '';
+    if (!confirm(`${categoryOf(pack, change.fromCategoryId).name} → ${categoryOf(pack, change.toCategoryId).name} ${formatWon(change.amount)}\n\n${notify ? '통보를 마친 것으로 처리하면' : '승인 처리하면'} 변경예산이 집행·증빙에 즉시 반영됩니다.${monthNote} 계속할까요?`)) return;
+    update(approveChange(project, change.id, new Date().toISOString(), note || undefined, pack));
   };
   const reject = (change: BudgetChange) => {
     const notify = typeOf(change) === 'notification';
@@ -2330,6 +2500,12 @@ function ChangeManagement({ project, update }: { project: Project; update: (p: P
       </div>
       <div className="transfer-row"><label>보내는 비목<select value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })}>{cats.map((c) => <option value={c.id} key={c.id}>{c.name}</option>)}</select><small>현재 {formatWon(source)}</small></label><div className="transfer-icon"><ArrowRight /></div><label>받는 비목<select value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })}>{cats.map((c) => <option value={c.id} key={c.id}>{c.name}</option>)}</select></label></div>
       <label>이동 금액<div className="money-input wide"><input required inputMode="numeric" value={withCommas(form.amount)} onChange={(e) => setForm({ ...form, amount: digitsOnly(e.target.value) })} placeholder="0" /><b>원</b></div></label>
+      {/* 승인 시 이 달부터 월별 집행계획을 새 예산에 맞춰 재배분한다 — 이전 달은 이미 집행·확정된 것으로 보아 그대로 둔다. */}
+      {changeMonths.length > 0 && <label>변경 적용월<select value={form.effectiveMonth} onChange={(e) => setForm({ ...form, effectiveMonth: e.target.value })}>{changeMonths.map((m) => { const [y, mm] = m.split('-'); return <option key={m} value={m}>{y}년 {Number(mm)}월</option>; })}</select><small>선택한 달을 기준으로 아래 방식에 따라 월별 계획을 다시 계산합니다.</small></label>}
+      {changeMonths.length > 0 && <label>이전 월 계획 처리<select value={form.monthlyPlanChangeMode} onChange={(e) => setForm({ ...form, monthlyPlanChangeMode: e.target.value as 'preserve' | 'restart' })}>
+        <option value="preserve">이전 계획 유지 — 적용월 이후만 재계산</option>
+        <option value="restart">적용월부터 새로 계산 — 이전 달은 0원</option>
+      </select><small>{form.monthlyPlanChangeMode === 'restart' ? '변경 후 비목 예산 전체를 적용월부터 사업 종료월까지 나눕니다.' : '적용월 이전 달의 기존 계획은 그대로 두고 남은 예산만 다시 나눕니다.'}</small></label>}
       {form.from === form.to && <p className="field-error"><AlertCircle /> 서로 다른 비목을 선택해주세요.</p>}
       {limitError && <p className="field-error"><AlertCircle /> {limitError} 신청할 수 없습니다.</p>}
       <label>변경 사유 템플릿<select value={form.reasonKey} onChange={(e) => { const template = REASON_TEMPLATES.find((t) => t.key === e.target.value)!; setForm({ ...form, reasonKey: template.key, reason: template.text }); }}>{REASON_TEMPLATES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}</select></label>

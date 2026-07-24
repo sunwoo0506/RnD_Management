@@ -90,7 +90,7 @@ svg { width: 18px; height: 18px; flex: none; }
 .header-actions { display: flex; align-items: center; gap: 10px; }.icon-button { border: 0; background: transparent; color: var(--muted-2); width: 36px; height: 36px; border-radius: var(--r-pill); display: grid; place-items: center; margin-right: 4px; }.icon-button:hover { background: #f9eefe; color: var(--primary); }
 .avatar { width: 34px; height: 34px; display: grid; place-items: center; background: #f5e4fd; color: var(--primary-deep); border-radius: var(--r-pill); font-weight: 400; font-size: 13px; }
 .user-meta { display: grid; }.user-meta strong { font-size: 13px; }.user-meta span { color: var(--muted); font-size: 12.5px; }
-.page-content { max-width: 1280px; margin: 0 auto; padding: 36px 44px 72px; }
+.page-content { max-width: 1520px; margin: 0 auto; padding: 24px 28px 60px; }
 /* 총괄 히어로 — display-lg(32px·300·-0.64px). 뒤에는 그라디언트 메시 워시 */
 .welcome { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
 .welcome span { color: var(--muted-2); font-size: 13px; }.welcome h2 { margin: 6px 0 0; font-size: 32px; font-weight: 700; line-height: 1.25; letter-spacing: -.256px; }
@@ -423,6 +423,19 @@ input[type='checkbox'], input[type='radio'] { accent-color: var(--primary); }
 
 /* ---- 예산 집행 현황 (비목·세목 × 월 매트릭스) ---- */
 .spend-dashboard { margin-bottom: 16px; }
+.spend-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.spend-budget-history { margin: 0 24px 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #fbfaf8; }
+.spend-budget-history > p { margin: 0 0 10px; display: grid; gap: 2px; font-size: 13px; }
+.spend-budget-history > p span { color: var(--muted); font-size: 12px; }
+.spend-budget-history > div { display: grid; gap: 6px; }
+.spend-budget-history article { display: grid; grid-template-columns: 74px minmax(180px, 1fr) 120px 90px; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 8px; background: white; font-size: 12px; }
+.spend-budget-history article > span { color: var(--primary); font-weight: 700; }
+.spend-budget-history article > b { text-align: right; }
+.spend-budget-history article > small { color: var(--muted); text-align: right; }
+@media (max-width: 700px) {
+  .spend-budget-history article { grid-template-columns: 1fr auto; }
+  .spend-budget-history article > span, .spend-budget-history article > small { text-align: left; }
+}
 .month-picker { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 24px 14px; }
 .month-picker > span { font-size: 13px; font-weight: 400; color: var(--muted); }
 .month-picker .period { font-style: normal; font-size: 12px; font-weight: 700; color: var(--primary); background: var(--canvas-cream); border: 1px solid #e2d3bf; padding: 3px 10px; border-radius: 90px; }
@@ -436,10 +449,18 @@ input[type='checkbox'], input[type='radio'] { accent-color: var(--primary); }
 /* 색은 중립(흰 바탕 + 회색 선)으로 두고, 오버진은 "지금 보고 있는 줄" 한 곳에만 쓴다.
    표 전체를 물들이면 어떤 줄이 중요한지 구분이 사라진다. */
 .spend-matrix thead th { color: var(--muted); font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; background: white; border-bottom: 1.5px solid #d6d6d6; }
+.spend-matrix thead th > small { display: block; margin-top: 3px; color: #927c61; font-size: 10px; font-weight: 600; letter-spacing: 0; text-transform: none; }
 .spend-matrix th.month-group { text-align: center; border-left: 1.5px solid #e0e0e0; color: var(--ink); font-size: 15px; font-weight: 700; text-transform: none; letter-spacing: 0; background: #faf7f2; border-bottom: 1px solid #e6e0d6; }
 /* 비목 이름은 가로로 스크롤해도 자리를 지킨다. 겹쳐 지나가는 칸을 가려야 하므로 배경은 불투명해야 한다. */
 .spend-matrix .col-name { position: sticky; left: 0; z-index: 1; text-align: left; background: white; min-width: 190px; }
 .spend-matrix thead .col-name { background: white; color: var(--muted); }
+.spend-matrix .budget-baseline { background: #faf7f2; color: #7a684e; }
+.spend-matrix thead .budget-baseline { color: #7a684e; }
+.spend-matrix tbody tr.cat:hover > td.budget-baseline { background: #f5f0e8; }
+.spend-matrix tbody tr.sub > td.budget-baseline,
+.spend-matrix tbody tr.split-row > td.budget-baseline { background: #f7f4ef; color: #9a9184; }
+.spend-matrix tbody tr.on > td.budget-baseline { background: #f2e9f2; }
+.spend-matrix tfoot td.budget-baseline { background: #f3ecdf; }
 
 /* 비목 행 — 그룹의 머리. 위에 선을 둘러 비목끼리 갈라 보이게 한다. */
 .spend-matrix tbody tr.cat > td { border-top: 1px solid #e6e6e6; font-weight: 400; color: var(--ink); background: white; }
@@ -999,10 +1020,17 @@ mark.hl.current { background: #e3643e; color: white; box-shadow: 0 0 0 2px #b34e
 .cap-alert-annual strong { color: #471d4c; }
 .cap-alert-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cap-alert-actions small { color: var(--muted); font-size: 12px; margin-left: 4px; }
+/* 한도·현재값 말고 원하는 금액을 직접 넣는 입력 — 금액 칸 + 원 + 적용 버튼 */
+.cap-manual { display: inline-flex; align-items: center; gap: 6px; }
+.cap-manual input { width: 150px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; font-variant-numeric: tabular-nums; text-align: right; background: #fbfbfd; }
+.cap-manual input:focus { outline: none; border-color: #b57116; background: white; }
+.cap-manual span { font-size: 13px; color: var(--muted); }
 @media (max-width: 900px) {
   .cap-alert-figures { gap: 12px; }
   .cap-diff { margin-left: 0; text-align: left; }
   .cap-alert-actions small { margin-left: 0; flex: 1 1 100%; }
+  .cap-manual { flex: 1 1 100%; }
+  .cap-manual input { flex: 1; width: auto; }
 }
 .cap-cell { display: grid; gap: 2px; font-size: 12px; color: #667087; line-height: 1.5; }
 .cap-cell strong { font-size: 13px; color: var(--ink); font-weight: 400; }
@@ -1373,6 +1401,24 @@ input[type='number'], .labor-rate input { border-radius: var(--r-pill); text-ali
 .agreement-row strong { display: block; font-size: 13px; }
 .agreement-row small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; }
 .agreement-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.agreement-budget-status { margin: 0 24px 22px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: #faf8f4; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.agreement-budget-status > div { display: grid; gap: 4px; }
+.agreement-budget-status span { color: var(--muted); font-size: 13px; }
+.agreement-budget-modal { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; background: white; border-radius: 18px; padding: 24px; box-shadow: 0 24px 70px #07192f66; }
+.agreement-budget-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.agreement-budget-modal-head h3 { margin: 4px 0 0; font-size: 22px; }
+.agreement-budget-modal-head .icon-button { font-size: 24px; line-height: 1; }
+.agreement-budget-grid { display: grid; gap: 10px; margin-top: 16px; }
+.agreement-budget-grid label { display: grid; grid-template-columns: minmax(150px, 1fr) minmax(220px, 280px); align-items: center; gap: 16px; font-weight: 700; }
+.agreement-budget-total { margin-top: 16px; padding: 14px 16px; border-radius: 12px; background: #f6f0f6; display: flex; align-items: center; justify-content: space-between; }
+.agreement-budget-total strong { color: var(--purple); font-size: 20px; }
+.agreement-budget-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+@media (max-width: 640px) {
+  .agreement-budget-status { align-items: stretch; flex-direction: column; }
+  .agreement-budget-grid label { grid-template-columns: 1fr; gap: 6px; }
+  .agreement-budget-actions { flex-direction: column-reverse; }
+  .agreement-budget-actions button { width: 100%; }
+}
 /* 신청 중인 변경 — 예산에 아직 안 잡혀 있다는 것이 한눈에 보여야 한다 */
 .pending-panel { border-color: #f0e0cd; }
 .pending-list { padding: 0 24px; display: grid; gap: 8px; }
