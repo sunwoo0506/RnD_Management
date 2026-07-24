@@ -3,6 +3,7 @@ import nrd2026Packs from './rulepacks/nrd2026.json';
 import tips2026Packs from './rulepacks/tips2026.json';
 import prestartup2026Packs from './rulepacks/prestartup2026.json';
 import didimdol2026Packs from './rulepacks/didimdol2026.json';
+import didimdolGlobal2026Packs from './rulepacks/didimdol-global2026.json';
 import type { BudgetCategoryId, BudgetItem, PackAllowedItem, PackApproval, PackArticle, PackCategory, PackEvidenceRule, PackOverlay, PackRule, PackSource, Participant, PaymentMethod, Project, RulePack } from './types';
 
 export const RULES_EFFECTIVE_DATE = '2026-07-19';
@@ -40,7 +41,7 @@ const LEGACY_PACK: RulePack = {
 // ---- 팩 로더 ----
 // 번들에 들어 있는 팩. Supabase가 없거나 아직 응답하지 않았을 때 쓰는 기본값이며, 같은 id의
 // 팩이 규정DB(Supabase)에서 오면 그쪽이 이긴다 — 규정이 개정돼도 재배포 없이 반영되도록.
-export const PACKS: RulePack[] = [...(packsData as RulePack[]), ...(nrd2026Packs as RulePack[]), ...(tips2026Packs as RulePack[]), ...(prestartup2026Packs as RulePack[]), ...(didimdol2026Packs as RulePack[]), LEGACY_PACK];
+export const PACKS: RulePack[] = [...(packsData as RulePack[]), ...(nrd2026Packs as RulePack[]), ...(tips2026Packs as RulePack[]), ...(prestartup2026Packs as RulePack[]), ...(didimdol2026Packs as RulePack[]), ...(didimdolGlobal2026Packs as RulePack[]), LEGACY_PACK];
 // 규정 DB에서 만든 팩으로 대체된 예시 팩 — 기존 과제가 계속 열리도록 남기되 새 과제에서는 고를 수 없다.
 const SUPERSEDED_PACK_IDS = ['legacy-rnd', 'prestartup'];
 

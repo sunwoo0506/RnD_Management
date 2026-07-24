@@ -1,0 +1,62 @@
+{
+  "package_name": "gwayeon_startup_growth_didimdol_global_2026_214",
+  "document_version": "STARTUP_GROWTH_DIDIMDOL_GLOBAL_2026_214",
+  "title": "2026년도 창업성장기술개발사업(디딤돌) 제3차 시행계획 공고 — 도약(글로벌 R&D)",
+  "notice_number": "중소벤처기업부 공고 제2026-214호",
+  "issuer": "중소벤처기업부",
+  "document_type": "PROGRAM_ANNOUNCEMENT",
+  "revision_type": "제3차 시행계획",
+  "effective_from": "2026-03-26",
+  "special_effective_dates": [],
+  "base_document_version": "NRD_COST_STANDARD_2026_38",
+  "generated_at": "2026-07-24",
+  "source_files": [
+    "(공고_제2026-214호)_2026년도 창업성장기술개발사업(디딤돌) 제3차 시행계획 공고.hwpx",
+    "[붙임 2-1] 디딤돌(도약_글로벌 R&D) 세부 지원내용.hwp",
+    "1. 연구개발계획서_도약(글로벌 R&D).hwp",
+    "4. 외부기술도입비 현물산정 신청서.hwp",
+    "2025년+중소기업기술개발+지원사업+관리지침+개정(안)+본문.hwp",
+    "2025년+중소기업기술개발+지원사업+관리지침+개정(안)+공통서식.hwp"
+  ],
+  "source_file_sha256": {
+    "공고": "3e3dfe4342a2b56129f09f9175203cff6f0f3f3cca31f684baa6fdd98ba413d4",
+    "글로벌_RnD_세부지원": "0774af78b310cb2d65b0337eda52445f10e3ca008d5214e909bc7ffbe69d3709",
+    "연구개발계획서": "d9b1db649d9828b06f5ca64f04b3bbaa63637a1dfdae40d58763c71930659330",
+    "외부기술도입비_현물산정_신청서": "2d7bcee1aea8f8d65fb5f33a2a8327a1e40478f652a989737746c9d0c10c272a",
+    "관리지침_본문": "9eb7312de8f8325e85006ee95af135beea27858179f323317413e6c89a776064",
+    "관리지침_공통서식": "c9529c26070ee79adca21c6d4c1c5ce9f08da4799fd99cd8155ac9e6a5599737"
+  },
+  "extraction_scope": "공고 지원조건 / 붙임2-1 지원기간·지원규모·주요 연구개발비 산정기준 / 연구개발계획서·공통서식의 연차별 비목 구조 / 2025 관리지침의 산정·관리·사용·변경승인·증빙·정산 기준",
+  "notes": "글로벌 R&D 트랙의 고유 규칙과 제공된 2025 관리지침·공통서식에서 직접 확인되는 공통 비목·인정항목·상한·승인·집행·증빙 규칙을 함께 추출했다. TIPS 패키지는 산출물 구조와 데이터 깊이만 참고했으며 TIPS 전용 투자·자격·기술료 규칙은 포함하지 않았다. 제공 문서에서 확인되지 않은 연 1억원 한도와 사업화 지원비 지급기한·미계상 제재는 활성 규칙에서 제외하고 review_issues.json에 남겼다.",
+  "counts": {
+    "categories": 25,
+    "budget_guides": 8,
+    "allowed_items": 29,
+    "limit_rules": 15,
+    "regulation_rules": 19,
+    "source_text": 9,
+    "review_issues": 2
+  },
+  "validation": {
+    "json_parse": "PASS",
+    "source_quote_required": "PASS",
+    "source_reference_resolution": "PASS",
+    "review_workbook": "PASS",
+    "app_build": "PASS"
+  },
+  "pack_meta": {
+    "guideline": "창업성장기술개발사업(디딤돌) 도약 글로벌 R&D (2026 공고 제2026-214호)",
+    "agency": "중소벤처기업부 · 중소기업기술정보진흥원",
+    "reference_url": "https://www.smtech.go.kr",
+    "output": "didimdol-global2026.json",
+    "scopes": [
+      {
+        "scope": "FOR_PROFIT",
+        "id": "didimdol-global2026",
+        "name": "창업성장기술개발사업 디딤돌 도약 글로벌 R&D (2026)",
+        "org_type": "영리기관(창업기업)"
+      }
+    ],
+    "program_name": "창업성장기술개발사업(디딤돌) 도약 글로벌 R&D"
+  }
+}

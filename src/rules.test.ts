@@ -4,7 +4,7 @@ import type { Project, RulePack } from './types';
 
 describe('규정 팩 로더', () => {
   it('규정 DB 팩(국가연구개발비·팁스·예비창업패키지)과 예시 팩을 함께 제공한다', () => {
-    expect(PACKS.map((pack) => pack.id).sort()).toEqual(['didimdol2026', 'legacy-rnd', 'nrd2026-forprofit', 'nrd2026-nonprofit', 'prestartup', 'prestartup2026', 'rnd-forprofit', 'rnd-govt', 'tips2026-deeptech', 'tips2026-general']);
+    expect(PACKS.map((pack) => pack.id).sort()).toEqual(['didimdol-global2026', 'didimdol2026', 'legacy-rnd', 'nrd2026-forprofit', 'nrd2026-nonprofit', 'prestartup', 'prestartup2026', 'rnd-forprofit', 'rnd-govt', 'tips2026-deeptech', 'tips2026-general']);
   });
 
   it('규정 DB로 대체된 예시 팩은 새 과제 선택 목록에서 빠진다', () => {

@@ -1,0 +1,92 @@
+[
+ {
+  "profile_code": "DDG_FUNDING",
+  "category_code": "ALL",
+  "display_name": "연구개발비 구성",
+  "usage_summary": "정부지원연구개발비와 기관부담연구개발비(현금·현물)로 구성.",
+  "limit_text": "정부지원연구개발비는 연구개발비의 75% 이내",
+  "limit_detail_text": "기관부담연구개발비는 연구개발비의 25% 이상이며, 전체 기관부담연구개발비(현금+현물) 중 10% 이상은 현금으로 부담. 지원한도는 정부지원연구개발비 최대 2억원 이내, 지원기간 최대 1년 6개월.",
+  "source_articles": ["붙임2-1 지원규모", "붙임2-1 지원기간 및 한도"],
+  "effective_from": "2026-03-26",
+  "display_order": 5
+ },
+ {
+  "profile_code": "DDG_LABOR",
+  "category_code": "DIRECT_LABOR",
+  "display_name": "인건비",
+  "usage_summary": "참여연구자에게 지급하는 인건비. 기존 인력과 신규채용으로 나뉜다.",
+  "limit_text": "별도 총액 상한 없음",
+  "limit_detail_text": "기존 인력은 현물계상이 원칙이나 창업 7년 이내(신산업 창업 분야는 10년 이내) 기업은 현금 계상 가능. 신규채용 참여연구자는 중소기업인 경우 현금 계상 가능. 참여연구자별 총 인건비 계상률은 월 100%를 초과할 수 없다 — 참여율 기준이며 비목 금액 상한은 아니다.",
+  "source_articles": ["붙임2-1 주요 연구개발비 산정기준"],
+  "effective_from": "2026-03-26",
+  "display_order": 110
+ },
+ {
+  "profile_code": "DDG_EQUIPMENT",
+  "category_code": "DIRECT_EQUIPMENT",
+  "display_name": "연구시설·장비비",
+  "usage_summary": "연구시설·장비의 구입·설치·임차 비용.",
+  "limit_text": "별도 총액 상한 없음",
+  "limit_detail_text": "이 공고가 별도로 정한 사항이 없어 「국가연구개발사업 연구개발비 사용 기준」을 따른다.",
+  "source_articles": ["붙임2-1 주요 연구개발비 산정기준"],
+  "effective_from": "2026-03-26",
+  "display_order": 120
+ },
+ {
+  "profile_code": "DDG_MATERIAL",
+  "category_code": "DIRECT_MATERIAL",
+  "display_name": "연구재료비",
+  "usage_summary": "시약·재료 구입비와 시험제품 제작비.",
+  "limit_text": "별도 총액 상한 없음",
+  "limit_detail_text": "이 공고가 별도로 정한 사항이 없어 「국가연구개발사업 연구개발비 사용 기준」을 따른다.",
+  "source_articles": ["붙임2-1 주요 연구개발비 산정기준"],
+  "effective_from": "2026-03-26",
+  "display_order": 130
+ },
+ {
+  "profile_code": "DDG_ACTIVITY",
+  "category_code": "DIRECT_ACTIVITY",
+  "display_name": "연구활동비",
+  "usage_summary": "출장비, 외부 전문기술 활용비, 지식재산 창출비, 회의비, 소프트웨어 활용비, 연구실운영비, 연구인력 지원비 등 연구활동에 드는 비용.",
+  "limit_text": "세부 항목별 한도 적용",
+  "limit_detail_text": "외부 전문기술 활용비는 직접비(현물 포함)의 40% 이내. 글로벌 R&D 과제는 사업화 지원 프로그램 비용 200만원을 필수 계상해야 한다. 출장비는 기관 여비기준 또는 실제 지출 증빙에 따르고 회의 식비는 외부인 참석과 사전 내부결재가 필요하다. 영리기관의 연구실 소모성 비용은 제한되며 사무용 기기·소프트웨어와 환경유지비는 계획 인정 또는 승인 시 사용할 수 있다.",
+  "source_articles": ["붙임2-1 주요 연구개발비 산정기준"],
+  "effective_from": "2026-03-26",
+  "display_order": 140
+ },
+ {
+  "profile_code": "DDG_INCENTIVE",
+  "category_code": "DIRECT_INCENTIVE",
+  "display_name": "연구수당",
+  "usage_summary": "참여연구자에게 지급하는 수당.",
+  "limit_text": "수정인건비 합의 20% 이내",
+  "limit_detail_text": "수정인건비 합 = 현금·현물 인건비 + 학생인건비 + 미지급 인건비 (연구근접지원인력 인건비 제외). 협약 체결 당시 계상한 금액보다 증액하여 계상할 수 없다.",
+  "source_articles": ["붙임2-1 주요 연구개발비 산정기준"],
+  "effective_from": "2026-03-26",
+  "display_order": 150
+ },
+ {
+  "profile_code": "DDG_SUBCONTRACT",
+  "category_code": "DIRECT_SUBCONTRACT",
+  "display_name": "위탁연구개발비",
+  "usage_summary": "과제의 일부를 위탁연구개발기관에 위탁하는 비용.",
+  "limit_text": "직접비(현물 포함, 위탁·국제공동·부담비 제외)의 40% 이내",
+  "limit_detail_text": "주관연구개발기관 직접비(현물 포함)에서 위탁연구개발비·국제공동연구개발비·연구개발부담비를 제외한 금액이 기준이다.",
+  "source_articles": ["붙임2-1 주요 연구개발비 산정기준"],
+  "effective_from": "2026-03-26",
+  "display_order": 160
+ },
+ {
+  "profile_code": "DDG_INDIRECT",
+  "category_code": "INDIRECT",
+  "display_name": "간접비",
+  "usage_summary": "인력지원비·연구지원비·성과활용지원비 등 연구개발기관의 연구지원 간접비.",
+  "limit_text": "직접비(미지급인건비·현물·국제공동·위탁 제외)의 10% 이내 (영리기관)",
+  "limit_detail_text": "영리기관은 직접비(미지급인건비·현물·국제공동연구개발비·위탁연구개발비 제외)의 10% 이내. 전체 연구개발기간의 간접비 총액 증액은 전문기관 사전승인이 필요하다.",
+  "source_articles": ["붙임2-1 주요 연구개발비 산정기준"],
+  "effective_from": "2026-03-26",
+  "display_order": 170
+ }
+]
+
+
